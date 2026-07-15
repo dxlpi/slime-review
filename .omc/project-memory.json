@@ -110,8 +110,14 @@
     },
     {
       "path": "slime_rag/sources.py",
-      "accessCount": 37,
-      "lastAccessed": 1784097552945,
+      "accessCount": 38,
+      "lastAccessed": 1784100633409,
+      "type": "file"
+    },
+    {
+      "path": "slime_rag/pipeline.py",
+      "accessCount": 29,
+      "lastAccessed": 1784100554726,
       "type": "file"
     },
     {
@@ -121,9 +127,9 @@
       "type": "file"
     },
     {
-      "path": "slime_rag/pipeline.py",
-      "accessCount": 27,
-      "lastAccessed": 1784099365368,
+      "path": "sql/schema.sql",
+      "accessCount": 15,
+      "lastAccessed": 1784100547436,
       "type": "file"
     },
     {
@@ -133,33 +139,27 @@
       "type": "file"
     },
     {
-      "path": "sql/schema.sql",
-      "accessCount": 12,
-      "lastAccessed": 1784098633193,
-      "type": "file"
-    },
-    {
       "path": "data/layer1_fixture.json",
-      "accessCount": 12,
-      "lastAccessed": 1784098797134,
+      "accessCount": 14,
+      "lastAccessed": 1784100554407,
       "type": "file"
     },
     {
       "path": "slime_rag/consolidated_view.py",
+      "accessCount": 13,
+      "lastAccessed": 1784100547071,
+      "type": "file"
+    },
+    {
+      "path": "app/ui.py",
       "accessCount": 11,
-      "lastAccessed": 1784098806650,
+      "lastAccessed": 1784100446644,
       "type": "file"
     },
     {
       "path": "slime_rag/bias.py",
       "accessCount": 10,
       "lastAccessed": 1784093983860,
-      "type": "file"
-    },
-    {
-      "path": "app/ui.py",
-      "accessCount": 10,
-      "lastAccessed": 1784098843585,
       "type": "file"
     },
     {
@@ -187,6 +187,12 @@
       "type": "file"
     },
     {
+      "path": "slime_rag/layer1.py",
+      "accessCount": 8,
+      "lastAccessed": 1784100547741,
+      "type": "file"
+    },
+    {
       "path": "slime_rag/search.py",
       "accessCount": 7,
       "lastAccessed": 1784029811244,
@@ -196,12 +202,6 @@
       "path": "slime_rag/db.py",
       "accessCount": 7,
       "lastAccessed": 1784080210023,
-      "type": "file"
-    },
-    {
-      "path": "slime_rag/layer1.py",
-      "accessCount": 6,
-      "lastAccessed": 1784098702026,
       "type": "file"
     },
     {
@@ -334,6 +334,72 @@
       "path": ".claude/ai-readiness-map.html",
       "accessCount": 1,
       "lastAccessed": 1784100155424,
+      "type": "file"
+    },
+    {
+      "path": "slime_rag/CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100425460,
+      "type": "file"
+    },
+    {
+      "path": "app/CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100441228,
+      "type": "file"
+    },
+    {
+      "path": "eval/CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100459163,
+      "type": "file"
+    },
+    {
+      "path": "sql/CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100480178,
+      "type": "file"
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100519294,
+      "type": "file"
+    },
+    {
+      "path": "MEMORY.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100567529,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100577607,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0001-embedding-and-vectorstore.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100586596,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0002-source-bias-first-class.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100594833,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0003-ig-businessdiscovery-fixture.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100603163,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0004-promo-gate-llm-cascade.md",
+      "accessCount": 1,
+      "lastAccessed": 1784100613855,
       "type": "file"
     }
   ],

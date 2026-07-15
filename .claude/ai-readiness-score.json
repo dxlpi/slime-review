@@ -7,7 +7,7 @@
     "rubric_version": "v2-100pt",
     "modules_total": 5,
     "context_files_total": 9,
-    "large_files_300plus": 3
+    "large_files_300plus": 4
   },
   "total": 85,
   "grade": "AI-Ready",
@@ -156,7 +156,7 @@
       {
         "path": "/Users/heather/Desktop/SlimeReview/eval",
         "rel": "eval",
-        "code_files": 3,
+        "code_files": 5,
         "has_context": true,
         "context_file": "/Users/heather/Desktop/SlimeReview/eval/CLAUDE.md",
         "context_kind": "CLAUDE.md"
@@ -198,6 +198,10 @@
       {
         "path": "eval/test_bias.py",
         "lines": 341
+      },
+      {
+        "path": "slime_rag/consolidated_view.py",
+        "lines": 317
       }
     ]
   }

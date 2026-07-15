@@ -1,0 +1,151 @@
+{
+  "slime_types": [
+    "폼볼",
+    "촉감류(점토)",
+    "디폼",
+    "난사",
+    "눈꽃",
+    "지글리",
+    "크런치",
+    "빈백",
+    "클라우드",
+    "샤베트",
+    "클리어",
+    "버글리",
+    "젤라또"
+  ],
+  "markets": [
+    {
+      "market": "봄슬라임",
+      "handle": "bom__slime",
+      "handles_alt": [],
+      "market_word": "봄",
+      "choseong": "ㅂ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "웨이즈슬라임",
+      "handle": "wayz.slime",
+      "handles_alt": [],
+      "market_word": "웨이즈",
+      "choseong": "ㅇㅇㅈ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "진통제슬라임",
+      "handle": "slime_painkiller",
+      "handles_alt": [],
+      "market_word": "진통제",
+      "choseong": "ㅈㅌㅈ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "베이퍼슬라임",
+      "handle": "invaporslimephase",
+      "handles_alt": [],
+      "market_word": "베이퍼",
+      "choseong": "ㅂㅇㅍ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "머머슬라임",
+      "handle": "from.murmurslime",
+      "handles_alt": [
+        "murmurslime"
+      ],
+      "market_word": "머머",
+      "choseong": "ㅁㅁ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "푸딩슬라임",
+      "handle": "sweetpuddingslime",
+      "handles_alt": [],
+      "market_word": "푸딩",
+      "choseong": "ㅍㄷ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "빈짱슬라임",
+      "handle": "vinzzang_slime",
+      "handles_alt": [],
+      "market_word": "빈짱",
+      "choseong": "ㅂㅉ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "모모네슬라임",
+      "handle": "momone.slime",
+      "handles_alt": [],
+      "market_word": "모모네",
+      "choseong": "ㅁㅁㄴ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "연찌슬라임",
+      "handle": "yeonzzi_slime",
+      "handles_alt": [],
+      "market_word": "연찌",
+      "choseong": "ㅇㅉ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "캐치슬라임",
+      "handle": "catchslime",
+      "handles_alt": [],
+      "market_word": "캐치",
+      "choseong": "ㅋㅊ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "예찬슬라임",
+      "handle": "yeahchan_slime",
+      "handles_alt": [],
+      "market_word": "예찬",
+      "choseong": "ㅇㅊ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "슬라임지나",
+      "handle": "slime_gina_",
+      "handles_alt": [],
+      "market_word": "지나",
+      "choseong": "ㅈㄴ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    },
+    {
+      "market": "늪지슬라임",
+      "handle": "swampylandslime",
+      "handles_alt": [],
+      "market_word": "늪지",
+      "choseong": "ㄴㅈ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": []
+    }
+  ]
+}

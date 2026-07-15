@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\".venv/bin/python - <<'PY' 2>/dev/null\\nimport logging\\nlogging.basicConfig(level=logging.WARNING)\\nfrom slime_rag import pipeline, search\\n\\ncounts = pipeline.setup(reset=True)\\nprint(\\\"==...",
+  "error": "Exit code 143\nCommand timed out after 5m 0s",
+  "timestamp": "2026-07-14T18:30:15.877Z",
+  "retry_count": 1
+}

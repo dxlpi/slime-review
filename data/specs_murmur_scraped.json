@@ -1,0 +1,111 @@
+{
+  "_note": "@from.murmurslime 프로필 스크랩→extract_spec 결과(2026-07-15). market/source/scraped_at provenance 포함. pipeline 검증용 실데이터. 캡션 미기재분은 null(명시된 것만). [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵] [재추출: 제품명=해시태그, 비매품 스킵]",
+  "market": "머머",
+  "scraped_at": "2026-07-15",
+  "n_specs": 7,
+  "specs": [
+    {
+      "product": "첵스초코딸기빙수_딸기",
+      "scent": "딸기우유",
+      "base_combo": "아마존 쁠루모 글루올 플레인",
+      "slime_type": "디폼",
+      "beads": [
+        "첵스 비즈"
+      ],
+      "evidence": "#첵스초코딸기빙수_딸기 / 딸기우유",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZwpPp9O7rd/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "키튼우유크림롤",
+      "scent": "에그노그",
+      "base_combo": "네추럴 아이올 컬스 플레인 솔리드",
+      "slime_type": "디폼",
+      "beads": [],
+      "evidence": "#키튼우유크림롤, 8mm 25g",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZt_qeOuJuA/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "아이스베리스무디",
+      "scent": "딸기요거트",
+      "base_combo": "아이뉴클 플로우 앨머스 점토 눈가루소량 솝소량",
+      "slime_type": "촉감류(점토)",
+      "beads": [
+        "딸기잼 시럽 동봉 파츠"
+      ],
+      "evidence": "#아이스베리스무디 / ... 딸기요거트",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZtiRnXOmtB/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "위즈캔디샵",
+      "scent": "코튼캔디",
+      "base_combo": "아이 글루올 플레인 택키",
+      "slime_type": "디폼",
+      "beads": [
+        "지렁이비즈"
+      ],
+      "evidence": "8mm 25g+지렁이비즈",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZtI5EeTot0/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "곰돌디핑프링글스",
+      "scent": "비스켓",
+      "base_combo": "엘머스 솔리드 아이올 플레인",
+      "slime_type": "디폼",
+      "beads": [
+        "감자칩비즈"
+      ],
+      "evidence": "#곰돌디핑프링글스 / 6mm 40g+...",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZtEbJnzi11/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "치치시리얼",
+      "scent": "요거트쿠키",
+      "base_combo": "네추럴+글루올+아이올+아마존+쁠루모",
+      "slime_type": "디폼",
+      "beads": [
+        "리본블럭"
+      ],
+      "evidence": "#치치시리얼 / 요거트쿠키",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZoF2_QTN1g/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    },
+    {
+      "product": "크림꼬끄카롱",
+      "scent": "솜사탕",
+      "base_combo": "쁠루모 플레인 플로우 글루올",
+      "slime_type": "디폼",
+      "beads": [
+        "별비즈"
+      ],
+      "evidence": "#크림꼬끄카롱 / 솜사탕",
+      "market": "머머",
+      "source_url": "https://www.instagram.com/p/DZjRbt_q90G/",
+      "source": "apify",
+      "scraped": true,
+      "scraped_at": "2026-07-15"
+    }
+  ]
+}

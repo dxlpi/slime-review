@@ -1,0 +1,23 @@
+# 로컬 pgvector — Phase 4 색인·검색용. `docker compose up -d` 로 기동.
+# 배포(Render 관리형 Postgres) 시 같은 schema.sql 을 적용하면 그대로 이전된다.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: slime_pg
+    environment:
+      POSTGRES_USER: slime
+      POSTGRES_PASSWORD: slime
+      POSTGRES_DB: slime_rag
+    ports:
+      - "55432:5432"   # 호스트 5432/5433 은 로컬 네이티브 Postgres 가 점유 → 55432 로 매핑
+    volumes:
+      - slime_pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slime -d slime_rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  slime_pgdata:

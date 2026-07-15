@@ -1,0 +1,19 @@
+# --- 수집·정제 (Phase 1) ---
+requests>=2.31
+beautifulsoup4>=4.12
+apify-client>=1.7         # 인스타 해시태그 스크래퍼(2층 유저후기) — actor run·dataset 페이지네이션
+
+# --- LLM·관측성 (Phase 2~) ---
+openai>=1.40
+python-dotenv>=1.0
+
+# --- 색인·검색 (Phase 4) ---
+torch>=2.6                # transformers 가 .bin 로드 시 요구(CVE-2025-32434). BGE-M3 가 .bin 배포라 필수.
+FlagEmbedding>=1.2        # BGE-M3 임베딩(한국어 + dense/sparse)
+psycopg[binary]>=3.1      # pgvector(Postgres)
+pgvector>=0.3
+kiwipiepy>=0.18           # 한국어 형태소 토큰화(하이브리드 키워드)
+rank-bm25>=0.2            # BM25
+
+# --- UI (Phase 6) ---
+streamlit>=1.36

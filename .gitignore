@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.egg-info/
+
+# Claude Code / OMC runtime artifacts (not project source)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.omc/sessions/

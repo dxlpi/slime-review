@@ -1,0 +1,75 @@
+{
+  "_note": "apify/instagram-hashtag-scraper 데이터셋 출력 샘플(손작성, 실제 필드 모양). 오프라인 매핑 테스트용 — API 미호출/무료. 저작권 회피 위해 캡션은 짧은 합성 예시.",
+  "items": [
+    {
+      "id": "3001",
+      "shortCode": "Cabc001",
+      "url": "https://www.instagram.com/p/Cabc001/",
+      "caption": "봄슬라임 허니푸냥이 후기! 말랑하고 향 진짜 좋아요 재구매각 #봄슬라임 #슬라임후기",
+      "ownerUsername": "slime_lover_kr",
+      "ownerFullName": "슬라임러버",
+      "hashtags": ["봄슬라임", "슬라임후기"],
+      "mentions": [],
+      "timestamp": "2026-07-01T09:12:00.000Z",
+      "likesCount": 152,
+      "commentsCount": 8,
+      "locationName": null
+    },
+    {
+      "id": "3002",
+      "shortCode": "Cabc002",
+      "url": "https://www.instagram.com/p/Cabc002/",
+      "caption": "빈짱 연유스무디 텍스처 미쳤다 쫀득쫀득 완전 취향저격 #빈짱슬라임 #슬라임",
+      "ownerUsername": "jelly_texture",
+      "ownerFullName": "젤리텍스처",
+      "hashtags": ["빈짱슬라임", "슬라임"],
+      "mentions": [],
+      "timestamp": "2026-07-02T14:03:00.000Z",
+      "likesCount": 89,
+      "commentsCount": 3,
+      "locationName": "Seoul, South Korea"
+    },
+    {
+      "id": "3002",
+      "shortCode": "Cabc002",
+      "url": "https://www.instagram.com/p/Cabc002/",
+      "caption": "빈짱 연유스무디 텍스처 미쳤다 쫀득쫀득 완전 취향저격 #빈짱슬라임 #슬라임",
+      "ownerUsername": "jelly_texture",
+      "ownerFullName": "젤리텍스처",
+      "hashtags": ["빈짱슬라임", "슬라임"],
+      "mentions": [],
+      "timestamp": "2026-07-02T14:03:00.000Z",
+      "likesCount": 89,
+      "commentsCount": 3,
+      "locationName": "Seoul, South Korea"
+    },
+    {
+      "id": "3003",
+      "shortCode": "Cabc003",
+      "url": "https://www.instagram.com/p/Cabc003/",
+      "caption": "ㅋㅋ",
+      "ownerUsername": "noise_acct",
+      "ownerFullName": "",
+      "hashtags": ["슬라임"],
+      "mentions": [],
+      "timestamp": "2026-07-03T00:00:00.000Z",
+      "likesCount": 1,
+      "commentsCount": 0,
+      "locationName": null
+    },
+    {
+      "id": "3004",
+      "shortCode": "Cabc004",
+      "url": "https://www.instagram.com/p/Cabc004/",
+      "caption": "",
+      "ownerUsername": "empty_caption",
+      "ownerFullName": "",
+      "hashtags": ["슬라임"],
+      "mentions": [],
+      "timestamp": "2026-07-04T00:00:00.000Z",
+      "likesCount": 0,
+      "commentsCount": 0,
+      "locationName": null
+    }
+  ]
+}

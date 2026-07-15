@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "entries": {
+    "466399dafa2d20f60587180bad0a07358eb7f2bce724df0ff682f038ad33f5ad": {
+      "last_emitted_at_ms": 1782704822460,
+      "message": "Read multiple files in parallel when possible for faster analysis."
+    },
+    "79a93d4a2f8f50b95f852280616242fee1855dc99a3c75211917f55e72e95fae": {
+      "last_emitted_at_ms": 1782704784229,
+      "message": "Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests)."
+    },
+    "92a5d8194828e6ebbfb6628252d3bf7be7edba8d55d815aea7baf5517d2eb360": {
+      "last_emitted_at_ms": 1782704774178,
+      "message": "Spawning agent: oh-my-claudecode:critic (inherit) | Task: Critic re-review for approval gate"
+    },
+    "a9e6334ee773c491b5265619ef32ef128f0aacecfd141b58cff1bbe700a90b43": {
+      "last_emitted_at_ms": 1782704494479,
+      "message": "Spawning agent: oh-my-claudecode:critic (inherit) | Task: Critic review of revised Phase 6 plan"
+    },
+    "26194a48118b5911cbddcf69fe350abd767e53c04f3e8166518df5724a4dbb66": {
+      "last_emitted_at_ms": 1782704223348,
+      "message": "Spawning agent: oh-my-claudecode:architect (inherit) | Task: Architect review of Phase 6 plan"
+    },
+    "ddf2aa7de398836a516025dc64703c024523aa9f5f2ffa425054c34d712116aa": {
+      "last_emitted_at_ms": 1782704047346,
+      "message": "Spawning agent: Explore (inherit) | Task: Verify data-access + obs gaps"
+    },
+    "a4dc61360205338f6d5ee2db85a2c5d02eceb95fe3c571e976c9982b0ab4f8c9": {
+      "last_emitted_at_ms": 1782703930104,
+      "message": "Spawning agent: Explore (inherit) | Task: Explore Phase 6 surface area"
+    }
+  },
+  "updated_at": "2026-06-29T03:47:02.460Z"
+}

@@ -1,0 +1,79 @@
+{
+  "description": "2층 추출 정확도 측정용 골드셋. 각 record: {input, source, expected}. 사람이 검수·정정한 정답.",
+  "records": [
+    {
+      "id": "amos-hanjul-compare-001",
+      "source": {"gallery": "amos", "type": "post", "note": "ㅂㅉ 한줌 비교글(한글과자 vs 과일사탕)"},
+      "input": "ㅂㅉ 한줌\n자사몰에서 아직 배송중뜨길래 문자첨부함\n한글과자한줌 재밌어서 과일사탕도 개큰기머하면서 샀는데\n걀걀거리는게 적고 묘하게 비즈양 적은거같아서\n사족보니까 한글 20g내외 과일18g내외네 ㅠ\n순수재미로만 따지면 한글과자압승,,\n컨셉 향은 과일사탕이 더 취향이었슴",
+      "expected": {
+        "market": "ㅂㅉ",
+        "shipping_cs": {
+          "notes": "아직 배송중, 문자첨부",
+          "sentiment": "neu",
+          "evidence": "아직 배송중"
+        },
+        "reviews": [
+          {
+            "mentioned_product": "한글과자한줌",
+            "scent": {
+              "perceived": "컨셉 향",
+              "projection": null,
+              "vs_official_comment": null,
+              "sentiment": "neg",
+              "evidence": "과일사탕이 더"
+            },
+            "texture": null,
+            "sound": null,
+            "longevity": null,
+            "value": null,
+            "overall": {
+              "stated_rating": null,
+              "model_sentiment": "pos",
+              "rebuy_intent": "미언급",
+              "summary": "순수 재미는 한글과자 압승"
+            }
+          },
+          {
+            "mentioned_product": "과일사탕한줌",
+            "scent": {
+              "perceived": "컨셉 향",
+              "projection": null,
+              "vs_official_comment": null,
+              "sentiment": "pos",
+              "evidence": "과일사탕이 더 취향"
+            },
+            "texture": {
+              "feel": [],
+              "feel_simile": null,
+              "feel_other": null,
+              "hand_stick": null,
+              "hand_residue": null,
+              "type_mentioned": null,
+              "sentiment": "neg",
+              "evidence": "비즈양 적은"
+            },
+            "sound": {
+              "mentioned": true,
+              "notes": "걀걀거리는게 적음",
+              "sentiment": "neg",
+              "evidence": "걀걀거리는게"
+            },
+            "longevity": null,
+            "value": {
+              "krw": null,
+              "sentiment": "neg",
+              "evidence": "과일18g내외"
+            },
+            "overall": {
+              "stated_rating": null,
+              "model_sentiment": "neg",
+              "rebuy_intent": "미언급",
+              "summary": "향은 더 취향이나 걀걀·비즈·중량에서 아쉬움"
+            }
+          }
+        ],
+        "flags": {"toxic": false}
+      }
+    }
+  ]
+}

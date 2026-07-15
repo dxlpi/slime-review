@@ -1,0 +1,20 @@
+{
+  "_doc": "개체연결 정답셋 (Cat G). demo KB(data/slime_market_kb_demo.json) 기준 현재 정답 동작을 인코딩 → 회귀 측정용. mentioned_market 표면형/초성 → 정규 market_word. expect_market=null 이면 보류(abstain)가 정답. 확장은 케이스 추가만.",
+  "cases": [
+    {"id": "surface-bom",        "mentioned_market": "봄",   "mentioned_product": "허니푸냥이", "expect_market": "봄",   "expect_abstain": false, "note": "표면형 단일매칭"},
+    {"id": "surface-binjjang",   "mentioned_market": "빈짱", "mentioned_product": "한줌",     "expect_market": "빈짱", "expect_abstain": false, "note": "표면형 단일매칭"},
+    {"id": "surface-murmur",     "mentioned_market": "머머", "mentioned_product": null,       "expect_market": "머머", "expect_abstain": false, "note": "표면형"},
+    {"id": "surface-weiz",       "mentioned_market": "웨이즈", "mentioned_product": null,      "expect_market": "웨이즈", "expect_abstain": false, "note": "표면형"},
+    {"id": "surface-jintongje",  "mentioned_market": "진통제", "mentioned_product": null,      "expect_market": "진통제", "expect_abstain": false, "note": "표면형"},
+    {"id": "surface-neupji",     "mentioned_market": "늪지", "mentioned_product": null,        "expect_market": "늪지", "expect_abstain": false, "note": "표면형"},
+    {"id": "handle-murmur",      "mentioned_market": "from.murmurslime", "mentioned_product": null, "expect_market": "머머", "expect_abstain": false, "note": "핸들 매칭"},
+    {"id": "alt-handle-murmur",  "mentioned_market": "murmurslime", "mentioned_product": null, "expect_market": "머머", "expect_abstain": false, "note": "보조 핸들 매칭"},
+    {"id": "choseong-binjjang",  "mentioned_market": "ㅂㅉ", "mentioned_product": "과일사탕한줌", "expect_market": "빈짱", "expect_abstain": false, "note": "초성 단일매칭"},
+    {"id": "choseong-bom",       "mentioned_market": "ㅂ",   "mentioned_product": null,       "expect_market": "봄",   "expect_abstain": false, "note": "초성 단일(demo KB엔 ㅂ 단독=봄)"},
+    {"id": "choseong-murmur",    "mentioned_market": "ㅁㅁ", "mentioned_product": null,        "expect_market": "머머", "expect_abstain": false, "note": "초성 단일(demo KB; 전체 KB선 충돌)"},
+    {"id": "notfound-jasamol",   "mentioned_market": "자사몰", "mentioned_product": "한줌",     "expect_market": null,  "expect_abstain": true,  "note": "일반어 → 미발견 보류"},
+    {"id": "notfound-gonggu",    "mentioned_market": "공구", "mentioned_product": null,        "expect_market": null,  "expect_abstain": true,  "note": "일반어 → 미발견 보류"},
+    {"id": "notfound-unknown",   "mentioned_market": "존재안함마켓", "mentioned_product": null, "expect_market": null,  "expect_abstain": true,  "note": "미등록 → 보류"},
+    {"id": "no-market",          "mentioned_market": null,   "mentioned_product": "한줌",      "expect_market": null,  "expect_abstain": true,  "note": "마켓 미언급 → 보류"}
+  ]
+}

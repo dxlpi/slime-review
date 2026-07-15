@@ -104,8 +104,8 @@
   "hotPaths": [
     {
       "path": "CLAUDE.md",
-      "accessCount": 38,
-      "lastAccessed": 1784099250304,
+      "accessCount": 40,
+      "lastAccessed": 1784101397991,
       "type": "file"
     },
     {
@@ -116,8 +116,8 @@
     },
     {
       "path": "slime_rag/pipeline.py",
-      "accessCount": 29,
-      "lastAccessed": 1784100554726,
+      "accessCount": 30,
+      "lastAccessed": 1784101399073,
       "type": "file"
     },
     {
@@ -146,8 +146,8 @@
     },
     {
       "path": "slime_rag/consolidated_view.py",
-      "accessCount": 13,
-      "lastAccessed": 1784100547071,
+      "accessCount": 14,
+      "lastAccessed": 1784101390609,
       "type": "file"
     },
     {
@@ -206,14 +206,26 @@
     },
     {
       "path": "slime_rag/linking.py",
-      "accessCount": 5,
-      "lastAccessed": 1784080125108,
+      "accessCount": 6,
+      "lastAccessed": 1784100944487,
       "type": "file"
     },
     {
       "path": "slime_rag/llm_ops.py",
       "accessCount": 5,
       "lastAccessed": 1784080131924,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 5,
+      "lastAccessed": 1784101521834,
+      "type": "file"
+    },
+    {
+      "path": ".claude/skills/ai-readiness-cartography/scripts/score.py",
+      "accessCount": 5,
+      "lastAccessed": 1784101617652,
       "type": "file"
     },
     {
@@ -253,15 +265,9 @@
       "type": "file"
     },
     {
-      "path": ".claude/skills/ai-readiness-cartography/scripts/score.py",
+      "path": "MEMORY.md",
       "accessCount": 2,
-      "lastAccessed": 1784099895637,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 1,
-      "lastAccessed": 1782703947660,
+      "lastAccessed": 1784101333874,
       "type": "file"
     },
     {
@@ -364,12 +370,6 @@
       "path": "ARCHITECTURE.md",
       "accessCount": 1,
       "lastAccessed": 1784100519294,
-      "type": "file"
-    },
-    {
-      "path": "MEMORY.md",
-      "accessCount": 1,
-      "lastAccessed": 1784100567529,
       "type": "file"
     },
     {

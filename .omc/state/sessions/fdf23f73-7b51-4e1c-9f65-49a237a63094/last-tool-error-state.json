@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls && echo \\\"---VENV---\\\" && ls .venv/bin 2>/dev/null | head && echo \\\"---DOCKER---\\\" && docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null\",\"description\":\"Check project layout, venv, ...",
-  "error": "Exit code 1\napp\nBUILD_LOG.md\nCLAUDE.md\ndata\ndocker-compose.yml\neval\nprompts\nREADME.md\nrequirements.txt\nslime_rag\nsql\n---VENV---\naccelerate\naccelerate-config\naccelerate-estimate-memory\naccelerate-launch\naccelerate-merge-weights\nactivate\nactivate.csh\nactivate.fish\nActivate.ps1\ndatasets-cli\n---DOCKER---",
-  "timestamp": "2026-07-14T11:50:00.257Z",
-  "retry_count": 1
-}

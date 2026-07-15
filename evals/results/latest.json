@@ -1,0 +1,23 @@
+{
+  "overall_pass_rate": 1.0,
+  "aggregate": {
+    "total": 15,
+    "passed": 15
+  },
+  "min_required": 1.0,
+  "suites": [
+    {
+      "suite": "linking",
+      "status": "ran",
+      "total": 15,
+      "passed": 15,
+      "pass_rate": 1.0,
+      "failures": []
+    },
+    {
+      "suite": "extract",
+      "status": "skipped",
+      "reason": "골드 케이스 0건 — 필드-매치 채점은 llm_ops 연결 후 확장"
+    }
+  ]
+}

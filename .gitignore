@@ -10,3 +10,4 @@ venv/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 .omc/sessions/
+.omc/state/

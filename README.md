@@ -5,8 +5,8 @@
 ## 구조
 
 ```
-slime_rag/
-  sources.py            수집 레이어 (Source 인터페이스 + DCInside + Instagram 스텁)
+slime_rag/              코어 RAG 패키지 → slime_rag/CLAUDE.md
+  sources/              수집 레이어 패키지(소스별 분할) → slime_rag/sources/CLAUDE.md
   relevance.py          관련성 필터 — 후기 vs 질문/양도/잡담            [Phase 1]
   extract.py            추출 러너 — 비정형 → 정형 JSON                  [Phase 2]
   linking.py            개체연결 — 초성/약칭 → KB + 보류(abstain)       [Phase 3]
@@ -14,10 +14,16 @@ slime_rag/
   consolidated_view.py  종합뷰 + 소스 편향 집계(소스별·갭·향불일치)
   llm_ops.py            관측성 + LLM 호출 래퍼(로깅·비용·재시도)
   config.py             .env 단일 출처
-data/                   KB(마켓 명부 + 초성/약칭)
+app/ui.py               Streamlit UI → app/CLAUDE.md                    [Phase 6]
+sql/schema.sql          pgvector 스키마 → sql/CLAUDE.md
+eval/                   오프라인 단위 테스트 + 골드셋 → eval/CLAUDE.md
+evals/                  pass-rate 평가 하네스 → evals/CLAUDE.md
+data/                   KB(마켓 명부 + 초성/약칭) + fixture
 prompts/                1층/2층 추출 프롬프트 스펙
-app/ui.py               Streamlit UI                                   [Phase 6]
 ```
+
+설계 지도: [ARCHITECTURE.md](ARCHITECTURE.md) · 도메인 규칙: [MEMORY.md](MEMORY.md) ·
+결정 근거: [docs/adr/](docs/adr/).
 
 ## 빠른 시작
 
@@ -58,4 +64,16 @@ python -m slime_rag.search    # 하이브리드 검색 + 근거 답변
 - **편향 투명화**: 평균 금지, 소스별 + 갭. 보정보다 라벨링.
 - **관측성 내장**: 외부 콜은 전부 `llm_ops` 통과 → 로깅·비용·재시도.
 
-빌드 과정은 [BUILD_LOG.md](BUILD_LOG.md), 전체 설계는 [CLAUDE.md](CLAUDE.md) 참조.
+## 개발 셋업 (품질 게이트)
+
+컨텍스트 문서의 경로 무결성과 평가 pass-rate 를 회귀 없이 유지한다.
+
+```bash
+git config core.hooksPath .githooks      # pre-push 훅 활성화(경로검사 + 평가 게이트)
+python .github/scripts/validate_context_paths.py   # 컨텍스트 경로 무결성(0 hallucinated paths)
+python -m evals.run --min 1.0            # 개체연결 pass-rate 게이트
+```
+
+같은 검사가 [.github/workflows/ci.yml](.github/workflows/ci.yml) 에서 push/PR 마다 무비용으로 돈다.
+
+빌드 과정은 [BUILD_LOG.md](BUILD_LOG.md), 나침반은 [CLAUDE.md](CLAUDE.md) 참조.

@@ -4,6 +4,14 @@
 구조적 결정은 [docs/adr/](docs/adr/) 의 번호 매긴 레코드로, 반복 적용되는 도메인 규칙은
 아래에 둔다. 아키텍처 흐름은 [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## 마켓 KB 구조
+- repo 포함은 **데모 13개**만: `data/slime_market_kb_demo.json`(봄·웨이즈·진통제·베이퍼·머머·
+  푸딩·빈짱·모모네·연찌·캐치·예찬·지나·늪지). 전체 118개는 미포함(필요 시 사용자 제공).
+- 최상위 `{slime_types[], markets[]}`. 마켓 필드 = `market, handle, handles_alt[], market_word,
+  choseong, choseong_aliases[], aliases[], products[]`. `products[]` 는 비어있음(1층 미시드).
+- **머머는 계정 2개 병합**: 대표 `from.murmurslime`, 보조는 `handles_alt` 의 `murmurslime`.
+- **Note:** 초성 충돌 12그룹(ㅁㅁ·ㅇㅇ·ㄴㅈ 등)은 전체 KB 기준 — 데모 13개엔 충돌 없음(개체연결 참조).
+
 ## 통제 어휘 (도메인)
 - **슬라임 종류(TYPE_ENUM, 1층)**: 폼볼, 촉감류(점토), 디폼, 난사, 눈꽃, 지글리, 크런치,
   빈백, 클라우드, 샤베트, 클리어, 버글리, 젤라또 (확장 가능).

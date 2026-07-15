@@ -40,7 +40,7 @@ PRIMARY_CONTEXT = ("CLAUDE.md", "AGENTS.md")  # anything stronger than README
 # Heuristic regex
 RE_PATH_REF = re.compile(
     r"(?<![A-Za-z0-9_/])"
-    r"((?:\./|[A-Za-z0-9_]+/)[A-Za-z0-9_./-]+\.(?:py|tsx|ts|jsx|js|md|sql|json|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))(?![A-Za-z0-9])"
+    r"((?:\./|\.?[A-Za-z0-9_]+/)[A-Za-z0-9_./-]+\.(?:py|tsx|ts|jsx|js|md|sql|json|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))(?![A-Za-z0-9])"
 )
 RE_BASH_FENCE = re.compile(r"```(?:bash|sh|shell|zsh|console)\s*\n([\s\S]*?)```", re.IGNORECASE)
 RE_NON_OBVIOUS = re.compile(r"\b(Why:|Note:|Gotcha|Warning|Don't|Caveat|Important:|반드시|주의)", re.IGNORECASE)
@@ -438,7 +438,9 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
     total_refs = 0
     bad_refs: list[tuple[Path, str]] = []
     for p in context_files:
-        text = read_text(p)
+        # strip markdown-link spans first: `](../..)` relative links otherwise get
+        # partial-matched into phantom paths (e.g. './../x.md'). Links aren't verified here.
+        text = RE_REL_LINK.sub(" ", read_text(p))
         for ref in set(RE_PATH_REF.findall(text)):
             total_refs += 1
             # try repo-relative and context-file-relative

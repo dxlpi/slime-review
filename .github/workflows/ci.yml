@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  offline-checks:
+    # 무비용·무네트워크 게이트: 컨텍스트 경로 무결성 + 오프라인 테스트 + 평가 pass-rate.
+    # 무거운 색인 의존성(torch/FlagEmbedding)은 설치하지 않는다 — 이 검사들은 필요 없음.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lightweight deps
+        run: pip install requests beautifulsoup4 python-dotenv
+
+      - name: Validate context paths (0 hallucinated paths)
+        run: python .github/scripts/validate_context_paths.py
+
+      - name: Offline unit tests
+        run: |
+          python -m eval.test_bias
+          python -m eval.test_apify_source
+
+      - name: Eval pass-rate gate
+        run: python -m evals.run --min 1.0

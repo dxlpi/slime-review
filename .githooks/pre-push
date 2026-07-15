@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# 컨텍스트 경로 무결성 + 평가 pass-rate 게이트 (push 시점 회귀 차단).
+# 활성화: git config core.hooksPath .githooks   (README '개발 셋업' 참고)
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+PY="${ROOT}/.venv/bin/python"
+[ -x "$PY" ] || PY="python3"
+
+echo "[pre-push] 컨텍스트 경로 검사…"
+"$PY" "${ROOT}/.github/scripts/validate_context_paths.py" "$ROOT"
+
+echo "[pre-push] 평가 pass-rate 게이트…"
+"$PY" -m evals.run --min 1.0 >/dev/null && echo "[pre-push] 평가 통과"
+
+echo "[pre-push] OK"

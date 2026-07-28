@@ -66,7 +66,14 @@ def seed_kb_products(markets: list[dict], fixture: Optional[dict[str, dict]] = N
         prods: list[dict] = []
         for k in keys:
             if k and k in fx:
-                prods.extend(fx[k].get("products", []))
+                # 제품에 source_permalink 가 없으면 같은 마켓 게시물 permalink 로 폴백(사용자 결정:
+                # 공식 스펙 URL = 게시물 permalink 재사용). fixture 원본은 건드리지 않게 복사본에 주입.
+                posts = fx[k].get("posts") or []
+                fallback = posts[0].get("permalink") if posts else None
+                for p in fx[k].get("products", []):
+                    if not p.get("source_permalink") and fallback:
+                        p = {**p, "source_permalink": fallback}
+                    prods.append(p)
         if prods:
             m["products"] = prods
             seeded += len(prods)
@@ -78,17 +85,19 @@ def seed_kb_products(markets: list[dict], fixture: Optional[dict[str, dict]] = N
 def iter_specs(kb_markets: list[dict]):
     """시드된 KB 마켓 → specs 테이블 행 튜플을 순회.
 
-    (market_word, product, scent, base_combo, slime_type, beads) 를 내준다.
+    (market_word, product, scent, base_combo, slime_type, beads, source_permalink) 를 내준다.
     market 은 정규 market_word(빈짱/봄/머머) — reviews.market(linking 결과)과 조인 키 일치.
     slime_type 은 TYPE_ENUM 배열을 콤마결합, 비면 type_other(마켓 고유 베이스어)로 폴백.
     beads 는 비즈/토핑 구성요소 리스트(오픈 어휘), 없으면 [].
+    source_permalink 은 공식 스펙 출처 게시물 URL(seed_kb_products 가 게시물 permalink 로 폴백), 없으면 None.
     """
     for m in kb_markets:
         mw = m.get("market_word") or m.get("market")
         for p in m.get("products", []):
             stype = ", ".join(p.get("type") or []) or p.get("type_other")
             yield (mw, p["product_name"], p.get("official_scent"),
-                   p.get("glue_composition"), stype, p.get("beads") or [])
+                   p.get("glue_composition"), stype, p.get("beads") or [],
+                   p.get("source_permalink"))
 
 
 # ---------------------------------------------------------------- 셀프테스트

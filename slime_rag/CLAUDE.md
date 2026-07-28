@@ -15,7 +15,7 @@ DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [A
 | `bias.py` | 편향 태깅(IG) — 홍보성 게이트→LLM 캐스케이드, 판매자 라우팅 `partition` |
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
-| `consolidated_view.py` | 소스별 정서·갭·향불일치·소스aware 요약(홍보성 분리) |
+| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/장단점 섹션, 미언급=빈칸; 홍보성 분리) |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
@@ -36,7 +36,7 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
 - **Important:** 미언급은 `null`, 지어내기 금지. 필드별 근거 스니펫(15자 내외)으로 인용·저작권 회피.
 - **주의:** 향 불일치·소스 갭은 LLM 이 아니라 **조인·집계 단계**(`consolidated_view.py`)에서 계산.
 - **Warning:** GPT-5 계열은 추론 모델이라 `temperature` 미전송(무시/제한됨).
-- **Don't:** 소스 편향을 평균내지 말 것 — 소스별 + 갭으로 라벨링(인스타=긍정, 디시=부정 쏠림).
+- **Don't:** 소스 편향을 평균내지 말 것 — 소스별 net + 갭으로 표시. **'긍정/부정 쏠림' 편향 라벨은 노출 안 함**(2026-07-15 결정). 서포터(홍보성)는 분리하되 소수라도 실내용(향/질감/장단점) 요약해 포함.
 - **Note:** 후기(주문) 단위 vs 제품 단위 분리 — `market`·`shipping_cs`는 최상위, 제품별 평가는 `reviews[]`.
 
 ## Cross-module dependencies

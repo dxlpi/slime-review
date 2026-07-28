@@ -271,11 +271,11 @@ def test_consolidated_splits_promo():
     assert v["n_reviews"] == 2, v["n_reviews"]
     ig = v["by_source"]["instagram"]
     assert ig["n"] == 1 and ig["net"] == 1.0, ig       # 홍보성 3건이 IG net 을 안 부풀림
-    # promo 분리 버킷
+    # 서포터(홍보성) 분리 버킷 — 향/질감/장단점 섹션 형태(LLM 미주입이라 내용은 비어있음).
     assert v["promo_view"] is not None
     assert v["promo_view"]["n_promo"] == 3, v["promo_view"]
-    assert v["promo_view"]["by_source"]["instagram"]["net"] == 1.0
-    print("✓ consolidated: 홍보성 분리(headline 미오염, promo_view.n_promo=3) OK")
+    assert set(v["promo_view"]) >= {"n_promo", "scent", "texture", "pros", "cons"}, v["promo_view"]
+    print("✓ consolidated: 서포터 분리(headline 미오염, promo_view.n_promo=3) OK")
 
 
 def test_consolidated_no_promo_regression():

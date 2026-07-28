@@ -30,21 +30,25 @@ SOURCE_PLATFORM = {"amos": "dcinside", "instagram": "instagram"}
 
 
 # ---------------------------------------------------------------- 1층 적재
-def _upsert_spec(cur, market, product, scent, base_combo, stype, beads=None) -> None:
+def _upsert_spec(cur, market, product, scent, base_combo, stype, beads=None,
+                 source_permalink=None) -> None:
     """specs (market,product) upsert — fixture 시드와 판매자 자동추출이 공유하는 단일 경로.
 
     beads: 비즈/토핑 구성요소 리스트(오픈 어휘). None/빈 → []. 제품행에 붙는 부가 메타이며,
     비즈 단독으로는 제품이 되지 않는다(호출부 백스톱이 scent/base_combo/slime_type 로 제품성 판정).
+    source_permalink: 공식 스펙 출처 인스타 게시물 URL(없으면 None). COALESCE 로 기존 값 보존 —
+    나중 upsert 가 URL 을 안 넘겨도(None) 이미 저장된 URL 을 지우지 않는다.
     """
     cur.execute(
         """
-        INSERT INTO specs (market, product, scent, base_combo, slime_type, beads)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO specs (market, product, scent, base_combo, slime_type, beads, source_permalink)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (market, product) DO UPDATE SET
           scent=EXCLUDED.scent, base_combo=EXCLUDED.base_combo,
-          slime_type=EXCLUDED.slime_type, beads=EXCLUDED.beads
+          slime_type=EXCLUDED.slime_type, beads=EXCLUDED.beads,
+          source_permalink=COALESCE(EXCLUDED.source_permalink, specs.source_permalink)
         """,
-        (market, product, scent, base_combo, stype, list(beads or [])),
+        (market, product, scent, base_combo, stype, list(beads or []), source_permalink),
     )
 
 
@@ -55,8 +59,8 @@ def load_specs(conn, kb: dict | None = None) -> int:
     layer1.seed_kb_products(kb["markets"])           # in-place: products[] 채움
     rows = list(layer1.iter_specs(kb["markets"]))
     with conn.cursor() as cur:
-        for market, product, scent, base_combo, stype, beads in rows:
-            _upsert_spec(cur, market, product, scent, base_combo, stype, beads)
+        for market, product, scent, base_combo, stype, beads, permalink in rows:
+            _upsert_spec(cur, market, product, scent, base_combo, stype, beads, permalink)
     conn.commit()
     log.info("specs 적재 %d행", len(rows))
     return len(rows)
@@ -133,7 +137,8 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
                         continue                     # 스펙 필드 전부 null → 비즈·토핑 노이즈, 제품 아님
                     # beads 는 제품성 판정에 포함하지 않는다(구성요소일 뿐) → 위 백스톱 통과분에만 부가.
                     _upsert_spec(cur, market, p["product"], p.get("scent"),
-                                 p.get("base_combo"), p.get("slime_type"), p.get("beads"))
+                                 p.get("base_combo"), p.get("slime_type"), p.get("beads"),
+                                 sp.url)                # 공식 스펙 출처 = 판매자 게시물 URL
                     n_spec += 1
         conn.commit()
     if n_skip_nohash:
@@ -206,11 +211,11 @@ def list_products(market: str) -> list[dict]:
     """해당 마켓의 1층 제품 스펙 리스트."""
     with connect() as conn:
         rows = conn.execute(
-            "SELECT product, scent, base_combo, slime_type, beads FROM specs "
+            "SELECT product, scent, base_combo, slime_type, beads, source_permalink FROM specs "
             "WHERE market=%s ORDER BY product", [market]).fetchall()
     return [{"product": p, "official_scent": s, "base_combo": b, "slime_type": t,
-             "beads": list(beads or [])}
-            for p, s, b, t, beads in rows]
+             "beads": list(beads or []), "source_permalink": url}
+            for p, s, b, t, beads, url in rows]
 
 
 def _records_for(conn, market: str, product: str | None) -> list[dict]:
@@ -231,23 +236,24 @@ def _records_for(conn, market: str, product: str | None) -> list[dict]:
 
 
 def consolidated_for(market: str, product: str, *, with_summary: bool = True) -> dict:
-    """1층 스펙 + 2층 후기 → 종합 뷰(소스별·갭·향불일치·요약)."""
+    """1층 스펙 + 2층 후기 → 종합 뷰(소스별·갭·향불일치 + 인스타/디시/통합 리뷰 요약)."""
     with connect() as conn:
         spec_row = conn.execute(
-            "SELECT product, scent, base_combo, slime_type, beads FROM specs "
+            "SELECT product, scent, base_combo, slime_type, beads, source_permalink FROM specs "
             "WHERE market=%s AND product=%s", [market, product]).fetchone()
         records = _records_for(conn, market, product)
     official_spec = None
     if spec_row:
         official_spec = {"product": spec_row[0], "official_scent": spec_row[1],
                          "base_combo": spec_row[2], "slime_type": spec_row[3],
-                         "beads": list(spec_row[4] or [])}
-    summarize = None
+                         "beads": list(spec_row[4] or []), "source_permalink": spec_row[5]}
+    sectionize = None
     if with_summary and records:
-        summarize = lambda prompt: LLM().complete(
-            prompt, model=settings.model_judge, label="consolidated.summary")
+        # 소스별(인스타/디시/통합/서포터) 향/질감/장단점 구조화 요약(structured outputs).
+        sectionize = lambda prompt, schema: LLM().complete(
+            prompt, model=settings.model_judge, schema=schema, label="consolidated.section")
     return cv.build_consolidated({"market": market, "product": product},
-                                 official_spec, records, llm_summarize=summarize)
+                                 official_spec, records, llm_sectionize=sectionize)
 
 
 # ---------------------------------------------------------------- 데모 실행
@@ -270,6 +276,7 @@ if __name__ == "__main__":
 
     print("\n=== 종합뷰 (빈짱 / 한글과자한줌) ===")
     view = consolidated_for("빈짱", "한글과자한줌")
-    print(json.dumps({k: v for k, v in view.items() if k != "summary"},
+    print(json.dumps({k: v for k, v in view.items() if k != "review_summaries"},
                      ensure_ascii=False, indent=2))
-    print("\n요약:", view.get("summary"))
+    print("\n리뷰 요약(인스타/디시/통합):")
+    print(json.dumps(view.get("review_summaries"), ensure_ascii=False, indent=2))

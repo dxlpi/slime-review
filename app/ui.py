@@ -21,17 +21,37 @@ import streamlit as st
 
 from slime_rag import pipeline, search
 
-st.set_page_config(page_title="슬라임 리뷰 RAG", page_icon="🟢", layout="wide")
-
 # 소스 라벨 ↔ DB source 컬럼 값
-_SOURCE_LABELS = {"전체": None, "디시 아모스갤(부정쏠림)": "amos",
-                  "인스타(긍정쏠림)": "instagram"}
+_SOURCE_LABELS = {"전체": None, "디시 아모스갤": "amos", "인스타": "instagram"}
 
 
 @st.cache_resource(show_spinner="DB 스키마·1층·2층 색인 준비 중…")
 def _bootstrap() -> dict:
     """프로세스당 1회: 스키마 적용 + 1층 specs + 2층 골드 색인 + 조인."""
     return pipeline.setup()
+
+
+# 리뷰 요약 블록 라벨(플랫폼 → 표시). 통합은 소스 갭 reconciliation.
+_REVIEW_TITLES = {"instagram": "🟣 인스타 리뷰", "dcinside": "🔵 디시 리뷰",
+                  "integrated": "🔀 통합 리뷰 (인스타+디시)"}
+
+
+def _render_review_block(title: str, block: dict | None, meta: str | None = None) -> None:
+    """향/질감/장단점 섹션 렌더. 언급 없는 섹션(None/빈)은 통째로 생략 — 빈칸 유지, 패딩 없음."""
+    if not block:
+        return
+    st.markdown(f"#### {title}" + (f"  ·  {meta}" if meta else ""))
+    if block.get("scent"):
+        st.markdown(f"**향** — {block['scent']}")
+    if block.get("texture"):
+        st.markdown(f"**질감** — {block['texture']}")
+    pros, cons = block.get("pros") or [], block.get("cons") or []
+    if pros or cons:
+        st.markdown("**장단점**")
+        for p in pros:
+            st.markdown(f"- ➕ {p}")
+        for c in cons:
+            st.markdown(f"- ➖ {c}")
 
 
 def _render_consolidated(view: dict) -> None:
@@ -44,6 +64,9 @@ def _render_consolidated(view: dict) -> None:
         beads = spec.get("beads") or []
         if beads:
             st.caption("비즈: " + ", ".join(beads))
+        url = spec.get("source_permalink")
+        if url:
+            st.caption(f"공식 스펙 출처: [인스타 게시물]({url})")
     st.caption(f"후기 {view['n_reviews']}건")
 
     by_src = view.get("by_source") or {}
@@ -52,12 +75,12 @@ def _render_consolidated(view: dict) -> None:
         cols = st.columns(len(by_src))
         for col, (plat, c) in zip(cols, by_src.items()):
             col.metric(f"{plat} · net", f"{c['net']:+.2f}",
-                       help=f"{c['bias_label']} · pos{c['pos']}/neu{c['neu']}/neg{c['neg']} (n={c['n']})")
+                       help=f"pos{c['pos']}/neu{c['neu']}/neg{c['neg']} (n={c['n']})")
 
     gap = view.get("sentiment_gap")
     if gap:
         st.info(f"**소스 갭** 인스타 {gap['instagram_net']:+.2f} vs 디시 "
-                f"{gap['dcinside_net']:+.2f} → 갭 {gap['gap']:+.2f} · {gap['reading']}")
+                f"{gap['dcinside_net']:+.2f} → 갭 {gap['gap']:+.2f}")
     else:
         st.warning("두 소스(인스타·디시)가 모두 있어야 갭 계산 — 현재 샘플은 한쪽 소스만 존재.")
 
@@ -77,27 +100,42 @@ def _render_consolidated(view: dict) -> None:
         st.subheader("👎 지적 속성")
         st.write(view.get("criticized") or "—")
 
-    if view.get("summary"):
-        st.subheader("📝 소스aware 요약")
-        st.markdown(view["summary"])
+    rs = view.get("review_summaries") or {}
+    promo = view.get("promo_view")
+    if any(rs.values()) or promo:
+        st.subheader("📝 리뷰 요약 (향·질감·장단점, 언급 없으면 빈칸)")
+        by = view.get("by_source") or {}
+
+        def _meta(plat: str) -> str | None:
+            c = by.get(plat)
+            return f"{c['n']}건" if c else None
+
+        _render_review_block(_REVIEW_TITLES["instagram"], rs.get("instagram"), _meta("instagram"))
+        _render_review_block(_REVIEW_TITLES["dcinside"], rs.get("dcinside"), _meta("dcinside"))
+        _render_review_block(_REVIEW_TITLES["integrated"], rs.get("integrated"))
+        if promo:                                    # 서포터(홍보성) — 실사용과 분리해 별도 표시
+            _render_review_block("🎁 서포터 리뷰 (협찬·무상 제공)", promo,
+                                 f"{promo.get('n_promo', 0)}건")
 
 
 # ---------------------------------------------------------------- 레이아웃
-st.title("🟢 슬라임 리뷰 RAG")
-st.caption("공식 스펙(1층) + 후기(2층)를 출처 인용해 답하는 근거 기반 어시스턴트 · "
-           "소스 편향(인스타=긍정/디시=부정)은 평균내지 않고 투명화")
+def main() -> None:
+  st.set_page_config(page_title="슬라임 리뷰 RAG", page_icon="🟢", layout="wide")
+  st.title("🟢 슬라임 리뷰 RAG")
+  st.caption("공식 스펙(1층) + 후기(2층)를 출처 인용해 답하는 근거 기반 어시스턴트 · "
+             "소스 편향(인스타=긍정/디시=부정)은 평균내지 않고 투명화")
 
-try:
+  try:
     counts = _bootstrap()
-except Exception as e:                       # DB/키 미준비 시 안내
+  except Exception as e:                       # DB/키 미준비 시 안내
     st.error(f"백엔드 준비 실패: {e}\n\ndocker compose up -d (pgvector 55432) 와 "
              ".env 의 OPENAI_API_KEY 를 확인하세요.")
     st.stop()
 
-markets = pipeline.list_markets()
+  markets = pipeline.list_markets()
 
-# --- 사이드바: 필터 + 1층 패널 ---
-with st.sidebar:
+  # --- 사이드바: 필터 + 1층 패널 ---
+  with st.sidebar:
     st.header("필터")
     market_sel = st.selectbox("마켓", ["전체"] + markets)
     source_label = st.radio("소스", list(_SOURCE_LABELS))
@@ -107,13 +145,16 @@ with st.sidebar:
         st.subheader(f"1층 스펙 · {market_sel}")
         for p in pipeline.list_products(market_sel):
             beads = ", ".join(p.get("beads") or []) or "—"
-            st.markdown(f"**{p['product']}**  \n향: {p['official_scent'] or '—'}  \n"
-                        f"풀: {p['base_combo'] or '—'}  \n종류: {p['slime_type'] or '—'}  \n"
-                        f"비즈: {beads}")
+            line = (f"**{p['product']}**  \n향: {p['official_scent'] or '—'}  \n"
+                    f"풀: {p['base_combo'] or '—'}  \n종류: {p['slime_type'] or '—'}  \n"
+                    f"비즈: {beads}")
+            if p.get("source_permalink"):
+                line += f"  \n[공식 스펙 게시물]({p['source_permalink']})"
+            st.markdown(line)
 
-tab_chat, tab_view = st.tabs(["💬 챗(근거 답변)", "📊 종합뷰(소스 편향)"])
+  tab_chat, tab_view = st.tabs(["💬 챗(근거 답변)", "📊 종합뷰(소스 편향)"])
 
-with tab_chat:
+  with tab_chat:
     q = st.text_input("질문", placeholder="예: 빈짱 한글과자한줌 향이랑 비즈 어때?")
     if q:
         filters = {}
@@ -129,7 +170,7 @@ with tab_chat:
                 st.markdown(f"**[{c['n']}]** `{c['source']}` · {c['market']}/"
                             f"{c['product']}  \n{c['evidence']}")
 
-with tab_view:
+  with tab_view:
     if market_sel == "전체":
         st.info("← 사이드바에서 마켓을 먼저 고르세요.")
     else:
@@ -139,3 +180,7 @@ with tab_view:
             with st.spinner("종합·편향 집계 + 요약 중…"):
                 view = pipeline.consolidated_for(market_sel, product_sel)
             _render_consolidated(view)
+
+
+if __name__ == "__main__":            # streamlit run 시 __name__=='__main__' → 실행.
+    main()                            # import(app.ui) 시엔 미실행 → 렌더 헬퍼 side-effect-free 테스트.

@@ -9,6 +9,8 @@
 |---|---|
 | `test_bias.py` | 편향 태깅 — 게이트 recall/단락/precision 보존/config (18 케이스) |
 | `test_apify_source.py` | Apify 어댑터 오프라인 매핑·provenance·중복접힘·회복력 (9 케이스) |
+| `test_consolidated_sections.py` | 리뷰 요약(향/질감/장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 (5 케이스) |
+| `test_ui_render.py` | 종합뷰 렌더 헤드리스(AppTest) — 3블록·URL 링크·빈 섹션 생략, 예외 0 |
 | `layer2_gold.json` | 2층 추출 골드셋(사람 검수, 현재 비교글 1건) |
 
 ## Common patterns (workflow)

@@ -333,3 +333,78 @@ relevance.py(후기 vs 비후기)는 여전히 별도 축·범위 밖(§8 TODO).
 - 비용: 단일 호출 $0.0015(무게이트 7호출 ≈ $0.0105 대비 절감). Apify 무료 티어 1페이지 상한(7건).
 
 **남은 것**: Render 배포가 마지막 하드게이트.
+
+
+## 2026-07-15 (2) — 속성 분리형 리뷰 요약(향/질감/장단점 · 인스타/디시/통합)
+
+**무엇을**: 종합뷰의 단일 `summary` 블롭을 **소스별 3블록(인스타/디시/통합) × 3섹션(향/질감/장단점)**
+구조로 교체. 향·질감·장단점 중 **언급 없는 섹션은 빈칸**(지어내기 금지). 통합은 평균이 아니라
+소스 갭 reconciliation. + 공식 스펙 인스타 URL(`source_permalink`) DB 플러밍.
+(플랜: `.omc/plans/attribute-sectioned-review-summaries.md`)
+
+**핵심 프롬프트(요지)**:
+- "리뷰 요약에 질감/향 섹션을 나누고 장단점도. 언급 없으면 그냥 비워둬."
+- "장단점은 향·질감과 별개 총괄 섹션."
+
+**근거(왜 구조화)**: 도메인 규칙(§10 미언급 null·근거 기반)과 정합 — 섹션을 스키마 `null` 로 강제하면
+LLM 이 빈 향/질감을 지어낼 여지가 없다. 소스당 structured output **1콜**(`{scent,texture,pros,cons}`)로
+3섹션 동시 산출 → 섹션별 개별 호출(3×) 대비 절감. 통합은 두 소스 요약 + `sentiment_gap` 을 입력받아
+'평균 금지, 갭 명시'.
+
+**한 일**:
+- `slime_rag/consolidated_view.py` — `SOURCE_REVIEW_SCHEMA`(strict, scent/texture nullable + pros/cons),
+  `SECTION_PROMPT`/`INTEGRATED_PROMPT`, `_source_material`(속성별 evidence 재료, 미언급 속성 제외),
+  `_sectionize_source`/`_sectionize_integrated`. `build_consolidated` 개편: `summary`→`review_summaries`
+  (instagram/dcinside/integrated), 소스 후기 0=None·통합은 두 소스 있을 때만. `llm_sectionize` 콜백 추가
+  (홍보성 `promo_view` 텍스트 요약은 `llm_summarize` 로 현행 유지).
+- `sql/schema.sql`·`slime_rag/layer1.py`·`slime_rag/pipeline.py` — `specs.source_permalink` 컬럼(멱등
+  마이그레이션) + `iter_specs` 7-튜플 + `seed_kb_products` 게시물 permalink 폴백(사용자 결정) +
+  `_upsert_spec`(COALESCE 로 URL 보존) + `list_products`/`consolidated_for` 노출. `consolidated_for` 가
+  `llm_sectionize`(structured) 주입.
+- `app/ui.py` — `_render_review_block`(향/질감/장단점, 빈 섹션 생략) + 3블록 렌더 + 스펙 URL 링크.
+  app body 를 **`main()` 가드**(`__name__=='__main__'`) 뒤로 이동 → import 시 부트스트랩(DB) 미실행 →
+  렌더 헬퍼 헤드리스 테스트 가능(streamlit run 은 `__main__` 이라 그대로 동작).
+- `eval/test_consolidated_sections.py`(신규 5케이스) + `eval/test_ui_render.py`(신규, AppTest 헤드리스).
+
+**검증(오프라인 무비용)**:
+- `python -m eval.test_consolidated_sections`: 미언급→빈칸(None), 단일소스→통합None, 홍보성 분리,
+  no-LLM 회귀, `_source_material` 언급속성만 — 전량 통과(fake sectionize, LLM 0호출).
+- `python -m eval.test_ui_render`: AppTest 로 3블록·URL 링크·빈 요약헤더 생략 렌더, **예외 0**.
+- 회귀: `test_bias`/`test_apify_source` + `consolidated_view`/`layer1` 셀프테스트 전량 통과.
+
+**AI생성 vs 사람수정**: 스키마/프롬프트/플러밍/렌더/테스트 초안 그대로 통과. 사람수정 0건.
+
+**미결(데이터)**: fixture `posts[].permalink` 가 전부 placeholder(None) → 실제 게시물 URL 채우면
+스펙 링크가 즉시 표시(플러밍은 완료·null 이면 링크 생략으로 그레이스풀). 라이브 LLM 요약 품질은
+디시/인스타 2층 데이터 확장 후 검증 예정.
+
+**라이브 검증(2026-07-15)**: `#레몬커드쉘도넛` 실수집(Apify) → 인스타 genuine 4·promo 1 색인 →
+`consolidated_for('머머','레몬커드쉘도넛')` 가 실 LLM 으로 향/질감/장단점 3섹션 생성. 이견("인위적 레몬빵")은
+평균 대신 ➖con 으로 보존, 서포터 1건은 promo_view 로 분리. 통합은 디시 부재로 None(가짜 평균 안 함).
+
+**남은 것**: Render 배포가 마지막 하드게이트.
+
+
+## 2026-07-15 (3) — 리뷰 요약 표시 조정(편향 라벨 제거 + 서포터 실내용 포함)
+
+**무엇을**(사용자 피드백): (1) '긍정 쏠림/부정 쏠림' 편향 라벨을 노출에서 전부 제거. (2) 서포터
+(홍보성) 후기를 소수라도 포함하되 '표본 적음' 무내용 disclaimer 대신 향/질감/장단점 실내용으로 요약.
+
+**한 일**:
+- `consolidated_view.py` — `PLATFORM_BIAS`·`bias_label` 제거(`per_source_sentiment` 은 net·건수만).
+  `PROMO_SUMMARY_PROMPT`(텍스트 disclaimer) → `SUPPORTER_SECTION_PROMPT`(구조화 향/질감/장단점).
+  `build_consolidated` 에서 `llm_summarize` 파라미터 제거(dead), promo_view = `{n_promo,scent,texture,pros,cons}`
+  (`_sectionize_supporter`). INTEGRATED/SECTION 프롬프트·모듈 docstring 의 쏠림 문구 제거.
+- `pipeline.consolidated_for` — `llm_summarize` 람다 제거, `llm_sectionize` 만 주입.
+- `app/ui.py` — 소스 라벨 `디시 아모스갤/인스타`(쏠림 표기 삭제), 메트릭 help·`_meta` 에서 bias_label 제거,
+  '🎁 서포터 리뷰 (협찬·무상 제공)' 블록 렌더 추가.
+- `search.py` — 근거답변 프롬프트/헤더의 '디시=부정/인스타=긍정 쏠림' → '소스별 구분(평균 금지)'로 중립화.
+- 테스트: `test_bias`(promo_view by_source→섹션형 어서션), `test_ui_render`(서포터 블록 렌더 + '쏠림'
+  문자열 부재 어서션, mock bias_label 제거). 전량 통과.
+
+**라이브 검증**: `머머/레몬커드쉘도넛` — by_source 에 bias_label 없음, promo_view 가 실 서포터 향/질감
+(버터크림 느낌·뽀득·몽글 등) 요약. 회귀: 전 오프라인 스위트 그린.
+
+**AI생성 vs 사람수정**: 사람수정 0건. 메모: `review-summary-display-prefs`.
+
+**남은 것**: Render 배포가 마지막 하드게이트.

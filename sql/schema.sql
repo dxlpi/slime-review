@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS specs (
   base_combo  TEXT,                   -- 풀조합
   slime_type  TEXT,                   -- 종류 (TYPE_ENUM)
   beads       TEXT[] NOT NULL DEFAULT '{}',  -- 비즈/토핑 구성요소(오픈 어휘, 없으면 {})
+  source_permalink TEXT,                 -- 공식 스펙 출처 인스타 게시물 URL(없으면 NULL)
   UNIQUE (market, product)
 );
 
@@ -53,3 +54,4 @@ CREATE INDEX IF NOT EXISTS reviews_class_idx ON reviews (review_class);
 
 -- 기존 배포 DB 멱등 마이그레이션: specs.beads 컬럼이 없으면 추가(기본 {} → 기존 행 무해).
 ALTER TABLE specs ADD COLUMN IF NOT EXISTS beads TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE specs ADD COLUMN IF NOT EXISTS source_permalink TEXT;

@@ -8,6 +8,8 @@ openai>=1.40
 python-dotenv>=1.0
 
 # --- 색인·검색 (Phase 4) ---
+numpy>=1.26               # relevance.py 가 직접 import(코사인·centroid). torch 의 전이 의존에 기대지 말 것 —
+                          # CI 오프라인 게이트는 torch 를 설치하지 않으므로 명시 선언이 필요하다.
 torch>=2.6                # transformers 가 .bin 로드 시 요구(CVE-2025-32434). BGE-M3 가 .bin 배포라 필수.
 FlagEmbedding>=1.2        # BGE-M3 임베딩(한국어 + dense/sparse)
 psycopg[binary]>=3.1      # pgvector(Postgres)

@@ -6,6 +6,9 @@
 - 모든 LLM 호출은 이 한 곳을 통과한다 → 지연·토큰·비용·상태를 빠짐없이 기록.
 - 벤더를 인터페이스 뒤에 숨긴다 → 교체 가능(이 파일은 OpenAI 구현이지만
   `LLM.complete` 시그니처는 벤더 무관. Anthropic→OpenAI 전환 시 파이프라인 무변경).
+- 벤더 SDK(`openai`)는 **지연 임포트**한다 → LLM 을 호출하지 않는 경로(예: `extract.LAYER1_SCHEMA`
+  같은 순수 스키마 상수)가 SDK 설치 없이 임포트된다. 오프라인 테스트·CI 가 벤더에 묶이지 않게
+  하는 것이 목적이며, '벤더는 이 파일 뒤에만' 원칙의 연장이다.
 - JSON 추출은 structured outputs(`response_format` json_schema, strict)로 강제.
   주의: GPT-5 계열은 추론 모델이라 temperature 가 무시/제한될 수 있다.
         결정성은 temperature 가 아니라 '스키마 강제'로 확보한다(그래서 temperature 미전송).
@@ -17,9 +20,10 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-import openai
+if TYPE_CHECKING:                    # 타입 힌트 전용 — 런타임엔 로드되지 않는다.
+    import openai
 
 from .config import settings
 
@@ -78,6 +82,7 @@ class LLM:
     """모든 LLM 호출의 단일 통로."""
 
     def __init__(self, client: Optional[openai.OpenAI] = None):
+        import openai                # 지연 로드(모듈 docstring). sys.modules 캐시라 반복 비용 없음.
         # OPENAI_API_KEY 를 환경에서 자동 해석.
         self.client = client or openai.OpenAI()
 
@@ -96,6 +101,8 @@ class LLM:
         schema 가 있으면 JSON(dict) 을, 없으면 텍스트(str) 를 반환.
         파싱 실패 시 1회 재시도(스펙). 모든 시도를 LEDGER 에 기록.
         """
+        import openai                # 지연 로드 — 아래 `except openai.APIError` 에서 필요.
+
         model = model or settings.model_extract
         messages: list[dict] = []
         if system:

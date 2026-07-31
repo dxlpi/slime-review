@@ -18,7 +18,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install lightweight deps
-        run: pip install requests beautifulsoup4 python-dotenv
+        # numpy 는 relevance.py(코사인·centroid)가 직접 쓰므로 필요. openai 는 llm_ops 가
+        # 지연 임포트하므로 불필요 — 이 게이트는 LLM 을 호출하지 않는다.
+        run: pip install requests beautifulsoup4 python-dotenv numpy
 
       - name: Validate context paths (0 hallucinated paths)
         run: python .github/scripts/validate_context_paths.py

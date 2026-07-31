@@ -14,7 +14,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from .base import (
-    RawReview, Source, Throttle, robots_allowed, get,
+    RawReview, Source, Throttle, RelevanceGate, robots_allowed, get,
     is_low_quality, toxic_via_llm, log,
 )
 
@@ -146,12 +146,16 @@ class DCInsideSource(Source):
         return out
 
     def collect(self, keywords: list[str], limit: int = 100,
-                max_pages: int = 5) -> Iterator[RawReview]:
+                max_pages: int = 5, target: dict | None = None) -> Iterator[RawReview]:
+        # 관련성 게이트(2층, D8): emitted 대신 relevant/examined 카운터. 비관련(뉴스 블리드·
+        # 랜박 잡담·오프토픽 댓글)은 yield/카운트 없이 계속 페이징. 상한(D9) 도달 시 조기 종료.
+        # target 미주입이면 keywords[0]을 slime 앵커로 폴백(하위호환); 앵커 없으면 패스스루.
+        gate = RelevanceGate(self.platform, target, keywords, limit, log)
         seen = set()
-        emitted = 0
         for kw in keywords:
             for page in range(1, max_pages + 1):
-                if emitted >= limit:
+                if gate.should_stop():
+                    gate.finish()
                     return
                 list_url = self._list_url(kw, page)
                 if not robots_allowed(list_url, self.s.headers["User-Agent"]):
@@ -164,7 +168,8 @@ class DCInsideSource(Source):
                 if not post_urls:
                     break
                 for purl in post_urls:
-                    if emitted >= limit:
+                    if gate.should_stop():
+                        gate.finish()
                         return
                     seen.add(purl)
                     phtml = get(self.s, purl, self.throttle)
@@ -172,33 +177,34 @@ class DCInsideSource(Source):
                         continue
                     title, body, date, pmeta = self._parse_post(phtml)
                     text = self._clean(f"{title or ''}\n{body or ''}")
-                    if is_low_quality(text):
-                        continue
-                    toxic = toxic_via_llm(text, self.classify_fn)
-                    yield RawReview(
-                        text=text, url=purl, platform=self.platform,
-                        posted_at=date, raw_title=title,
-                        meta={"keyword": kw, "gallery": self.gid, "type": "post",
-                              "toxic": toxic, **pmeta},
-                    )
-                    emitted += 1
+                    # 글 단위 후보 배치: 본문 + (있으면) 댓글을 모아 한 번에 classify(배치 임베딩).
+                    # 페이지 전체가 아니라 글 단위로 잡는 건 상한 도달 시 다음 글의 댓글 요청을
+                    # 아끼기 위한 책임 수집(D9) 균형점.
+                    candidates: list[RawReview] = []
+                    if not is_low_quality(text):
+                        toxic = toxic_via_llm(text, self.classify_fn)
+                        candidates.append(RawReview(
+                            text=text, url=purl, platform=self.platform,
+                            posted_at=date, raw_title=title,
+                            meta={"keyword": kw, "gallery": self.gid, "type": "post",
+                                  "toxic": toxic, **pmeta},
+                        ))
                     # --- 댓글(후기 다수) ---
-                    if self.include_comments and emitted < limit:
+                    if self.include_comments:
                         token = self._extract_token(phtml)
                         m = self._NO_RE.search(purl)
                         if token and m:
                             for c in self._fetch_comments(m.group(1), purl, token):
-                                if emitted >= limit:
-                                    return
                                 ctext = self._clean(c["text"])
                                 if is_low_quality(ctext):
                                     continue
-                                yield RawReview(
+                                candidates.append(RawReview(
                                     text=ctext, url=f"{purl}#cmt", platform=self.platform,
                                     posted_at=c.get("date"),
                                     meta={"keyword": kw, "gallery": self.gid, "type": "comment",
                                           "parent_no": m.group(1), "parent_title": title,
                                           "ip": c.get("ip"),
                                           "toxic": toxic_via_llm(ctext, self.classify_fn)},
-                                )
-                                emitted += 1
+                                ))
+                    yield from gate.filter(candidates)
+        gate.finish()

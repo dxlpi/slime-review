@@ -9,7 +9,7 @@ scraped=True). `_run` 이 유일한 네트워크 경계 → 샘플 주입으로 
 from __future__ import annotations
 from typing import Iterator, Optional
 
-from .base import RawReview, Source, is_low_quality, toxic_via_llm, log
+from .base import RawReview, Source, RelevanceGate, is_low_quality, toxic_via_llm, log
 
 
 # ---------------------------------------------------------------- 인스타그램 해시태그(Apify 스크래퍼)
@@ -162,17 +162,17 @@ class ApifyHashtagSource(Source):
             },
         )
 
-    def collect(self, keywords: list[str], limit: int = 100) -> Iterator[RawReview]:
+    def collect(self, keywords: list[str], limit: int = 100,
+                target: dict | None = None) -> Iterator[RawReview]:
         hashtags = self._resolve_hashtags(keywords)
         items = self._run(hashtags)
         # 관측성: 요청 태그 수 / 반환 건수 / 예상비용(무음 상한 금지)
         cost = len(items) / 1000 * self.COST_PER_1000
         log.info("Apify 해시태그 %d개 요청 → %d건 반환 (예상비용 $%.4f)",
                  len(hashtags), len(items), cost)
-        seen, emitted = set(), 0
+        # 매핑(중복접기 + 저품질 드롭) — 관련성 게이트 이전 상태.
+        seen, mapped = set(), []
         for item in items:
-            if emitted >= limit:
-                return
             key = item.get("shortCode") or item.get("url")
             if key and key in seen:                  # shortCode 중복 접기
                 continue
@@ -181,9 +181,12 @@ class ApifyHashtagSource(Source):
             review = self._to_review(item)
             if review is None:                       # 빈/저품질 캡션 드롭
                 continue
-            yield review
-            emitted += 1
-        log.info("Apify 해시태그: %d건 방출(중복/저품질 제외)", emitted)
+            mapped.append(review)
+        # 관련성 게이트(2층). 캡션은 이미 배치로 와 있어 classify 배치가 자연스럽다.
+        # 앵커가 없으면(target 미주입 + keywords 없음) 하위호환 패스스루(RelevanceGate 비활성).
+        gate = RelevanceGate(self.platform, target, keywords, limit, log)
+        yield from gate.filter(mapped)
+        gate.finish()
 
 
 class InstagramProfileSource(Source):
@@ -275,8 +278,10 @@ class InstagramProfileSource(Source):
             },
         )
 
-    def collect(self, keywords: list[str], limit: int = 100) -> Iterator[RawReview]:
-        """keywords = 마켓 핸들(username). '@' 접두 허용. 프로필 최신 게시물을 RawReview 로 방출."""
+    def collect(self, keywords: list[str], limit: int = 100,
+                target: dict | None = None) -> Iterator[RawReview]:
+        """keywords = 마켓 핸들(username). '@' 접두 허용. 프로필 최신 게시물을 RawReview 로 방출.
+        1층(판매자 스펙) 경로라 관련성 게이트 미적용(D6 불변식) — target 은 인터페이스 통일용으로만 받음."""
         usernames = [k.lstrip("@").strip() for k in (keywords or []) if k and k.strip()]
         items = self._run(usernames)
         cost = len(usernames) / 1000 * self.COST_PER_1000

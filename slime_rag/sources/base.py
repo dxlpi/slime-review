@@ -35,8 +35,13 @@ class Source(ABC):
     platform: str
 
     @abstractmethod
-    def collect(self, keywords: list[str], limit: int = 100) -> Iterator[RawReview]:
-        """키워드(마켓명/제품명/초성)별로 원시 후기를 yield."""
+    def collect(self, keywords: list[str], limit: int = 100,
+                target: Optional[dict] = None) -> Iterator[RawReview]:
+        """키워드(마켓명/제품명/초성)별로 원시 후기를 yield.
+
+        target = {"market": str|None, "slime": str} — 2층 관련성 게이트 앵커(선택). None 이면
+        keywords[0]로 폴백하거나(2층) 무시한다(1층). 하위호환을 위해 기본 None.
+        """
         ...
 
 
@@ -106,3 +111,96 @@ def has_toxic(text: str) -> bool:
 def toxic_via_llm(text: str, classify_fn=None) -> bool:
     """운영용: 외부 분류기/LLM 훅. classify_fn(text)->bool 주입."""
     return bool(classify_fn(text)) if classify_fn else has_toxic(text)
+
+
+# ---------------------------------------------------------------- 관련성 게이트(2층)
+def resolve_target(target: Optional[dict], keywords: list[str]) -> Optional[dict]:
+    """관련성 앵커용 타깃 해석. 명시 target 우선; 없으면 keywords[0]을 slime 으로 폴백(계획 Step 6).
+    앵커를 만들 근거가 전혀 없으면 None → 게이트는 하위호환 패스스루로 동작."""
+    if target and (target.get("slime") or target.get("market")):
+        return target
+    for kw in (keywords or []):
+        kw = (kw or "").strip()
+        if kw:
+            return {"market": None, "slime": kw}
+    return None
+
+
+class RelevanceGate:
+    """
+    관련성 게이트 — 수집 루프가 후보 배치(post+댓글 / 캡션들)를 넘기면 KEEP 만 흘려보낸다.
+
+    - 비관련은 yield 안 하고 **카운트 안 함**(예산=관련 항목, 계획 §1·D8).
+    - 상한(D9): 정지 = relevant==limit OR examined>=K*limit OR 소스 자체 페이지 상한.
+      수집 루프는 매 배치 전 `should_stop()` 으로 네트워크 조기 종료.
+    - 관측성(AC7): DROP 마다 axis/score/kind/url 로깅, 경계 KEEP 별도 마킹, 종료 시 요약 1줄.
+    - 앵커 없음(target 미주입+keywords 없음) 또는 미설정 플랫폼 → 비활성(패스스루, 하위호환).
+    - 임베딩은 `relevance.classify_batch` 가 배치로 처리(BGE-M3 encode 호출 amortize).
+    """
+
+    def __init__(self, platform: str, target: Optional[dict], keywords: list[str],
+                 limit: int, logger=log):
+        from ..relevance import RELEVANCE_CONF, RELEVANCE_K
+        self.platform = platform
+        self.limit = limit
+        self.log = logger
+        self.target = resolve_target(target, keywords)
+        self.conf = RELEVANCE_CONF.get(platform)
+        self.active = bool(self.conf) and self.target is not None
+        self.cap = (self.conf.get("k", RELEVANCE_K) if self.conf else RELEVANCE_K) * limit
+        self.relevant = 0
+        self.examined = 0
+        self.emitted = 0                              # 패스스루 카운터
+        self.dropped = {"topic": 0, "kind": 0, "domain": 0}
+
+    def should_stop(self) -> bool:
+        if not self.active:
+            return self.emitted >= self.limit
+        return self.relevant >= self.limit or self.examined >= self.cap
+
+    def filter(self, reviews: list[RawReview]) -> Iterator[RawReview]:
+        """후보 배치 → KEEP 만 yield. 카운터 갱신·로그. 비활성이면 limit 까지 그대로 흘림."""
+        if not reviews:
+            return
+        if not self.active:                           # 하위호환 패스스루
+            for r in reviews:
+                if self.emitted >= self.limit:
+                    return
+                yield r
+                self.emitted += 1
+            return
+        from ..relevance import classify_batch
+        verdicts = classify_batch(reviews, self.target, self.conf)
+        for review, v in zip(reviews, verdicts):
+            if self.relevant >= self.limit or self.examined >= self.cap:
+                return
+            self.examined += 1
+            if not v.keep:
+                self.dropped[v.axis] = self.dropped.get(v.axis, 0) + 1
+                self.log.info("relevance drop axis=%s score=%.3f kind=%s url=%s",
+                              v.axis, v.topic_score, v.kind, review.url)
+                continue
+            if v.near_boundary:
+                self.log.info("relevance near-boundary keep score=%.3f url=%s",
+                              v.topic_score, review.url)
+            review.meta["relevance"] = {
+                "axis": v.axis, "topic_score": round(v.topic_score, 4),
+                "kind": v.kind, "near_boundary": v.near_boundary,
+            }
+            yield review
+            self.relevant += 1
+
+    def finish(self) -> None:
+        """소스 종료 시 shortfall(AC5) + 요약 카운터(AC7) 로깅."""
+        if not self.active:
+            return
+        # examined==0 은 관련성 미달이 아니라 '수집할 후보가 애초에 없음'(토큰/네트워크) →
+        # 그건 소스가 이미 로깅하므로 여기서 shortfall 로 오탐하지 않는다.
+        if self.relevant < self.limit and self.examined > 0:
+            reason = "examined 상한(K*limit) 도달" if self.examined >= self.cap else "후보 소진"
+            self.log.warning(
+                "relevance shortfall [%s]: relevant=%d < limit=%d (%s, examined=%d, cap=%d)",
+                self.platform, self.relevant, self.limit, reason, self.examined, self.cap)
+        if self.examined:
+            self.log.info("relevance summary [%s] examined=%d relevant=%d dropped=%s",
+                          self.platform, self.examined, self.relevant, self.dropped)

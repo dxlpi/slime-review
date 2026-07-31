@@ -47,12 +47,18 @@ def expand_queries(product: str,
 
 
 # ---------------------------------------------------------------- 오케스트레이션
-def collect_all(sources: list[Source], keywords: list[str], per_source_limit: int = 100) -> list[RawReview]:
-    """여러 소스를 동일 인터페이스로 수집. 나중에 네이버/유튜브 추가 시 리스트에만 넣으면 됨."""
+def collect_all(sources: list[Source], keywords: list[str], per_source_limit: int = 100,
+                target: dict | None = None) -> list[RawReview]:
+    """여러 소스를 동일 인터페이스로 수집. 나중에 네이버/유튜브 추가 시 리스트에만 넣으면 됨.
+
+    target = {"market": str|None, "slime": str} — 2층 관련성 게이트 앵커(계획 Step 6). 주입하면
+    소스별 게이트가 이 타깃으로 KEEP/DROP 을 판정한다. None 이면 각 소스가 keywords[0]로 폴백
+    (하위호환); 1층 소스(InstagramProfileSource 등)는 target 을 무시한다(D6 불변식).
+    """
     out: list[RawReview] = []
     for src in sources:
         try:
-            out.extend(src.collect(keywords, limit=per_source_limit))
+            out.extend(src.collect(keywords, limit=per_source_limit, target=target))
         except NotImplementedError:
             log.info("%s: 미구현 — 스킵", src.platform)
         except Exception as e:

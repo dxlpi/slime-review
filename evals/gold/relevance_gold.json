@@ -1,0 +1,2221 @@
+{
+  "_doc": "관련성 골드셋(US-006). 실텍스트만(D5). label.draft=true 는 자동 초안 — 사용자 교정 필요. collected_for=수집 타깃(앵커). kind∈{review,question,resale,chitchat}(디시). 인스타 name-collision 비슬라임 네거티브는 실 IG 데이터 부재로 미포함(향후 실수집 필요).",
+  "counts": {
+    "total": 138,
+    "keep": 52,
+    "drop": 86,
+    "dcinside": 120,
+    "instagram": 12,
+    "boundary_pairs": 6
+  },
+  "items": [
+    {
+      "text": "ㅂ슬라임 간단후기와 함께 한마디\n1. 초코비크런키 (5/5)\n묵꾸크에 옛날 언니들슬라임 생각날정도로 미감 예쁘고 좋음\n질감 완벽하고 향기도 좋음 무조건 사셈\n진짜재밌는 묵꾸크ㅠㅠ 이거 꼭 제발 사길바람\n2. 베리팝스 (5/5)\n원래있던 베이스 같베라 후기는생략 질감짱조흠\n뭔가 초반엔 로션슬 같다가도 후반엔 크리미해짐\n3. 갈릭쉬림프마요 (5/5)\n이거 향이",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-000"
+    },
+    {
+      "text": "비추수 무섭노! 전부내잘못인정하고\n앞으론 좋다는 글만 올릴게",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-001"
+    },
+    {
+      "text": "솔젝히 슬라임이 딸배랑 비슷함\n비싸고 몇번만지면끝이고 남는거없고 ㅜ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-002"
+    },
+    {
+      "text": "난 그래서 당근에 되팔음;",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-003"
+    },
+    {
+      "text": "훅추 카피바라 조음 솝퐁말 조아하면 ㅊㅊ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-004"
+    },
+    {
+      "text": "근데ㅜㅜ 퀄좋긴함 그래서 미치겠음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-005"
+    },
+    {
+      "text": "\"단돈 2만 원에 예약 폭주\"…500km 달리는 신차 등장에 현대차 '비상' 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-006"
+    },
+    {
+      "text": "ㅋㅋㅋ 현타오는거 ㅇㅈ함",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-007"
+    },
+    {
+      "text": "하 근데 ㄹㅇ 점점 돈아까움..",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-008"
+    },
+    {
+      "text": "ㄹㅇ가격때매 신상만삿어",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-009"
+    },
+    {
+      "text": "고닉셀털 ㄴㄴ 네임드화도 마찬가지임\n너가 댓글에 보인다 싶으면 반응해주지말고 적당히 썰어\n댓글은 우선 삭했음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-010"
+    },
+    {
+      "text": "창고형 할인마트 이용 및 ‘소분모임’ 관련 소비자 인식 조사 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-011"
+    },
+    {
+      "text": "ㅇㅈ 푸냥이 ㄴㅏ는 좀더 무게감 있을줄",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-012"
+    },
+    {
+      "text": "ㅂ 존나좋다\n촉감류는 기본 3통 이상 부풀고 생베도 개맛도리임\n허니푸냥이 인별에 많이 올라오던데 이유가있네\n카피바라보다 더 재밌었음 향수향을 더 선호하는데 오로지 촉감으로 캐리함 오프에서 쟁이고싶은데 슬켓이려나",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-013"
+    },
+    {
+      "text": "이번차수 ㄹㅈㄷ임 ㅈㄴ 좋음 ㄹㅇ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-014"
+    },
+    {
+      "text": "ㅂ 얘네 살만한가?\n이미 ㅂ 유슬은 다 시켰는데 다들 좋다고 하는 것 중에 아직 안산게\n그래놀라딸기토스트 베어브런치타임 베리팝스 크림앤플라워 인데 살말?\n슬린이라 ㅂ은 첫굼인고 솝 들어간거 만져본거라곤 ㅇㅉ거 밖에 없는데 좀 많이 실망함.\n제일 재밌게 만진건 ㅇㄹ 새콤달콤랜드..\n이번에 ㅂ에서 산 슬은 신상 빼면\n카피바라 허넛시 콩포트 후르트링 초코비 모닝",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-015"
+    },
+    {
+      "text": "그래놀라딸토 개좋음 향은 호불호 많이 갈리던데 난 괜찮았음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-016"
+    },
+    {
+      "text": "그래놀라 신세계였어 나 촉감류 진짜 싫어함ㅋㅋ 근데 걔는 만질때 마다 쫄깃해",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-017"
+    },
+    {
+      "text": "그래놀라진짜개좋음 난카피바라보다 훨젛앗어",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-018"
+    },
+    {
+      "text": "근데향이좀에바긴함 그래도난내가만진촉감류중에젤좋앗은",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-019"
+    },
+    {
+      "text": "@아갤러3(118.235) 그래놀라 추천 진짜많네.. 품절되기전에 얼른 사야겟다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-020"
+    },
+    {
+      "text": "‘과부제조기’ '바퀴 달린 관'으로 불리는데... 또 유명 배우 사망 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-021"
+    },
+    {
+      "text": "ㅂ 첫구매 드디어 해야지 하고 장전해놨는데\n상황이 많이 어수선해졌네 ㅜㅜ\n사실 본인은 저번차수 마켓때 궁금했던\n카피바라 팝핑소다 캔디토이박스 초코비 있어서 구매하기로 결심...ㅜㅜ(지금이 아니면 기회가 없을 것 같아서...슬파때도 실패했음...)\n더이상 미룰 수 없다 나의 첫굼 그래서 내가 뭘 샀냐면....\n나는 첫굼인데 요렇게 담아봤어!\n티엠아) 오픈 한",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-022"
+    },
+    {
+      "text": "후기 잘 찾아보고 고른 거에 유슬도 담았으니 잘 산 거 같은데?!!",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-023"
+    },
+    {
+      "text": "다행이다!! 예전에 타마켓 후기 쪄왔을때 ㅂ 잘맞을것같대서 열심히 골라서 담았음 ㅎㅎ ㅂ 후기도 들고올게!!",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-024"
+    },
+    {
+      "text": "구매내역보니 갤검 열심히 해서 산 느낌이 확 난다 ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-025"
+    },
+    {
+      "text": "앜ㅋㅋㅋㅋㅋ 글케 보여졌다니 다행이다 난 그럼 만족 ㅎㅎ\nㅂ 후기도 열심히 쪄서 들고올게",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-026"
+    },
+    {
+      "text": "ㅂ 첨삭좀\n초코비\n콩포트\n코튼멜로팝\n푸냥이or카피바라\n푸냥이랑 카피바라 고민되네",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-027"
+    },
+    {
+      "text": "카피 ㄱㄱ 푸냥이 층분리랑 수분감 개심해",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-028"
+    },
+    {
+      "text": "나도 푸냥이랑 카피바라 고민하다가 카피바라 일단 리스트에 담아놨다!!",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-029"
+    },
+    {
+      "text": "이번에 ㅂ 뭐살거얌?\n난 7개 사려고 하다가 기존 라인업 살게 없어서... 4개로 바꿈\n총알 열심히 모았는데,, 4월에 더 샀어야 했나봐\n그 뒤로 나오는 마켓 엄청 끌리는게 없어\n초코비크런키\n미니베이킹클래스(이건 묵매크 아니라고 해서,,, 새롭다고 하길래 넣음 ㅋㅋ)\n베어브런치타임 (카피바라, 푸냥이 할까 하다가 질감 겹치는 것 같아서, 걍 이걸로 감)\n딸",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-030"
+    },
+    {
+      "text": "그냥 나처럼 이번 패스 다음마켓 ㄱㄱ 뭔가안땡김",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-031"
+    },
+    {
+      "text": "나도 패쓰하려구",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-032"
+    },
+    {
+      "text": "난 신상 3개땡기는데 담마켓 사자니 그땐 신상할인 없어질거아녀...고민중",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-033"
+    },
+    {
+      "text": "나도 윗댓들처럼 그냥 넘길까 고민되는데... ㅋㅋ 신상 담 마켓에서 안가지고 올까봐... 좀 고민됨",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-034"
+    },
+    {
+      "text": "@글쓴 아갤러(58.78) 그니까....ㅜ차라리 땡기는거 많으면 막 담겠는데 나도 콩포트 안땡기고 ㅈㄴ고민됨 난 스타후르트링, 미니베이킹, 트리플치즈 이렇게 3개 땡김",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-035"
+    },
+    {
+      "text": "나도 안삼ㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-036"
+    },
+    {
+      "text": "향 아쉬워서 패스 ㅇㅇㅈ기대해보게",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-037"
+    },
+    {
+      "text": "에스파 카리나, 운전면허 시험 결과…충격적인 점수 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-038"
+    },
+    {
+      "text": "안사 비슷하기도 하고 서폿영상도 소리때문에 못보겟어서 걍 패스",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-039"
+    },
+    {
+      "text": "딸바크런키 푸냥이 카피바라 츄로토스트 살듯??\n푸냥이 카피바라를 아직도 안만져봐서 ㅈㄴ궁금함\n글고 누텔라바이트 매트꾸덕 좋아하면 제발사봐 난 재밌게만짐 다신 초반에 좀 탈출있음ㅜ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-040"
+    },
+    {
+      "text": "누텔라 바이트 사봐야겠다!! 혹시 수명은 어땠어?? 나도 푸냥이 카피바라 궁금한데 서폿이 베어 뭐시기랑 중간 질감이라고 해서 일단 저거 시도해보려고 ㅋㅋ 신상 할인 받아서...",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-041"
+    },
+    {
+      "text": "@글쓴 아갤러(58.78) 좀 뜨문뜨문 만지긴했는데 생각보다 잘살아있어서 놀랬음ㅋㅋ 나도 그런생각으로 전차수에 신상촉감골랐다가 개안부풀어서 걍 이번에 푸냥이 카피바라 꼭사려공ㅇ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-042"
+    },
+    {
+      "text": "천재이승국 \"20대 도둑맞은 느낌\" 16년 투병 밝혔다 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-043"
+    },
+    {
+      "text": "나도 안땡기는데 다른 마켓 기다리기가 어려움",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-044"
+    },
+    {
+      "text": "나도 이상태 더 만질게 없음 ㅜ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-045"
+    },
+    {
+      "text": "ㅂ 피드백 부탁해도 될까..?\nㅂ 처음사보고\n물 생기는거나, 질감 빠르게 변하는거 싫음\n식향 좋은데, 향이 이상하면 만지기가 어려움...\n- 텁텁하거나 인위적인 향 같은거\n여기서 누가 조언해줘서 담아봤는데 피드백 부탁해 ㅜ\n초코비 크런키\n카피바라 (푸냥이 사려고 하다가 물생긴다길래..)\n허니넛츠 시리얼\n요거 세개는 고정이구\n모닝빵\n자몽콩포트\n그래놀라 딸기토",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-046"
+    },
+    {
+      "text": "솝퐁말은 물생기는거 어쩔수앖는듯 ㅠ 단호박크림 개좋았어 한번 구매해보는거 ㅊㅊ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-047"
+    },
+    {
+      "text": "나 거의 모든 향수향 못 맡는데 수선화 ㅈㄴ 은은하고 발향 약해서 조앗음 약간 자연의 향?스러움",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-048"
+    },
+    {
+      "text": "엥 푸냥이 물 안생기는데",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-049"
+    },
+    {
+      "text": "수선화 좋음 깨끗한 핸드크림 냄새",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-050"
+    },
+    {
+      "text": "카피바라사서 만져봣었는데 그냥 딱히 크게호불호안갈릴향임",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-051"
+    },
+    {
+      "text": "ㅂ 카피바라 푸냥이 둘다만져본사람\n뭐가 더 좋았음? 카피바라 못사서 ㅈㄴ 울고있어\n- dc official App",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-052"
+    },
+    {
+      "text": "취향차이일듯 어떤 촉감류좋아하는데?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-053"
+    },
+    {
+      "text": "음 설명 잘 못해서 콩포트랑 과치샐로 비교하면 압도적으로 과치샐 좋아해 ㅠㅠ 빵반죽보단 가볍고 생크림질감?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-054"
+    },
+    {
+      "text": "@글쓴 아갤러(220.119) 흠 카피바라 솝퐁말 그자체로 거품같이사르르한느낌도있음 푸냥이는 실키하면서 푸둥물먹은 퐁말",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-055"
+    },
+    {
+      "text": "@아갤러2(106.101) 설명만 들어서는 카피바라가 내스타일에 가까울듯.. 고마버 담에 꼭 산다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-056"
+    },
+    {
+      "text": "너=나 나도 카피바라안사서 우는중",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-057"
+    },
+    {
+      "text": "@엄마나똥꼬에서슬라임이나와 샤갈 푸냥이는 겟함?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-058"
+    },
+    {
+      "text": "@글쓴 아갤러(220.119) 웅 근데 향이 좀 에바ㅠ 고구마케이크향에 좀 이상한 향 입힌느낌이야..",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-059"
+    },
+    {
+      "text": "@엄마나똥꼬에서슬라임이나와 식향러버도 힘드려나 오히려 기대돼",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-060"
+    },
+    {
+      "text": "“가상 자산에 과세 확정, 비트코인 수익 ‘이만큼’ 넘으면 세금 내야 합니다\" 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-061"
+    },
+    {
+      "text": "나 3월 마켓 때 사서 푸냥이는 안 만져봤고 카피바라는 만져봤는데 진짜 극락임 ㅈㄴ 좋아",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-062"
+    },
+    {
+      "text": "꼭 가질거야 카피바라...",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-063"
+    },
+    {
+      "text": "과치샐 좋아하면 푸냥이 더 좋아할듯?\n내 기준 푸냥이가 과치샐이랑 더 비슷하게 느껴짐\n근데 카피바라도 비슷하게 좋긴함 걍 둘다 잘맞을것같은데",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-064"
+    },
+    {
+      "text": "오 그래?? 꼭 둘 다 만져보겠어 둘 다 좋아보이긴 해 봄 촉감류 취향은 갈려도 실패는 없는 느낌,,,",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-065"
+    },
+    {
+      "text": "나도 과치샐파인데 난 푸냥이가 훨 좋았음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-066"
+    },
+    {
+      "text": "하운드13 '드래곤소드: 어웨이크닝', 출시 일주일 만에 20만 장 판매 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-067"
+    },
+    {
+      "text": "ㅂ 사고싶은 초보인데\n저 ㅂ 사고싶은데 4개에서 7개 사고싶어요 생각중인건\n초코비,베리팝스,푸냥이,캔디토이,피치요고,카피바라,딸기콩포트,그래놀라딸기,스트로베리디폼...\n여기서 뭘 뺄까욥",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-068"
+    },
+    {
+      "text": "취향을 말하셈",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-069"
+    },
+    {
+      "text": "향이 취향이 아니거나 파츠가 ㅂㄹ인거 빼셈 어차피 슬라임 나중에 다죽고 파츠만 남는다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-070"
+    },
+    {
+      "text": "ㅍㄷ 블루베어코어 훅이\n이번에 나온 신상 화글임 근데 별로 인기 없어보이더라 인별 후기도 거의 없고 오끄에도 거의 마지막까지 남아있던데\n정기 마켓 구매했는데 상태가 꽤 많이 녹아있었음 다른 후기도 그랬다는 거 보면 딴 건 몰라도 얘를 좀 더 유연하게 만들엇나봄\n냄새가 먼 섬유유연제인지 향수 냄새인데 발향 ㅈ대서 코아픔\n하트블럭+6디 조합임\n하트블럭 탈곡기",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "봄",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-071"
+    },
+    {
+      "text": "ㅇㅈ 이거베이스 좋더라 탈곡기라 슬프지만",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "봄",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-072"
+    },
+    {
+      "text": "ㅍㅋ 다 담아놓고 8시에 사는거 깜빡했는데\n어차피 못샀을거같네 .. 머머 담았어 암시들??\n난 당케 니트크림 몽글구름 별쿠키 파스텔 ㅠㅠ\n- dc official App",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-073"
+    },
+    {
+      "text": "파스텔도넛 엔젤블루 베리스타 너티멍 ㅠ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-074"
+    },
+    {
+      "text": "아니 머머\n장바구니 타임 지나면 닫아둬야지\n어떤 병신년들이 계속 시키니까 장바구니에 담지도 못한다고 씨발",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-075"
+    },
+    {
+      "text": "? 7시에 결제하는거 아님?? 왜 2분3분전에 품절이 먼저 떠 ㅡㅡ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-076"
+    },
+    {
+      "text": "그니까 아니 재고 풀린줄알고 계속 사잖아",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-077"
+    },
+    {
+      "text": "@글쓴 아갤러(116.46) 아 개빡치네 정직하게 기다린 우리만 바보됐노 ㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-078"
+    },
+    {
+      "text": "@아갤러1(180.67) 뭐 이건 그사람들 잘못도 아님.. 당연히 나라도 인스타 공지못봤으면 풀려서 좋다고 샀을 듯",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "갤 운영/메타 잡담",
+        "draft": true
+      },
+      "id": "dc-079"
+    },
+    {
+      "text": "@글쓴 아갤러(116.46) 하긴 공지못보고 뒤늦게 드가서 산사람들은 모르겄네... 아 ㅅㅂ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "갤 운영/메타 잡담",
+        "draft": true
+      },
+      "id": "dc-080"
+    },
+    {
+      "text": "@아갤러1(180.67) 그냥 40-50분 열고 닫아뒀어야 했어 장바구니 타임이 장바구니타임이아녔음 계속 품절이라서 담는거조차 못했는데",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-081"
+    },
+    {
+      "text": "@글쓴 아갤러(116.46) 그니까 스토리에 7시에 재오픈한다 올려놨으면 당연히 7시 전까지 막아두다가 푸는걸로 이해했는데 나는 ㅋㅋ \n사이트 대기타고있는데 갑자기 58분쯤에 장바구니 담아논거 품절되길래 뭔가 했음.. 하",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-082"
+    },
+    {
+      "text": "\"이 와중에 또 악재가..\" 현대차 발목 잡은 ‘3대 요구안’ 뭐길래 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-083"
+    },
+    {
+      "text": "내말이ㅋㅋㅋㅋㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-084"
+    },
+    {
+      "text": "아니 사장이 알아서 쳐내야되는거아님..?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-085"
+    },
+    {
+      "text": "아 ㅁㅁㄴ살지말지 ㅈㄴ고민돼 시발시발시발\n이번달 산 거\n늪지8.1 / 캐치4.4 / 욤4.3 / 파스텔로7.5 / 폴린11\n총 36만원\n살거\n오니 / 쥬리 / 페페롱 / 머머 / 예찬\n페페롱 예찬 최애라 각각 10넘을 거 같음\n고민중 모모네4.4  아아아아악\n뭐 골랏냐면\n1. 스누피쿠킹\n2. 베리프루팁스\n3. 끼리와플\n4. 에그노그\n+내리꽃\n모모네까지하면",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-086"
+    },
+    {
+      "text": "ㅁㅊ 난 아니라고 본다 진짜 산거 다 만지긴 함? 정신차려 이년아",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-087"
+    },
+    {
+      "text": "다 못만져ㅜㅜㅜ시발 안깐슬 100개ㅜ ㅜㅜㅜㅜㅠ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-088"
+    },
+    {
+      "text": "퓨리아 '타투', CBLoL 1경기 출장정지-벌금 징계 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-089"
+    },
+    {
+      "text": "사 나도 ㅇㅊ ㅁㅁㄴ ㅍㅍㄹ 다산다 그대신 4+1로만..",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-090"
+    },
+    {
+      "text": "비매욕심땜에 사쁠원은 가혹해ㅜㅜㅡㅜㅜㅜㅜ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-091"
+    },
+    {
+      "text": "넌 그만사라 ㅋㅋㅋㅋ 상시인데 머하러 몰아삼",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-092"
+    },
+    {
+      "text": "참으께ㅜㅜㅜㅜㅜ하",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-093"
+    },
+    {
+      "text": "상시라 굳이긴 해",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-094"
+    },
+    {
+      "text": "참는다 눈물로 보내준다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-095"
+    },
+    {
+      "text": "\"이 정도면 살인미수 분명\" 네티즌들이 보고 경악한 영상 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-096"
+    },
+    {
+      "text": "상시인데 걍 담달에 사",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-097"
+    },
+    {
+      "text": "나 보는거같다.. 맘에드는거 있으면 당장 만질거 아니라도 일단 당장 내옆에 있었으면 좋겠는 그런 마음이고 충동구매까지 있음..\n근데 이번엔 참아보게 ㅜ 산게 너무많다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-098"
+    },
+    {
+      "text": "사람들 보는 눈 비슷하네\n이번차수 머머 왠지 모르게 땡기더라니..\n- dc official App",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-099"
+    },
+    {
+      "text": "ㄴㅈ 랜박받은쓱있음??\n머머옴\n- dc official App",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-100"
+    },
+    {
+      "text": "못받음 못삿으니까",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-101"
+    },
+    {
+      "text": "슬린이 모모네슬라임 후기!\n크런치슬랑이 한번 만져보고\n슬라임에도 관심이 가서 빈짱에 디폼슬라임이라 적힌거 한개 주문해봤는데\n만지작하다보니 꽤 좋은거?\n글서 다른 질감들도 궁금해서 더 사볼까 찾아보다가\n상시판매인 신기동이랑 모모네랑 고민하다가 모모네로 주문\n내가 무슨 취향인지를 몰라서\n인스타 설명이랑 영상 계속 봐가면서\n최대한 질감 안 겹치게 주문해봤는데 잘",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-102"
+    },
+    {
+      "text": "ㅁㅁㄴ 좋아\n지금 상시중에서 늪지 파스텔로 추천해",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-103"
+    },
+    {
+      "text": "옥케! 늪지랑 파스텔로! 바로 쇼핑한다",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-104"
+    },
+    {
+      "text": "ㄴㅈ 퀄 진짜 좋아",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-105"
+    },
+    {
+      "text": "이 댓 보고 포풍검색해서 몇개 추렸는데 전부 품절이다잉...",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-106"
+    },
+    {
+      "text": "ㅋㅋㅋㅋ 저 말 말고 어케 표현해야할지 잘모르겠엌ㅋㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-107"
+    },
+    {
+      "text": "[리뷰] AI가 삼성전자를 다시 '반도체 황제'로 만들었다 1 / 20 이전 다음",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "news-bleed(디시 실시간 위젯)",
+        "draft": true
+      },
+      "id": "dc-108"
+    },
+    {
+      "text": "처음 써보는 빈짱슬라임 훅\n반응 좋으면 만간 ㅁㅁㄴ도 올려보겠음 ~\n(처음 써봐서 인증 어떻게 하는지 잘 모름 잘못된거 있으면 얘기 부탁해 !)\n빈짱슬라임\n1. 코지 스노우볼 (5/5)\n옛날에 빈짱에서 한국 빈백 물젤리 산 적 있었는데 탈출 많아서 만지다가 던졌음\n근데 조기 이빨 스팽글???? 물음표 500만 개 생기면서 빈백이 탈출해도 스팽글이 있으니 괜",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "question",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-109"
+    },
+    {
+      "text": "ㅁㅁㄴ후기도 주세요!!",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-110"
+    },
+    {
+      "text": "스노우볼 궁금해지네 비줠도 예쁘던데 훅 ㅊㅊㅊ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-111"
+    },
+    {
+      "text": "와 요즘 ㅂㅉ 미감 맛좋네\n걍 피드로 보다가 뭐지? 했는데 빈짱임\n어떤 심경 변화가 있으셨길래 이렇게 변하지?\n할로윈부터 미감 ㅅㅌㅊ되서 존나신기함ㅋㅋㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-112"
+    },
+    {
+      "text": "ㄱㄴㄲ 대체 무슨일이 있었던건지ㅋㅋㅋㅋㅋ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-113"
+    },
+    {
+      "text": "여긴 원래 겨울에 폼좋아짐",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-114"
+    },
+    {
+      "text": "토마토컨셉 다 사고 싶은데\n여기서 빠진거 있으면 알려줘\n온고잉 제품들로만 !\n별안간토마토사탕 - 신기동\n토달플레이트 - 포코\n멋쟁이샐러드 - 슬지나\n토마토얼음과자 - 웨이즈\n토마꿀렁 - 332\n부라타토마토치즈 - 빈짱\n바질토마토블렌디드 - 베이퍼\n토마토푸리링푸딩 - 핏치\n- dc official App",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-115"
+    },
+    {
+      "text": "ㅈㅌㅈ - 찰토마토바질에이드?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-116"
+    },
+    {
+      "text": "내가볼려고 적는 할로윈마켓\n모모네\n파스텔로\n연찌\n에러\n웨이즈\n쥬리\n삐야\n호씨\n슬지나\n베이퍼\n봄\n빈짱\n퐁슈\n페페롱\n이외 하는마켓 있으면 댓글부탁함\n마켓너무 많아서 헷갈릴까봐 초성처리안함\nㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ\n10월 건너뛰는 마켓\n+이외 확정적으로 안여는 마켓 있으면 더 알려주셈\n포코\n와악",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "제품/후기 어휘",
+        "draft": true
+      },
+      "id": "dc-117"
+    },
+    {
+      "text": "ㅍㅍㄹ-10월 중순 선제작\nㅆㄴ-10월 12일 선제작\nㅇㄴ-10월 말 예정",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-118"
+    },
+    {
+      "text": "할로윈 컨셉 확정이래?",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": "빈짱",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "제품 무관 잡담(추정)",
+        "draft": true
+      },
+      "id": "dc-119"
+    },
+    {
+      "text": "📦머머슬라임 랜덤박스 판매📦\n\n6월 차수 라인업으로 구성되어 있습니다!\n\n🌡️18도 냉방 환경에서 보관되었습니다.\n📦5개 35,000원 무료배송\n⭐️1인 1박스 구매가능 합니다\n⭐️일부제품 파츠 미포함 될 수 있습니다! \n📍cs재고는 남겨두기 않기 때문에 용기파손일 경우 용기값 환불, 사용 불가 제품일 경우 개당 금액 환불로만 진행됩니다.\n\n일시 : 7월 11일 토요일 11시 재오픈\n배송일 : 7월 13일 월요일\n주문 방법 : 정각에 프로필에 올라오는 오픈카톡 링크로 아래와 같이 주문서 작성 후 보내주세요.\n성함 / 연락처 / 주소 / 현금영수증 여부",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-120"
+    },
+    {
+      "text": "출고공지 📦🚛️\n\n🚛 오래 기다리셨습니다! 2차 주문건 모두 금일 출고되었습니다. 송장번호가 아직 등록이 안 되어있어 오후 늦게 배송정보 확인하실 수 있습니다. 아래는 비매품 정보 입니다.\n\n1️⃣스쿱 점토\n네추럴 글루올 플로우 점토 / 망고요거트향\n\n2️⃣8mm디폼 \n엘머스 플로우 솔리드 / 블루베리요거트향\n\n3️⃣6mm디폼 \n스쿨 플레인 쁠루모 / 레몬향\n\n4️⃣6mm디폼+파스타비즈\n택키 컬글 엘머스 / 살구향\n\n5️⃣완충재 촉감류 \n네추럴 아이믹스 점토 / 소다향\n\n6️⃣빨대\n아이믹스 엘머스 / 모링가향\n\n7️⃣수수깡\n아이믹스 플로우 글루올 컬스 / 히노끼향\n\n8️⃣빈백와르르\n솔리드 네추럴 택키 엘머스 / 비스켓향\n\n🌡️ 25도 환경에서 반죽 후 21도 환경에서 단단한 농도로 보관하였습니다. 받아보실 ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-121"
+    },
+    {
+      "text": "안녕하세요! 6월 19일 오픈하는 온라인 마켓 공지입니다.\n\n📍6월 19일 오후 8시 오픈 재고소진 시 마감하며, 7시 50분 부터 장바구니 담기 가능합니다. 이 시간에는 장바구니에 담기만 가능합니다. 결제는 8시 정각 이후부터 가능합니다. 8시 이전 주문 건은 무통보 취소됩니다.\n\n📍무통장 주문 시 입금기한은 '1시간' 입니다. 기한이 지난 주문건은 무통보 취소됩니다. 주문자명과 입금자명이 다를 시 문의 남겨주셔야 확인이 가능합니다!\n\n⭐️발송일 - 7월 6일, 7일 랜덤출고 (배송일 지정 불가)\n* 택배사- CJ대한통운\n* 택배비 - 기본 3,500원 / 제주 외 도서산간 + 3,000\n* 40,000원 이상 무료배송 \n\n⭐️합배송 공지\n추가주문 시 사이트 내에서 자동으로 합배송 되지 않습니다.\n합배송 ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-122"
+    },
+    {
+      "text": "6월마켓 비매품\n\n1.스쿱 점토 데코 2.플레잉\n네추럴 글루올 플로우 점토 / 망고요거트향\n푸등하고 보들한 생크림재질 퐁말이에요! 초반에 묵직하지만 부풀리다보면 손녹는 뚱땡이로 변해요. 손 작으신분들은 덜어만지시는 것을 추천드려요.\n생크림퐁말이라 호불호 없을 것 같습니다.\n\n3.빈백와르르 데코 4.플레잉\n솔리드 네추럴 택키 엘머스 / 비스켓향\n점소처럼 부푸는 생베이스 빈백와르르예요. 크리미하고 와방 부푸는 밀도높은 베이스예요. 부풀수록 매트크리미 해집니다!\n\n5.빨대\n아이믹스 엘머스 / 모링가향\n퐁신하고 촉촉한 반죽같은 질감이에요. 수분감이 커서 빨대를 두세알 정도 뱉어내더라구요🥲 많이 부풀고 도톰 맨질맨질 합니다. \n\n6.수수깡\n아이믹스 플로우 글루올 컬스 / 히노끼향\n수수깡과 잘 어울리는 얇실 서걱 베이",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-123"
+    },
+    {
+      "text": "6월마켓 비매품\n\n1.8mm디폼 \n엘머스 플로우 솔리드 / 블루베리요거트향\n쫀쫀 졸깃하면서 젤라틴 비계? 같은 질감이에요! 딴딴하면서 응집된 상태에서 풀어질수록 말캉 뻐등한 쩰리 질감으로 부풀어요. 유연해야 쫀득함은 적고 졸인 느낌이 나서 더 재미있습니다. \n\n2.6mm디폼 \n스쿨 플레인 쁠루모 / 레몬향\n얇실하고 자글자글한 베이스입니다. 유들함에 녹진함이 살짝 느껴지고 부풀수록 크리미해져요. 쁠루모의 말캉 크리미함이 재미있습니다. 이제품은 탈출이 있어서 유연하게 플레잉 부탁드립니다. 만져보면서 설명을 적고있는데 숙성 후 탈출이 많이 줄어들어요.\n \n3.스티로폼 촉감류 \n네추럴 아이믹스 점토 / 소다향\n새로운 점토로 만들고나서 굉장히 신기했던 질감이라고 느꼈어요! 솝없솝 질감에 참기름을 잔뜩 바른 듯한 질감",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-124"
+    },
+    {
+      "text": "#첵스초코딸기빙수_딸기 \n아마존 쁠루모 글루올 플레인 / 딸기우유\n6mm 디폼 40g 내장 / 첵스 비즈 15g 내외 동봉 / 파츠 포함\n\n영상을 모두 업로드 한 줄 알았는데 첵스초코딸기빙수가 업로드가 안 되었네요. 마켓 바로 직전에 혼동드려 죄송합니다😭\n\n첵스초코딸기빙수와 같은 베이스로, 디자인은 기존 제공된 비매품에서 살짝 바뀌었습니다. 딸기파츠는 수제로 작업해 딸기초콜렛 멜팅 모양이 조금씩 다를 수 있다는 점 참고해주세요. \n\n수정액같은 뽀독한 느낌 한 스푼에 녹진함도 살짝 느껴지는 질감이에요! 전체적으로 매트하고 부풀수록 꾸덕함도 살짝 올라옵니다. 6디폼의 간질함과 첵스초코빙수의 걀걀함이 합쳐져 재미있어요. 뒷면이 매끈하게 처리된 비즈이다 보니 탈출이 더 발생할 수 있습니다. 향은 달달한 딸기우유향 ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "첵스초코딸기빙수_딸기"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-125"
+    },
+    {
+      "text": "#키튼우유크림롤\n네추럴 아이올 컬스 플레인 솔리드 / 에그노그\n8mm 25g+데코 소량\n파츠 토핑 포함\n\n8디폼과 잘 어울리는 뭉텅 생크림 질감입니다. 처음에 뭉긋뭉긋한 촉촉한 막이 느껴지고 쫀쫀 판판 뭉텅에서 부풀수록 보송 와방 휘핑한 가벼운 크림처럼 부풀어요! 가볍고 디폼이 잘 느껴져서 재미있었어요ㅎㅎ 여러가지 종류의 크리미함이 섞여있어 호불호 없이 느껴질 질감입니다. 에어컨 아래에서 플레잉 했더니 영상 속 탈출이 조금 보이네요🥺 2알 정도 탈출이 있었습니다!\n\n향은 에그노그향으로 계란과자 같은 향인데 발향이 약한편이니 참고 부탁드립니다!",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "키튼우유크림롤"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-126"
+    },
+    {
+      "text": "#아이스베리스무디 \n아이뉴클 플로우 앨머스 점토 눈가루소량 솝소량 / 딸기요거트\n딸기잼 시럽 동봉 파츠 포함\n\n눈가루가 소량 들어간 솝퐁말입니다. 초반부터 가볍고 말캉 촉촉한 질감이고 부풀수록 보송한 물수건 느낌이에요. 기포 채워주실 수록 두둥실 퐁신해져요! 부푼 후에도 촉촉하게 느껴지고 스치는 눈가루 느낌도 좋습니다ㅎㅎ\n\n부풀기는 3통 충분히 나왔고 유연하게 시작하여 액티 소량씩 조절해가며 만지시면 와방방 부풀더라구요! 향은 딸기요거트향 입니다❤️",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "아이스베리스무디"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-127"
+    },
+    {
+      "text": "#위즈캔디샵\n아이 글루올 플레인 택키\n8mm 25g+지렁이비즈 20g\n토핑 파츠 글리터 포함\n\n새벽에 해 없을 때 찍었더니 실물을 못 담네요🚰·̫🚰 지렁이비즈가 올라가는 화글 디폼 슬라임입니다! 지렁이비즈의 걀걀함 보다는 우득뚜득하고 기다란 생김새가 손에 스치는 느낌이 큽니다. \n\n초반에 지렁이비즈로 인한 찢뜯김이 있어서 플레잉이 어렵지만 조금만 기포를 채워주시면 진가를 발휘하는 슬라임 입니다,,, 도톰하게 잡히지만 내용물이 잘 느껴지고 그 위로 택키의 크리미가 가득 올라와요! 재료가 무거운데도 잘 받쳐주는 베이스여요. 도톰크리미를 좋아하시고 새로운 질감을 만져보고 싶다 하시는 프슬분들께 추천드립니다. \n\n지렁이비즈는 뒷면이 매끈한 특징때문에 크런치베이스 제외 하고는 탈출이 있더라구요 참고 부탁드립니다. 제",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "위즈캔디샵"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-128"
+    },
+    {
+      "text": "#곰돌디핑프링글스\n엘머스 솔리드 아이올 플레인 / 비스켓\n6mm 40g+감자칩비즈 10g\n토핑 파츠 포함\n\n유행은 끝났지만 꼭 감자칩 비즈를 사용해보고 싶어서 만들어본 슬라임 입니다! \n\n베이스는 딱 가볍고 산뜻한 크림소스st 크리미라고 느껴졌어요. 몇번 늘이면 바로 부풀면서 휘핑크림 같은 가벼운 크리미가 올라옵니다ㅎㅎ 비즈가 작아서 10g이어도 꽤 넉넉히 올라가더라구요. 감자칩 비즈의 직접적인 손맛이나 걀걀함은 안 느껴지지만 확실히 베이스를 더 얇게 만들어주고 난사처럼 겹겹이 기포가 쌓이도록 도와주더라구요. 재미있게 만진 슬라임이어서 추천 드립니다!\n\n향은 시판과자 다이제 같은 고소한 비스켓 향이에요ㅎㅎ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "곰돌디핑프링글스"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-129"
+    },
+    {
+      "text": "#치치시리얼\n네추럴+글루올+아이올+아마존+쁠루모 / 요거트쿠키\n6mm디폼 40g+리본블럭 13g\n\n치치시리얼의 갈색 리본비즈가 단종되어 연갈색으로 바뀌어요. 파츠도 조금 변경되었습니다. 리본비즈의 자극은 디폼>리본비즈>별비즈 이렇게 느껴졌어요! 쟈글한 6디폼과 합이 좋더라구요.\n\n초반에 늘일 때 응집되어 있는 쁠루모 쩰리에 수정액을 한 숟가락 넣은 느낌이에요. 얇고 요거트같은 베이스 사이로 재료가 버무려집니다... 부풀수록 녹진함이 돌며 크리미로 꽉 찬 질감이 올라와요😚 부풀어도 얇게 겹겹이 기포층이 쌓이는 느낌이어서 쟈글함이 잘 느껴졌어요. \n\n좀만 농도가 잡혀도 리본비즈 탈출이 생기니 유연하게 만져주세요! 코팅감이 아주 좋았고 대신에 리본비즈 5알 정도 탈출이 있었습니다🥹 최대한 탈출을 잡아서 출고하도록",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "치치시리얼"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-130"
+    },
+    {
+      "text": "#크림꼬끄카롱\n쁠루모 플레인 플로우 글루올 / 솜사탕\n6mm 디폼 40g + 별비즈 15g\n파츠 토핑 가루 따로 동봉\n\n이번 신상 중 추천 제품입니다...🫶🏻 요즘 얇베병에 걸려서 얇고 자극 좋은 베이스로 신상 연구를 해보았어요. 머머슬라임 별비즈 중 브라운슈베이커리 베이스가 얇아 칭찬도 많았고, 꾸준히 출시 문의가 있었는데 여러가지 이유로 못 나오고 있어요🥺 브라운슈 원하시는 분들 이번에 크림꼬끄카롱 드셔보시는 것을 추천드려요🫳🏻🫳🏻🫳🏻\n\n얇실하고 크리미한 베이스에 재료가 가득 들어있어 크런치함과 걀걀함이 아주 잘 느껴져요. 쁠루모의 약매트 몽글함과 플레인의 촉촉 크리미함이 조화롭게 어우러진 느낌입니다. 저는 강철손인데 플레잉 후에 시원하면서 손이 조금 얼얼하더라구요ㅎㅎ 부풀수록 유들한 코팅감도 소량 느껴",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": "머머",
+        "slime": "크림꼬끄카롱"
+      },
+      "label": {
+        "keep": true,
+        "kind": "review",
+        "why": "실 슬라임 캡션(온토픽)",
+        "draft": true
+      },
+      "id": "in-131"
+    },
+    {
+      "text": "ㅂ슬라임 간단후기와 함께 한마디\n1. 초코비크런키 (5/5)\n묵꾸크에 옛날 언니들슬라임 생각날정도로 미감 예쁘고 좋음\n질감 완벽하고 향기도 좋음 무조건 사셈\n진짜재밌는 묵꾸크ㅠㅠ 이거 꼭 제발 사길바람\n2. 베리팝스 (5/5)\n원래있던 베이스 같베라 후기는생략 질감짱조흠\n뭔가 초반엔 로션슬 같다가도 후반엔 크리미해짐\n3. 갈릭쉬림프마요 (5/5)\n이거 향이",
+      "platform": "dcinside",
+      "type": "post",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 텍스트는 다른 제품",
+        "draft": true
+      },
+      "id": "dc-132"
+    },
+    {
+      "text": "솔젝히 슬라임이 딸배랑 비슷함\n비싸고 몇번만지면끝이고 남는거없고 ㅜ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 텍스트는 다른 제품",
+        "draft": true
+      },
+      "id": "dc-133"
+    },
+    {
+      "text": "훅추 카피바라 조음 솝퐁말 조아하면 ㅊㅊ",
+      "platform": "dcinside",
+      "type": "comment",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "chitchat",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 텍스트는 다른 제품",
+        "draft": true
+      },
+      "id": "dc-134"
+    },
+    {
+      "text": "📦머머슬라임 랜덤박스 판매📦\n\n6월 차수 라인업으로 구성되어 있습니다!\n\n🌡️18도 냉방 환경에서 보관되었습니다.\n📦5개 35,000원 무료배송\n⭐️1인 1박스 구매가능 합니다\n⭐️일부제품 파츠 미포함 될 수 있습니다! \n📍cs재고는 남겨두기 않기 때문에 용기파손일 경우 용기값 환불, 사용 불가 제품일 경우 개당 금액 환불로만 진행됩니다.\n\n일시 : 7월 11일 토요일 11시 재오픈\n배송일 : 7월 13일 월요일\n주문 방법 : 정각에 프로필에 올라오는 오픈카톡 링크로 아래와 같이 주문서 작성 후 보내주세요.\n성함 / 연락처 / 주소 / 현금영수증 여부",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "review",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 캡션은 다른 제품",
+        "draft": true
+      },
+      "id": "in-135"
+    },
+    {
+      "text": "출고공지 📦🚛️\n\n🚛 오래 기다리셨습니다! 2차 주문건 모두 금일 출고되었습니다. 송장번호가 아직 등록이 안 되어있어 오후 늦게 배송정보 확인하실 수 있습니다. 아래는 비매품 정보 입니다.\n\n1️⃣스쿱 점토\n네추럴 글루올 플로우 점토 / 망고요거트향\n\n2️⃣8mm디폼 \n엘머스 플로우 솔리드 / 블루베리요거트향\n\n3️⃣6mm디폼 \n스쿨 플레인 쁠루모 / 레몬향\n\n4️⃣6mm디폼+파스타비즈\n택키 컬글 엘머스 / 살구향\n\n5️⃣완충재 촉감류 \n네추럴 아이믹스 점토 / 소다향\n\n6️⃣빨대\n아이믹스 엘머스 / 모링가향\n\n7️⃣수수깡\n아이믹스 플로우 글루올 컬스 / 히노끼향\n\n8️⃣빈백와르르\n솔리드 네추럴 택키 엘머스 / 비스켓향\n\n🌡️ 25도 환경에서 반죽 후 21도 환경에서 단단한 농도로 보관하였습니다. 받아보실 ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "review",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 캡션은 다른 제품",
+        "draft": true
+      },
+      "id": "in-136"
+    },
+    {
+      "text": "안녕하세요! 6월 19일 오픈하는 온라인 마켓 공지입니다.\n\n📍6월 19일 오후 8시 오픈 재고소진 시 마감하며, 7시 50분 부터 장바구니 담기 가능합니다. 이 시간에는 장바구니에 담기만 가능합니다. 결제는 8시 정각 이후부터 가능합니다. 8시 이전 주문 건은 무통보 취소됩니다.\n\n📍무통장 주문 시 입금기한은 '1시간' 입니다. 기한이 지난 주문건은 무통보 취소됩니다. 주문자명과 입금자명이 다를 시 문의 남겨주셔야 확인이 가능합니다!\n\n⭐️발송일 - 7월 6일, 7일 랜덤출고 (배송일 지정 불가)\n* 택배사- CJ대한통운\n* 택배비 - 기본 3,500원 / 제주 외 도서산간 + 3,000\n* 40,000원 이상 무료배송 \n\n⭐️합배송 공지\n추가주문 시 사이트 내에서 자동으로 합배송 되지 않습니다.\n합배송 ",
+      "platform": "instagram",
+      "type": "post",
+      "collected_for": {
+        "market": null,
+        "slime": "레몬커드쉘도넛"
+      },
+      "label": {
+        "keep": false,
+        "kind": "review",
+        "why": "쿼리조건부 네거티브(무관 타깃) — 원 캡션은 다른 제품",
+        "draft": true
+      },
+      "id": "in-137"
+    }
+  ]
+}

@@ -54,9 +54,11 @@ class InstagramSource(Source):
         raise NotImplementedError(
             "business_discovery 라이브는 App Review 통과 후 가능 — 데모는 fixture_path 사용")
 
-    def collect(self, keywords: list[str], limit: int = 100) -> Iterator[RawReview]:
+    def collect(self, keywords: list[str], limit: int = 100,
+                target: Optional[dict] = None) -> Iterator[RawReview]:
         """fixture 모드: 마켓 공식 게시물 캡션을 1층 RawReview 로 yield(공식 스펙=official_spec).
-        keywords 를 주면 그 핸들만, 없으면 fixture 전체. (2층 hashtag 경로는 _collect_hashtag 참고)"""
+        keywords 를 주면 그 핸들만, 없으면 fixture 전체. (2층 hashtag 경로는 _collect_hashtag 참고)
+        1층(공식 스펙) 경로라 관련성 게이트 미적용 — target 은 인터페이스 통일용으로만 받음(D6)."""
         if not self.fixture_path:
             raise NotImplementedError("Graph API 토큰/App Review 연결 후 구현 — 데모는 fixture_path 사용")
         from ..layer1 import load_fixture, iter_official_posts

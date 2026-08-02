@@ -1,45 +1,52 @@
-# CLAUDE.md — 슬라임 리뷰 RAG (compass)
+# CLAUDE.md — Slime Review RAG (compass)
 
-한국 슬라임 마켓의 **공식 스펙(1층·정형) + 사용자 후기(2층·비정형)** 를 통합해 출처를 인용하며
-답하는 근거 기반 RAG. 제논(GenON) AI Product Engineer 지원 포트폴리오 — GenOS(AI Search +
-에이전트 + LLM Ops)의 축소판. **소스 편향(인스타 긍정 / 디시 부정)은 보정 대상이 아니라 1급 기능** —
-평균내지 말고 소스별 + 갭으로 투명하게.
+An evidence-grounded RAG that answers with citations by combining **official specs (Layer 1,
+structured) with user reviews (Layer 2, unstructured)** across Korean slime marketplaces.
+Portfolio for a GenON AI Product Engineer application — a scaled-down GenOS (AI Search + agents +
+LLM Ops). **Source bias (Instagram positive / DCInside negative) is a first-class feature, not
+something to correct for** — never average it; show it per source, plus the gap.
 
-> 이 파일은 나침반이다. 상세는 아래 문서로 분산되어 있으니 필요한 것만 따라가라.
+> This file is a compass. The details live in the documents below — follow only what you need.
 
-## 어디를 볼까 (map)
-- **전체 흐름·의존성**: [ARCHITECTURE.md](ARCHITECTURE.md) (파이프라인 + mermaid + ripple 표)
-- **도메인 규칙·암묵지**: [MEMORY.md](MEMORY.md) (어휘·홍보성·1층 규칙·개체연결·KB 구조)
-- **구조적 결정 근거**: [docs/adr/](docs/adr/) (임베딩·소스편향·IG fixture·홍보 캐스케이드·후기단위)
-- **모듈별 상세**: [slime_rag](slime_rag/CLAUDE.md) · [app](app/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
-  [eval](eval/CLAUDE.md)(단위테스트) · [evals](evals/CLAUDE.md)(pass-rate)
-- **빌드 기록·생산성 근거**: [BUILD_LOG.md](BUILD_LOG.md) · **스택 근거**: [README.md](README.md)
+## Where to look (map)
+- **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
+- **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit)
+- **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [app](app/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
+  [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
+- **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
 
-## 평가 하드 게이트 (반드시 충족)
-1. 배포된 데모 + 리포지토리 + 기술 문서
-2. **AI 코딩 도구 생산성 근거**([BUILD_LOG.md](BUILD_LOG.md): 핵심 프롬프트 / AI생성 vs 사람수정 / 시간)
-3. **관측성**(로깅·메트릭·비용·장애 추적 — 전 LLM 콜은 `slime_rag/llm_ops.py` 한 곳)
+## Evaluation hard gates (must be met)
+1. Deployed demo + repository + technical documentation
+2. **Evidence of AI coding-tool productivity** ([BUILD_LOG.md](BUILD_LOG.md): key prompts / AI-generated vs human-edited / time)
+3. **Observability** (logging, metrics, cost, failure tracing — every LLM call goes through `slime_rag/llm_ops.py` alone)
 
-## 현재 상태 & 남은 일
-- Phase 0~6 **end-to-end 라이브 검증 완료**. **남은 하드게이트 = 배포(Render)** 뿐.
-- 1층은 IG App Review 차단으로 fixture(`data/layer1_fixture.json`, 3마켓 6제품) — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
-- 남은 구현: `slime_rag/relevance.py` 관련성 기준(스텁) · 개체연결 정답셋 확장([evals/gold/](evals/gold/)) ·
-  제품 약칭 사전(`data/product_aliases.json`) · 유해 필터 기준.
+## Current status & what's left
+- Phases 0–6 **verified end-to-end against live data**. **The only hard gate left is deployment (Render).**
+- Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
+  blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
+- Still to do: calibrate `τ_topic` for the relevance gate (`slime_rag/relevance.py` is implemented;
+  the precision/recall gate needs corrected user labels) · expand the entity-linking gold set
+  ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
+  toxicity filter criteria.
 
-## 자주 쓰는 명령
+## Frequently used commands
 ```bash
-source .venv/bin/activate                 # 항상 repo 루트에서 (DB 포트 55432)
-docker compose up -d                      # pgvector + schema 초기화
-python -m slime_rag.pipeline              # end-to-end 글루
+source .venv/bin/activate                 # always from the repo root (DB port 55432)
+docker compose up -d                      # pgvector + schema init
+python -m slime_rag.pipeline              # end-to-end glue
 streamlit run app/ui.py                   # UI
-python -m eval.test_bias && python -m eval.test_apify_source   # 오프라인 테스트
-python -m evals.run --min 1.0             # 평가 pass-rate 게이트
-python .github/scripts/validate_context_paths.py               # 컨텍스트 경로 무결성
+python -m eval.test_bias && python -m eval.test_apify_source && python -m eval.test_relevance_gate   # offline tests
+python -m evals.run --min 1.0             # evaluation pass-rate gate
+python .github/scripts/validate_context_paths.py               # context path integrity
 ```
 
-## 절대 규칙 (어기면 스킬이 아님)
-- **미언급은 null, 지어내기 금지.** 필드별 근거 스니펫(15자 내외)으로 인용·저작권 회피.
-- **소스 편향 라벨링, 평균 금지.** 향 불일치·소스 갭은 LLM 아니라 조인/집계(`consolidated_view.py`)에서.
-- **LLM 벤더는 `llm_ops.py` 한 곳에만** 의존. 새 소스/모델은 인터페이스 뒤에.
-- **책임 수집**: robots·딜레이·페이지 상한·원문 미재배포(스니펫만).
-- 결정성은 structured outputs(strict), 파싱 실패 1회 재시도. ⚠️ GPT-5 계열은 `temperature` 미전송.
+## Absolute rules (non-negotiable)
+- **Unmentioned → null; never invent.** Cite via per-field evidence snippets (~15 characters) to stay
+  clear of copyright.
+- **Label source bias; never average.** Scent mismatches and source gaps come from joins/aggregation
+  (`consolidated_view.py`), not from the LLM.
+- **The LLM vendor is a dependency of `llm_ops.py` only.** New sources and models go behind the interface.
+- **Responsible collection**: robots, delays, page caps, no redistribution of source text (snippets only).
+- Determinism comes from structured outputs (strict), with one retry on parse failure.
+  ⚠️ Do not send `temperature` for GPT-5-family models.

@@ -104,10 +104,19 @@ _PRODUCT_PROPS: dict = {
         "rebuy_intent": {"type": "string", "enum": REBUY},
         "summary": _nstr(),
     }),
+    # 전언 차단의 **결정적 게이트**(AC15). 프롬프트 지시만으로는 못 막는다 — 실측상 같은 입력에
+    # 4회 호출하면 4번 다 답이 달랐다(빈 배열 ↔ 전언 제품 4개 유입). 그래서 '본인 경험임을 보여주는
+    # 원문 조각'을 필수 필드로 요구하고, null 인 항목은 코드가 버린다(`drop_hearsay_reviews`).
+    # 1층에서 '제품명은 반드시 캡션 해시태그여야 한다'로 유령 제품을 막은 것과 같은 수법이다.
+    "firsthand_evidence": {"type": ["string", "null"],
+                           "description": "작성자 '본인'이 직접 써 봤음을 보여주는 원문 조각(15자 내외). "
+                                          "전언('다들 좋다고 함')·미구매('아직 안산게')·미사용이면 반드시 null."},
 }
 
 # 최상위: 후기(주문) 단위 사실(market·shipping_cs·flags) + 제품별 평가(reviews[]).
-LAYER2_SCHEMA: dict = _obj({
+# 이 프로퍼티 묶음은 단건 스키마와 **스레드 배치 스키마가 공유**한다(정의가 갈라지면 배치 결과와
+# 단건 결과가 조용히 달라진다 — AC12 동등성이 무의미해진다).
+_DOC_PROPS: dict = {
     "market": {"type": ["string", "null"],
                "description": "마켓 식별자만(초성·약칭·마켓명). 제목/머리말의 마켓도 여기. "
                               "후기 전체에 하나(보통 1주문=1마켓). '자사몰/공홈/스토어' 등 일반어는 null."},
@@ -117,9 +126,21 @@ LAYER2_SCHEMA: dict = _obj({
         "evidence": _nstr(),
     }, description="배송·주문·문자·도착·교환·CS. 후기(주문) 전체 기준. 이걸로 제품 항목을 만들지 마라."),
     "reviews": {"type": "array", "items": _obj(_PRODUCT_PROPS),
-                "description": "실제 '사용 경험/평가'를 서술한 슬라임마다 한 항목. 비교글이면 제품별 분리. "
-                               "제목·배송만 있고 평가가 없는 건 항목으로 만들지 마라."},
+                "description": "작성자 '본인'의 사용 경험/평가를 서술한 슬라임마다 한 항목. 비교글이면 제품별 분리. "
+                               "제목·배송만 있고 평가가 없는 건, 그리고 전언(남이 좋다더라)은 항목으로 만들지 마라."},
     "flags": _obj({"toxic": {"type": "boolean"}}),
+}
+
+LAYER2_SCHEMA: dict = _obj(_DOC_PROPS)
+
+# 스레드 배치(C-1) — 조각(글/댓글) 하나당 문서 하나. source_id 가 귀속의 유일한 근거다.
+LAYER2_THREAD_SCHEMA: dict = _obj({
+    "docs": {"type": "array",
+             "items": _obj({"source_id": {"type": "string",
+                                          "description": "이 문서가 대응하는 입력 조각의 [S<n>] 번호. "
+                                                         "입력에 나온 값을 그대로. 새로 만들지 마라."},
+                            **_DOC_PROPS}),
+             "description": "입력 스레드의 조각마다 정확히 한 항목. 합치거나 빠뜨리지 마라."},
 })
 
 
@@ -154,6 +175,23 @@ LAYER2_SYSTEM = f"""\
   비즈/글리터 같은 구성요소는 종류가 아니다 → null.
 - scent.vs_official_comment: 작성자가 '공식향과 다르다'고 직접 말한 경우만.
 
+[전언(남의 경험) 배제 — reviews 는 작성자 본인이 겪은 것만]
+- 한국어는 증거성을 어미로 표시한다. 전언 표지가 붙은 평가는 '남의 경험'이므로 항목으로 만들지 마라:
+  '-대 / -다는데 / -다더라 / -다고 함 / -다길래 / -대서 / -라던데', '들었는데', '후기 보니', '다들 ~한다고',
+  '친구가·누가·남들이 ~했다는'.
+  예) "친구가 허니푸냥이 샀는데 걀걀거림 심하다고 함" → reviews: [] (걀걀거림 항목을 만들지 마라)
+  예) "다들 좋다고 하는 것 중에 아직 안산게 A B C" → A·B·C 로 항목을 만들지 마라(본인이 안 만져봤다).
+- 직접 지각 표지는 본인 경험이다 — 정상 추출한다:
+  '-더라 / -던데'(직접 겪음. '-다더라'와 혼동 금지), '만져보니 / 만져봤는데', '써보니', '내 기준', '나는 ~했음'.
+  예) "이거베이스 좋더라" → 정상 추출. "만져봤는데 좋았음" → 정상 추출.
+- '아직 안 산 / 안 만져본 / 살까 고민중 / 장바구니에 담은' 제품은 **구매 후보 목록**이지 후기가 아니다.
+  나열된 제품이 여럿이어도 항목을 만들지 마라 — 그 글에서 항목이 되는 건 작성자가 실제로 만져본 제품뿐이다.
+  예) "다들 좋다고 하는 것 중에 아직 안산게 A B C D 인데 살말?" → A·B·C·D 전부 항목 없음.
+- 만드는 항목마다 firsthand_evidence 에 **본인이 직접 써 봤음을 보여주는 원문 조각**을 넣는다.
+  근거를 못 대겠으면 그 항목은 애초에 만들지 마라(= firsthand_evidence 가 null 인 항목은 버려진다).
+- ⚠️ 과교정 금지: 전언 표지가 없으면 1인칭으로 간주한다. 본인 경험 후기·본인이 두 제품을 견준 비교글은
+  전언이 아니다 — 의심만으로 버리지 마라. 배제하는 건 '표지가 명시된 전언'과 '미구매 후보 목록'뿐이다.
+
 [다제품 비교 — 제품별 분리]
 - 출력은 reviews 배열이다. 작성자가 '실제 사용 경험/평가'를 서술한 제품마다 항목 1개를 만든다.
   한 제품만 다루면 1개, 두 제품을 비교하면 2개. 단순 언급·제목·배송만 있는 건 항목으로 만들지 마라.
@@ -171,6 +209,20 @@ LAYER2_SYSTEM = f"""\
 점수는 작성자가 직접 매긴 경우만 overall.stated_rating, 아니면 null.
 overall.model_sentiment 는 텍스트 기반 모델 추정 라벨이다.
 flags.toxic 은 후기 전체 기준(제품별 아님). 욕설/유해 표현이 있으면 true."""
+
+
+LAYER2_THREAD_SYSTEM = LAYER2_SYSTEM + """
+
+[스레드 배치 — 조각별로 따로 출력]
+- 입력은 **한 스레드**다. 조각마다 [S0] [S1] … 번호가 붙어 있다(S0=글 본문, 이후는 댓글 순서).
+- docs 배열에 **입력에 나온 조각마다 정확히 한 항목**을 만들고 source_id 에 그 번호를 그대로 적는다.
+  조각을 합치거나 건너뛰지 마라. 평가가 없는 조각도 항목은 만들되 reviews: [] 로 둔다.
+- 위의 모든 규칙(전언 배제·제품별 분리·미언급 null)은 **조각마다 개별 적용**한다.
+- **문맥은 참조하되 내용은 섞지 마라.** 어떤 조각이 제품명을 생략하고 앞 조각을 받아 말하면,
+  그 제품이 무엇인지 앞 조각에서 찾아 mentioned_product 에 적는다. 하지만 앞 조각의 평가를
+  그 조각으로 복사하지는 마라 — 각 항목은 그 조각이 실제로 말한 것만 담는다.
+  예) [S1] "카피바라랑 푸냥이 중 뭐가 나아?" / [S2] "웅 근데 향이 좀 에바ㅠ"
+      → S2 의 mentioned_product 는 앞 문맥이 가리키는 제품. S1 에는 평가 항목을 만들지 마라."""
 
 
 # ---------------------------------------------------------------- 1층 스키마 (판매자 → 공식 스펙)
@@ -271,6 +323,44 @@ def extract_spec(text: str, llm: LLM, model: str | None = None) -> dict:
     )
 
 
+def _norm(text: str) -> str:
+    return "".join((text or "").split())
+
+
+def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
+    """
+    본인 경험 근거를 못 대는 항목 제거 — 전언 차단의 **결정적 게이트**(AC15).
+
+    왜 코드로 막나: 프롬프트만으로는 안 잡힌다. 같은 입력(`dc-015`)을 반복 호출하면
+    `[]` / `['ㅇㅉ거','ㅂ 유슬']` / `['ㅇㅉ거', 전언제품 4개]` 로 매번 달랐다(관측 누수율 ~1/14).
+    가짜 후기 행 하나가 **디시 긍정 카운트를 부풀려** 1급 기능인 소스 편향을 왜곡하므로,
+    비결정에 맡기지 않고 스키마 필드 + 코드 필터로 확정한다.
+
+    세 겹으로 검사한다 — 앞의 것을 통과해도 뒤에서 걸린다:
+      1) 근거가 비어 있으면 폐기.
+      2) 근거가 원문에 실제로 없으면 폐기(**지어낸 인용**). evidence 는 사용자에게 보이는
+         인용이기도 해서, 원문에 없는 문자열은 그 자체로 결함이다.
+      3) 근거 조각 자체가 전언·미사용 표지를 담고 있으면 폐기 — "다들 좋다고 하는"을 근거로
+         댔다면 그건 본인 경험의 근거가 아니다.
+    source_text 를 안 넘기면 2)는 건너뛴다(원문을 모르는 호출부 하위호환).
+    """
+    from . import relevance_rules as rules
+
+    haystack = _norm(source_text)
+    kept = []
+    for r in (doc.get("reviews") or []):
+        ev = (r.get("firsthand_evidence") or "").strip()
+        if not ev:
+            continue
+        if haystack and _norm(ev) not in haystack:
+            continue
+        if rules.is_hearsay_span(ev):
+            continue
+        kept.append(r)
+    doc["reviews"] = kept
+    return doc
+
+
 def extract_review(text: str, llm: LLM, model: str | None = None) -> dict:
     """
     후기 텍스트 한 건 → 2층 JSON(dict):
@@ -278,51 +368,112 @@ def extract_review(text: str, llm: LLM, model: str | None = None) -> dict:
     market·shipping_cs 는 후기(주문) 단위, reviews 는 제품 단위. 비교글이면 reviews 가 제품 수만큼.
     스키마 강제 + 파싱 실패 1회 재시도.
     """
-    return llm.complete(
+    return drop_hearsay_reviews(llm.complete(
         text,
         system=LAYER2_SYSTEM,
         schema=LAYER2_SCHEMA,
         model=model,
         label="extract.layer2",
-    )
+    ), text)
 
 
-def extract_collected(raws: list, llm: LLM, model: str | None = None) -> list[tuple]:
+def _empty_doc() -> dict:
+    """빈 문서 — **팩토리로 만든다.** 모듈 상수로 두면 얕은 복사본들이 같은 `reviews` 리스트를
+    공유해, 한 조각의 결과가 다른 조각으로 새는 종류의 버그가 조용히 생긴다."""
+    return {"market": None, "shipping_cs": None, "reviews": [], "flags": {"toxic": False}}
+
+# 한 호출에 넣을 조각(글+댓글) 최대 개수. 크게 잡을수록 호출은 줄지만 항목별 귀속 정확도가
+# 떨어진다(§5 위험표). 실측 근거: 고정 프롬프트가 입력의 99.4%(evals/cost_profile.py)라
+# 조각 12개면 호출당 낭비가 1/12 로 떨어지고, 그 이상 키워도 절감은 미미한데 귀속 위험만 는다.
+# AC12 동등성 테스트가 이 값에서 통과하는 것을 확인한 뒤에만 올릴 것.
+MAX_THREAD_SOURCES = 12
+
+
+def build_thread_prompt(title: str | None, texts: list[str]) -> str:
+    """조각들에 [S<n>] 번호를 붙인 스레드 프롬프트. 번호가 귀속의 유일한 근거다."""
+    head = f"[제목] {title}\n" if title else ""
+    body = "\n".join(f"[S{i}] {t}" for i, t in enumerate(texts))
+    return head + body
+
+
+def extract_thread(title: str | None, texts: list[str], llm: LLM,
+                   model: str | None = None) -> list[dict]:
     """
-    수집된 RawReview(글 + 댓글)를 모두 '동일한 extract_review'로 추출한다.
+    스레드 조각들 → 조각별 문서 리스트(입력 순서 정렬, 길이 보장).
+    응답에 빠진 조각은 빈 문서로 메운다 — 조용히 짧은 리스트를 돌려주면 호출부에서 귀속이 밀린다.
+    """
+    if not texts:
+        return []
+    out = llm.complete(
+        build_thread_prompt(title, texts),
+        system=LAYER2_THREAD_SYSTEM,
+        schema=LAYER2_THREAD_SCHEMA,
+        model=model,
+        label="extract.layer2.thread",
+    )
+    by_id: dict[str, dict] = {}
+    for doc in (out.get("docs") or []):
+        by_id.setdefault(str(doc.get("source_id", "")).strip(), doc)
+    docs = []
+    for i in range(len(texts)):
+        doc = dict(by_id.get(f"S{i}") or by_id.get(str(i)) or _empty_doc())
+        doc.pop("source_id", None)               # 귀속은 리스트 위치로 끝났다
+        docs.append(drop_hearsay_reviews(doc, texts[i]))
+    return docs
+
+
+def extract_collected(raws: list, llm: LLM, model: str | None = None,
+                      batch_size: int = MAX_THREAD_SOURCES) -> list[tuple]:
+    """
+    수집된 RawReview(글 + 댓글)를 **스레드 단위 배치**로 추출한다(계획 C-1).
     이 갤은 후기가 댓글에 많아(sources.py 주석) 댓글도 1급 후기로 취급한다.
 
-    댓글은 보통 마켓을 명시하지 않으므로, 글과 같은 '제목+본문' 형태가 되도록
-    부모 글 제목(meta['parent_title'])을 머리말로 붙여 추출한다
-    (LAYER2_SYSTEM 이 '제목/머리말의 마켓'을 market 으로 읽음).
-    그래도 market 이 비면 같은 스레드(부모 글)의 추출 market 을 상속한다.
+    왜 배치인가: 호출당 입력 토큰의 **99.4%가 고정 프롬프트**다(실측, `evals/cost_profile.py`).
+    댓글 1건당 1회 호출은 그 2,900자짜리 지시문을 댓글 수만큼 재전송한다는 뜻이다.
+    분류기를 아무리 잘 튜닝해도 이 부분은 안 줄어든다 — 줄이는 건 호출 단위를 바꾸는 것뿐이다.
 
-    반환: [(raw, doc), ...] — index.index_post 입력으로 그대로 사용.
+    부수 이득(AC13): 같은 호출 안에 형제 댓글이 있으므로 **제품명을 생략한 댓글의 귀속**이 가능해진다.
+    per-comment 경로에서는 원리적으로 불가능했던 케이스다.
+
+    market 상속은 유지한다 — 댓글 단독 추출은 'ㅂ슬라임' 등으로 흔들려 개체연결을 막는다.
+
+    반환: [(raw, doc), ...] — index.index_post 입력으로 그대로 사용(호출부 무변경).
     """
     posts = [r for r in raws if r.meta.get("type") == "post"]
     comments = [r for r in raws if r.meta.get("type") == "comment"]
 
+    def _no(raw) -> str:
+        m = _NO_RE.search(raw.url or "")
+        return m.group(1) if m else ""
+
+    # 스레드 그룹핑 — 댓글은 parent_no, 글은 자기 no. 매칭 실패분은 ''(고아) 그룹으로 모인다.
+    threads: dict[str, dict] = {}
+    for p in posts:
+        threads.setdefault(_no(p), {"post": None, "comments": []})["post"] = p
+    for c in comments:
+        threads.setdefault(c.meta.get("parent_no") or "", {"post": None, "comments": []})\
+            ["comments"].append(c)
+
     out: list[tuple] = []
-    thread_market: dict[str, str] = {}          # parent_no → 글에서 추출한 market
+    for _, thread in threads.items():
+        post, cmts = thread["post"], thread["comments"]
+        title = (post.raw_title if post else None) or \
+                (cmts[0].meta.get("parent_title") if cmts else None)
+        members = ([post] if post else []) + cmts
 
-    for p in posts:                              # 글 먼저 — 스레드 market 확보
-        doc = extract_review(p.text, llm, model)
-        m = _NO_RE.search(p.url)
-        if m and doc.get("market"):
-            thread_market[m.group(1)] = doc["market"]
-        out.append((p, doc))
+        docs: list[dict] = []
+        for start in range(0, len(members), batch_size):
+            chunk_members = members[start:start + batch_size]
+            docs.extend(extract_thread(title, [r.text for r in chunk_members], llm, model))
 
-    for c in comments:                           # 댓글 — 글과 동일 추출 + market 상속
-        head = c.meta.get("parent_title")
-        text = f"{head}\n{c.text}" if head else c.text
-        doc = extract_review(text, llm, model)
-        # 스레드(부모 글) market 이 권위: 댓글 자체 추출은 'ㅂ슬라임' 등으로 흔들려 개체연결을
-        # 막으므로, 부모 글에서 깨끗이 추출된 market 이 있으면 그것으로 덮어쓴다.
-        parent_mk = thread_market.get(c.meta.get("parent_no"))
-        if parent_mk:
-            doc["market"] = parent_mk
-        out.append((c, doc))
-
+        # 스레드 market 은 글에서 뽑은 것이 권위. 없으면 댓글 중 처음 잡힌 것.
+        market = docs[0].get("market") if post and docs else None
+        if not market:
+            market = next((d.get("market") for d in docs if d.get("market")), None)
+        for raw, doc in zip(members, docs):
+            if market:
+                doc["market"] = market
+            out.append((raw, doc))
     return out
 
 

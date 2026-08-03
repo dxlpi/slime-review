@@ -45,6 +45,16 @@ def _cost_usd(model: str, usage) -> float:
     return (usage.prompt_tokens * p["input"] + usage.completion_tokens * p["output"]) / 1_000_000
 
 
+def _cached_tokens(usage) -> int:
+    """벤더가 보고한 프롬프트 캐시 적중 토큰. 필드가 없으면 0(미지원).
+
+    고정 시스템 프롬프트가 2,000자대인데 본문은 수십 자라(계획 §1-E) 캐시 적중 여부가
+    추출 비용을 좌우한다. 지원 여부 자체가 관측 대상이므로 조용히 삼키지 않고 0으로 기록한다.
+    """
+    details = getattr(usage, "prompt_tokens_details", None)
+    return int(getattr(details, "cached_tokens", 0) or 0) if details else 0
+
+
 def _schema_name(label: str) -> str:
     name = re.sub(r"[^a-zA-Z0-9_-]", "_", label) or "structured_output"
     return name[:64]
@@ -58,6 +68,7 @@ class CallRecord:
     latency_ms: int
     input_tokens: int = 0
     output_tokens: int = 0
+    cached_tokens: int = 0      # 프롬프트 캐시 적중분(AC14). 벤더 미지원이면 0.
     cost_usd: float = 0.0
     attempts: int = 1
     error: Optional[str] = None
@@ -73,6 +84,7 @@ def summary() -> dict:
         "calls": len(LEDGER),
         "errors": sum(1 for r in LEDGER if r.status != "ok"),
         "input_tokens": sum(r.input_tokens for r in LEDGER),
+        "cached_tokens": sum(r.cached_tokens for r in LEDGER),
         "output_tokens": sum(r.output_tokens for r in LEDGER),
         "cost_usd": round(sum(r.cost_usd for r in LEDGER), 4),
     }
@@ -143,14 +155,15 @@ class LLM:
                 last_err = f"refusal: {msg.refusal}"
                 LEDGER.append(CallRecord(label, model, "refusal", latency,
                                          usage.prompt_tokens, usage.completion_tokens,
-                                         _cost_usd(model, usage), attempt, last_err))
+                                         _cached_tokens(usage), _cost_usd(model, usage),
+                                         attempt, last_err))
                 break
 
             text = msg.content or ""
             if not schema:
                 LEDGER.append(CallRecord(label, model, "ok", latency,
                                          usage.prompt_tokens, usage.completion_tokens,
-                                         _cost_usd(model, usage), attempt))
+                                         _cached_tokens(usage), _cost_usd(model, usage), attempt))
                 return text
             try:
                 parsed = json.loads(text)
@@ -158,12 +171,13 @@ class LLM:
                 last_err = f"JSONDecodeError: {e}"
                 LEDGER.append(CallRecord(label, model, "parse_error", latency,
                                          usage.prompt_tokens, usage.completion_tokens,
-                                         _cost_usd(model, usage), attempt, last_err))
+                                         _cached_tokens(usage), _cost_usd(model, usage),
+                                         attempt, last_err))
                 log.warning("LLM parse_error [%s] 재시도", label)
                 continue
             LEDGER.append(CallRecord(label, model, "ok", latency,
                                      usage.prompt_tokens, usage.completion_tokens,
-                                     _cost_usd(model, usage), attempt))
+                                     _cached_tokens(usage), _cost_usd(model, usage), attempt))
             return parsed
 
         raise RuntimeError(f"LLM 호출 실패 [{label}]: {last_err}")

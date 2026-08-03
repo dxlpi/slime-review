@@ -21,7 +21,7 @@ from .config import settings, ROOT
 from .db import connect, apply_schema
 from . import layer1, index, linking, search
 from . import consolidated_view as cv
-from .llm_ops import LLM
+from .llm_ops import LLM, summary
 
 log = logging.getLogger("pipeline")
 
@@ -162,6 +162,52 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
               "promo": n_promo, "genuine": n_genuine, "joined_now": n_join,
               "gate_suspect": n_suspect, "llm_calls_saved": n_saved}
     log.info("ingest_hashtag 완료: %s", counts)
+    return counts
+
+
+# ---------------------------------------------------------------- 2층 색인(디시 실수집)
+def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | None = None,
+                    limit: int = 30, comment_pages: int = 1, dry_run: bool = False) -> dict:
+    """
+    디시 실수집 → 관련성 게이트 → **스레드 배치 추출** → 색인 (계획 C-4).
+
+    `extract_collected` 은 진작 있었지만 파이프라인에 연결돼 있지 않았다(§1-G) — 인스타 경로만
+    `ingest_hashtag` 로 이어져 있었다. 지금 연결하는 이유는 지금이 **추출 단위를 정하기 가장 싼
+    시점**이기 때문이다. 나중에 per-comment 로 굳은 뒤 뜯는 것보다 배치 단위로 처음부터 잇는 게 싸다.
+
+    dry_run=True 면 LLM·DB 를 건드리지 않고 수집·게이트까지만 돌려 카운트를 돌려준다(키 없이 점검용).
+    반환: 카운트 요약.
+    """
+    from . import extract
+    from .sources import DCInsideSource, collect_all, expand_queries
+
+    src = DCInsideSource(gallery_id="amos", comment_pages=comment_pages)
+    queries = expand_queries(slime, aliases=aliases or [], market_word=market)
+    target = {"market": market, "slime": slime}
+    raws = collect_all([src], keywords=queries, per_source_limit=limit, target=target)
+    n_post = sum(1 for r in raws if r.meta.get("type") == "post")
+    counts = {"collected": len(raws), "posts": n_post, "comments": len(raws) - n_post,
+              "queries": queries}
+    if dry_run or not raws:
+        counts["dry_run"] = True
+        log.info("ingest_dcinside(dry) 완료: %s", counts)
+        return counts
+
+    llm = LLM()
+    pairs = extract.extract_collected(raws, llm, settings.model_extract)
+    n_rows = 0
+    with connect() as conn:
+        for i, (raw, doc) in enumerate(pairs):
+            # post_id 는 조각별로 달라야 한다 — 스레드 배치라도 귀속은 조각 단위(AC12).
+            # 댓글 URL 은 스레드 안에서 전부 `…#cmt` 로 같으므로(수집기가 앵커를 안 붙인다)
+            # 순번을 넣지 않으면 같은 스레드 댓글들이 한 post_id 로 뭉개진다.
+            post_id = raw.url if raw.meta.get("type") == "post" else \
+                f"{raw.url}:{raw.meta.get('parent_no')}:{i}"
+            n_rows += index.index_post(doc, source="amos", post_id=post_id, conn=conn)
+        conn.commit()
+    counts["indexed_rows"] = n_rows
+    counts["llm"] = {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}
+    log.info("ingest_dcinside 완료: %s", counts)
     return counts
 
 

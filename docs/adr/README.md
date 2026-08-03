@@ -9,5 +9,6 @@
 | [0003](0003-ig-businessdiscovery-fixture.md) | IG 1층은 fixture(App Review 차단) | Accepted |
 | [0004](0004-promo-gate-llm-cascade.md) | 홍보성 판정 게이트→LLM 캐스케이드 | Accepted |
 | [0005](0005-review-vs-product-unit.md) | 후기(주문) 단위 vs 제품 단위 분리 | Accepted |
+| [0006](0006-mqe-three-axis-relevance.md) | 관련성 `kind` 4분류 → M/Q/E 독립 이진 3축 | Accepted |
 
 배경 흐름: [../../ARCHITECTURE.md](../../ARCHITECTURE.md) · 도메인 규칙: [../../MEMORY.md](../../MEMORY.md).

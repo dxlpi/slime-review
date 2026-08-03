@@ -25,8 +25,13 @@ something to correct for** — never average it; show it per source, plus the ga
 - Phases 0–6 **verified end-to-end against live data**. **The only hard gate left is deployment (Render).**
 - Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
   blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
-- Still to do: calibrate `τ_topic` for the relevance gate (`slime_rag/relevance.py` is implemented;
-  the precision/recall gate needs corrected user labels) · expand the entity-linking gold set
+- The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
+  independent binary axes **M/Q/E** ([.omc/plans/kind-axis-resolution.md](.omc/plans/kind-axis-resolution.md)).
+  Only `M` drops; `Q`/`E` rank. Extraction now runs **thread-batched** (input was 99.4% fixed prompt).
+- The 15 boundary rulings are **user-confirmed** (2026-08-03,
+  [evals/gold/boundary_rulings.json](evals/gold/boundary_rulings.json)); the gold's absolute axes are final.
+- Still to do: decide the `collected_for` target policy (product-level vs market-level) — this, not the
+  labels, is what still blocks `τ_topic` on dcinside · expand the entity-linking gold set
   ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
   toxicity filter criteria.
 
@@ -37,6 +42,8 @@ docker compose up -d                      # pgvector + schema init
 python -m slime_rag.pipeline              # end-to-end glue
 streamlit run app/ui.py                   # UI
 python -m eval.test_bias && python -m eval.test_apify_source && python -m eval.test_relevance_gate   # offline tests
+python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
+python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates
 python -m evals.run --min 1.0             # evaluation pass-rate gate
 python .github/scripts/validate_context_paths.py               # context path integrity
 ```
@@ -44,6 +51,9 @@ python .github/scripts/validate_context_paths.py               # context path in
 ## Absolute rules (non-negotiable)
 - **Unmentioned → null; never invent.** Cite via per-field evidence snippets (~15 characters) to stay
   clear of copyright.
+- **Only `M` (meta/noise) may drop an item.** Questions and low-E items are ranked to the tail, never
+  filtered out; anything past the budget is logged as `unprocessed`, not dropped. Negative-sentiment
+  items stay in the candidate set regardless of `E` — that is the source-bias hard gate.
 - **Label source bias; never average.** Scent mismatches and source gaps come from joins/aggregation
   (`consolidated_view.py`), not from the LLM.
 - **The LLM vendor is a dependency of `llm_ops.py` only.** New sources and models go behind the interface.

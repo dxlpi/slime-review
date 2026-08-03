@@ -196,7 +196,8 @@ def test_ac7_drop_log_schema():
     drop_logs = [m for m in cap.messages() if "relevance drop" in m]
     assert drop_logs, "DROP 로그가 없음"
     m = drop_logs[0]
-    assert "axis=" in m and "score=" in m and "kind=" in m and "url=drop-url-1" in m, \
+    # kind(4분류)는 폐기됐고 그 자리에 절대 축 3개(axes=M0Q0E0)가 들어간다.
+    assert "axis=" in m and "score=" in m and "axes=" in m and "url=drop-url-1" in m, \
         f"DROP 로그 스키마 불완전: {m}"
     assert any("relevance summary" in x for x in cap.messages()), "요약 카운터 로그 없음"
     print("✓ AC7 DROP 로그 스키마(axis/score/kind/url) + 요약 OK")
@@ -221,6 +222,98 @@ def test_ac7_near_boundary_marked():
         R.RELEVANCE_CONF.pop("_test_near", None)
 
 
+# ================================================================ kind 축 해소 (kind-axis-resolution)
+# 아래 KAX-* 는 `.omc/plans/kind-axis-resolution.md` 의 인수 기준이다. 위쪽 AC 번호(relevance-aware-
+# collection)와 겹치므로 접두사로 구분한다.
+def test_kax_ac4_three_axes_replace_kind():
+    """AC4 — verdict 가 M/Q/E 를 담고, 4분류 kind 경로가 코드에서 사라졌다."""
+    from pathlib import Path
+    v = R.classify(RawReview(text="허니푸냥이 만져봤는데 향 좋았음", url="u", platform="dcinside"),
+                   {"market": "봄", "slime": "허니푸냥이"}, R.RELEVANCE_CONF["dcinside"])
+    for ax in ("M", "Q", "E"):
+        assert hasattr(v, ax), f"RelevanceVerdict 에 {ax} 축이 없음"
+    assert v.axes.startswith("M"), f"axes 표기 이상: {v.axes}"
+    body = (Path(__file__).resolve().parent.parent / "slime_rag" / "relevance.py").read_text("utf-8")
+    for dead in ("_KEEP_KINDS", "_DROP_KINDS", "load_prototypes", "_nearest_kind"):
+        assert dead not in body, f"폐기 대상 {dead} 가 relevance.py 에 남아 있음"
+    assert "kind_axis" not in body, "conf 키 kind_axis 가 남아 있음(mqe_axis 로 교체돼야)"
+    print("✓ KAX-AC4 3축 도입 + 4분류 kind 경로 제거 OK")
+
+
+def test_kax_ac5_chrome_strip():
+    """AC5 — 뉴스 위젯·멘션·앱 푸터가 LLM 도달 전에 제거되고, 진짜 후기는 무손상."""
+    from slime_rag.sources.base import strip_chrome
+    widget = "에스파 카리나, 운전면허 시험 결과…충격적인 점수 1 / 20 이전 다음"
+    assert strip_chrome(widget) == "", f"뉴스 위젯 잔여: {strip_chrome(widget)!r}"
+    m = strip_chrome("@글쓴 아갤러(58.78) 그니까 나도 콩포트 안땡기고 ㅈㄴ고민됨")
+    assert "아갤러" not in m and "@" not in m, f"멘션 잔여: {m!r}"
+    assert m.startswith("그니까"), f"멘션 제거가 본문을 깎음: {m!r}"
+    assert "dc official" not in strip_chrome("푸냥이 좋았음\n- dc official App").lower()
+    intact = "카피 ㄱㄱ 푸냥이 층분리랑 수분감 개심해"
+    assert strip_chrome(intact) == intact, "진짜 후기가 chrome-strip 에 깎임(FP)"
+    print("✓ KAX-AC5 chrome-strip(위젯/멘션/푸터) + FP 0 OK")
+
+
+def test_kax_ac6_declarative_endings_not_questions():
+    """AC6 — 포럼체 -음/-함/-임 은 평서형이다. 단독으로 Q=1 을 만들면 안 된다."""
+    from slime_rag import relevance_rules as rules
+    for t in ("퀄좋긴함", "괜찮았음", "좋았음", "모름", "ㄹㅈㄷ임"):
+        assert rules.axes(t)["Q"] == 0, f"평서형 종결어미가 질문으로 오분류: {t!r}"
+    for t in ("이거 살까?", "수명은 어땠어??", "뭘 뺄까욥"):
+        assert rules.axes(t)["Q"] == 1, f"질문인데 Q=0: {t!r}"
+    print("✓ KAX-AC6 평서형 종결어미 회귀 OK")
+
+
+def test_kax_ac7_hearsay_vs_direct_perception():
+    """AC7 — 전언(-다고/-대서)은 E=0, 직접지각(-더라/만져봤는데)은 E=1."""
+    from slime_rag import relevance_rules as rules
+    for t in ("다들 좋다고 함", "타마켓 후기 쪄왔을때 ㅂ 잘맞을것같대서 담았음"):
+        assert rules.axes(t)["E"] == 0, f"전언인데 E=1: {t!r}"
+    for t in ("이거베이스 좋더라", "만져봤는데 좋았음"):
+        assert rules.axes(t)["E"] == 1, f"직접지각인데 E=0: {t!r}"
+    # 한 글에 둘이 섞이면 1인칭 절이 이긴다(§1-B — 배타 분류였다면 통째로 죽었을 케이스).
+    mixed = "다들 좋다고 하는 것 중에 아직 안산게 많은데 ㅇㅉ거는 좀 많이 실망함"
+    ax = rules.axes(mixed)
+    assert ax["E"] == 1, "전언절 때문에 1인칭 평가가 통째로 죽음"
+    print("✓ KAX-AC7 전언 vs 직접지각 분리 (혼합 절 포함) OK")
+
+
+def test_kax_ac8_negative_survives_gate():
+    """AC8 — 부정 감성은 E=0 이어도 후보로 남는다(D6 하드게이트, bias_hold)."""
+    conf = R.RELEVANCE_CONF["dcinside"]
+    tgt = {"market": "봄", "slime": "허니푸냥이"}
+    for text in ("하 근데 ㄹㅇ 점점 돈아까움..", "ㅋㅋㅋ 현타오는거 ㅇㅈ함",
+                 "푸냥이 별로임", "카피 ㄱㄱ 푸냥이 층분리랑 수분감 개심해"):
+        v = R.classify(RawReview(text=text, url="u", platform="dcinside"), tgt, conf)
+        assert v.axis != "e_union", f"부정 감성이 E 합집합에서 드롭됨: {text!r}"
+        assert v.M == 0, f"부정 감성이 메타로 오분류: {text!r}"
+    print("✓ KAX-AC8 부정 감성 후보 유지(편향 보존) OK")
+
+
+def test_kax_ac10_ranking_and_budget():
+    """AC10 — E 신뢰도로 정렬하고 예산에서 절단하되, 초과분은 드롭이 아니라 '미처리'."""
+    cap = _capture_sources_log()
+    reviews = [
+        RawReview(text="ㅂ 얘네 살만한가? 아직 안샀는데 고민중", url="q1", platform="dcinside"),
+        RawReview(text="허니푸냥이 만져봤는데 향 진짜 좋았음 쫀득하고 완벽", url="e1", platform="dcinside"),
+        RawReview(text="봄 허니푸냥이 촉감 개좋음 재구매각", url="e2", platform="dcinside"),
+    ]
+    gate = RelevanceGate("dcinside", {"market": "봄", "slime": "허니푸냥이"}, [], limit=1)
+    out = list(gate.filter(reviews))
+    gate.finish()
+    assert len(out) == 1, f"예산 1 인데 {len(out)}건 나옴"
+    assert out[0].meta["relevance"]["rank"] == 0, "1위가 아닌 항목이 예산을 먹음"
+    assert out[0].meta["relevance"]["e_bucket"] >= 1, \
+        f"E 신뢰도 낮은 항목이 1위: {out[0].meta['relevance']}"
+    assert gate.unprocessed >= 1, "예산 초과분이 미처리로 세어지지 않음"
+    assert gate.dropped.get("e_union", 0) == 0, "후보였던 항목이 드롭으로도 세어짐(이중 계상)"
+    msgs = cap.messages()
+    assert any("unprocessed" in m and "드롭 아님" in m for m in msgs), \
+        f"미처리 로그(침묵 절단 금지)가 없음: {[m for m in msgs if 'relevance' in m]}"
+    assert any("unprocessed=" in m for m in msgs if "summary" in m), "요약에 미처리 수 미노출"
+    print(f"✓ KAX-AC10 순위·예산·미처리 로깅 OK (unprocessed={gate.unprocessed})")
+
+
 if __name__ == "__main__":
     test_ac1_counts_only_relevant()
     test_ac1_relevant_scarcity_returns_fewer()
@@ -231,4 +324,10 @@ if __name__ == "__main__":
     test_ac5_max_pages_preserved()
     test_ac7_drop_log_schema()
     test_ac7_near_boundary_marked()
+    test_kax_ac4_three_axes_replace_kind()
+    test_kax_ac5_chrome_strip()
+    test_kax_ac6_declarative_endings_not_questions()
+    test_kax_ac7_hearsay_vs_direct_perception()
+    test_kax_ac8_negative_survives_gate()
+    test_kax_ac10_ranking_and_budget()
     print("\n관련성 게이트 오프라인 테스트 통과 ✅")

@@ -25,10 +25,20 @@ jobs:
       - name: Validate context paths (0 hallucinated paths)
         run: python .github/scripts/validate_context_paths.py
 
+      - name: Gold integrity (절대축 일치 + 3축 스키마)
+        # 순수 JSON 검사라 numpy/torch 없이 돈다. 동일 텍스트의 M/Q/E 가 갈라지거나
+        # AC3 쿼리조건부 하드 네거티브 6건이 삭제되면 실패한다.
+        run: python evals/check_gold_integrity.py
+
       - name: Offline unit tests
+        # test_relevance_gate 는 BGE-M3(torch) 가 필요해 이 경량 게이트에서 제외 — 로컬 전용.
+        # 아래 둘은 키 없으면 실호출 케이스만 skip 하고 결정적 부분(프롬프트 스냅샷·
+        # firsthand_evidence 게이트·배치 호출 수/귀속)은 그대로 검증한다.
         run: |
           python -m eval.test_bias
           python -m eval.test_apify_source
+          python -m eval.test_extract_hearsay
+          python -m eval.test_extract_thread
 
       - name: Eval pass-rate gate
         run: python -m evals.run --min 1.0

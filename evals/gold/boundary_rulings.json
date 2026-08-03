@@ -1,0 +1,250 @@
+{
+  "_doc": [
+    "경계 케이스 판정 원장 (계획 §7 블로커 #1 / AC3).",
+    "여기 적힌 판정만이 relevance_gold.json 의 M/Q/E 절대축을 덮어쓴다 — 규칙 캐스케이드는",
+    "이 파일을 학습·평가의 정답으로 쓴다. 한 항목의 판정은 같은 theme 의 동류 항목(also_applies)에",
+    "규칙으로 전파된다(전파는 M/E 만 — Q 는 문장별로 달라 전파 대상이 아니다).",
+    "provisional=false = 사용자 확정. 2026-08-03 사용자가 15건 전부 제안값 그대로 확정했다.",
+    "값을 바꾸려면 여기서 M/Q/E 를 고치고 `python evals/migrate_gold_mqe.py --write` 를 다시 돌린다(멱등)."
+  ],
+  "themes": {
+    "T1": "마켓/차수 단위 평가 — 제품이 아니라 마켓 전체를 평가",
+    "T2": "제품명 없이 앞 댓글을 받는 평가 — 대상이 스레드 문맥에만 존재",
+    "T3": "카테고리 일반론 — 슬라임 취미 전반에 대한 회의/감상",
+    "T4": "비사용 근거 판단 — 서폿영상·피드만 보고 내린 평가",
+    "T5": "구매 행위·의도만 — 평가 서술 없음",
+    "T6": "일반 조언·도메인 지식 — 특정 제품 경험 아님",
+    "T7": "갤 메타/드라마 — 구조적 노이즈",
+    "T8": "마켓 운영 사태(장바구니·품절·공지) — 구매 도메인인가 메타인가"
+  },
+  "rulings": [
+    {
+      "id": "dc-114",
+      "theme": "T1",
+      "provisional": false,
+      "text": "여긴 원래 겨울에 폼좋아짐",
+      "issue": "마켓 단위 계절 평가를 1인칭 실사용 평가(E)로 칠 것인가",
+      "M": 0,
+      "Q": 0,
+      "E": 1,
+      "why": "반복 사용 경험에서 나온 일반화 — 마켓 단위여도 실사용 근거가 있다",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-105",
+      "theme": "T1",
+      "provisional": false,
+      "text": "ㄴㅈ 퀄 진짜 좋아",
+      "issue": "제품 지목 없는 마켓 총평",
+      "M": 0,
+      "Q": 0,
+      "E": 1,
+      "why": "품질 평가 서술 — 계획 AC9 가 KEEP 을 요구하는 항목",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-014",
+      "theme": "T1",
+      "provisional": false,
+      "text": "이번차수 ㄹㅈㄷ임 ㅈㄴ 좋음 ㄹㅇ",
+      "issue": "차수(마켓 회차) 단위 총평",
+      "M": 0,
+      "Q": 0,
+      "E": 1,
+      "why": "T1 규칙 일관 적용",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-112",
+      "theme": "T1",
+      "provisional": false,
+      "text": "와 요즘 ㅂㅉ 미감 맛좋네 걍 피드로 보다가 뭐지? 했는데 빈짱임",
+      "issue": "피드(사진)만 보고 한 미감 평가",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "'걍 피드로 보다가' 가 미사용을 명시 — T4 와 같은 근거로 E=0",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-005",
+      "theme": "T2",
+      "provisional": false,
+      "text": "근데ㅜㅜ 퀄좋긴함 그래서 미치겠음",
+      "issue": "제품명 없이 앞 댓글을 받는 1인칭 평가",
+      "M": 0,
+      "Q": 0,
+      "E": 1,
+      "why": "E 는 절대 축(평가 서술 존재 여부)이고 대상 귀속은 topic 축 소관 — 분리 유지",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-012",
+      "theme": "T2",
+      "provisional": false,
+      "text": "ㅇㅈ 푸냥이 ㄴㅏ는 좀더 무게감 있을줄",
+      "issue": "기대 불일치 서술이 암묵 평가인가",
+      "M": 0,
+      "Q": 0,
+      "E": 1,
+      "why": "'있을줄 (알았다)' = 실물 접촉 후 기대 대비 실망 — 1인칭 평가",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-002",
+      "theme": "T3",
+      "provisional": false,
+      "text": "솔젝히 슬라임이 딸배랑 비슷함 비싸고 몇번만지면끝이고 남는거없고 ㅜ",
+      "issue": "취미 전반 회의론 — 제품 평가로 칠 것인가",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "계획 §1-A 표가 정상값을 chitchat 으로 지목 — 제품명 없는 카테고리 일반론",
+      "also_applies": [
+        "dc-133"
+      ],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-008",
+      "theme": "T3",
+      "provisional": false,
+      "text": "하 근데 ㄹㅇ 점점 돈아까움..",
+      "issue": "부정 감성이지만 제품 평가는 아님",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "E=0 이지만 AC8 하드게이트가 부정 항목 드롭을 금지 — 후보에는 잔류(꼬리 순위)",
+      "also_applies": [
+        "dc-007"
+      ],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-037",
+      "theme": "T4",
+      "provisional": false,
+      "text": "향 아쉬워서 패스 ㅇㅇㅈ기대해보게",
+      "issue": "서폿영상만 보고 쓴 판단을 1인칭 경험으로 칠 것인가",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "실물 접촉 근거 없음 — 전언/간접 지각과 같은 급",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-039",
+      "theme": "T4",
+      "provisional": false,
+      "text": "안사 비슷하기도 하고 서폿영상도 소리때문에 못보겟어서 걍 패스",
+      "issue": "동일 — 서폿영상 기반 비구매 결정",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "T4 규칙 일관 적용",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-009",
+      "theme": "T5",
+      "provisional": false,
+      "text": "ㄹㅇ가격때매 신상만삿어",
+      "issue": "구매 사실만 있고 평가 서술 없음 (현재 kind=review 는 오류)",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "extract.py 가 '단순 언급·구매 사실'로 항목을 만들지 않는 것과 정합",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-104",
+      "theme": "T5",
+      "provisional": false,
+      "text": "옥케! 늪지랑 파스텔로! 바로 쇼핑한다",
+      "issue": "추천 수용 + 구매 의도 (현재 kind=review 는 오류)",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "T5 규칙 일관 적용",
+      "also_applies": [],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-070",
+      "theme": "T6",
+      "provisional": false,
+      "text": "향이 취향이 아니거나 파츠가 ㅂㄹ인거 빼셈 어차피 슬라임 나중에 다죽고 파츠만 남는다",
+      "issue": "특정 제품 경험이 아닌 도메인 통칙",
+      "M": 0,
+      "Q": 0,
+      "E": 0,
+      "why": "조언 화행 — 추출해도 제품 귀속 불가",
+      "also_applies": [
+        "dc-069"
+      ],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-001",
+      "theme": "T7",
+      "provisional": false,
+      "text": "비추수 무섭노! 전부내잘못인정하고 앞으론 좋다는 글만 올릴게",
+      "issue": "갤 내 드라마를 구조적 노이즈(M)로 볼 것인가",
+      "M": 1,
+      "Q": 0,
+      "E": 0,
+      "why": "제품·마켓 정보가 0 인 갤 메타 — M 의 정의에 부합",
+      "also_applies": [
+        "dc-010"
+      ],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    },
+    {
+      "id": "dc-076",
+      "theme": "T8",
+      "provisional": false,
+      "text": "? 7시에 결제하는거 아님?? 왜 2분3분전에 품절이 먼저 떠 ㅡㅡ",
+      "issue": "마켓 운영(장바구니·품절·공지) 불만 11건 묶음의 대표 — M 인가 아닌가",
+      "M": 0,
+      "Q": 1,
+      "E": 0,
+      "why": "메모리 규칙 '할인·비매·서비스=구매 도메인' 의 연장 — 운영은 갤 메타가 아니라 마켓 사실. M=0 이되 E=0 이라 순위 꼬리로 밀린다",
+      "also_applies": [
+        "dc-075",
+        "dc-077",
+        "dc-078",
+        "dc-079",
+        "dc-080",
+        "dc-081",
+        "dc-082",
+        "dc-084",
+        "dc-085"
+      ],
+      "confirmed_by": "user",
+      "confirmed_on": "2026-08-03"
+    }
+  ]
+}

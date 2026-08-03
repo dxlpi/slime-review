@@ -9,11 +9,17 @@
   LLM 미사용. 청크 단위 최대 코사인으로 한 줄 신호가 전체글에 희석되지 않게.
 - **두(세) 축**:
     - Axis 1 (topic, 양쪽 소스): 청크 최대 코사인 ≥ τ_topic → 온토픽.
-    - Axis 2 (kind, 주로 디시): 종류 프로토타입 centroid 최근접. review/question=KEEP, resale/chitchat=DROP.
+    - Axis 2 (M/Q/E, 주로 디시): **독립 이진 3축**. 배타 4분류 `kind` 를 대체한다
+      (계획 `.omc/plans/kind-axis-resolution.md` §1-B — 배타 taxonomy 가 centroid 붕괴의 원인이었다).
+        M = 갤 메타/드라마/뉴스 위젯  → **유일한 DROP 사유**
+        Q = 질문·조언요청 화행        → 관측용(드롭 아님)
+        E = 1인칭 실사용 평가          → 추출 순위의 주 신호(드롭 아님)
+      후보 집합 = 규칙 OR 프로브의 **합집합**, 정렬 = E 신뢰도 버킷, 절단 = 예산 N(§C-3).
     - Axis 0 (domain, 인스타 name-collision 폴백): 슬라임/비슬라임 centroid. 기본 OFF — 도메인 인식
       앵커('… 슬라임')로 충분. 검증에서 leak 시 conf['domain_gate']='centroid' 로 활성.
-- **불변식**(D6): Layer 1 미적용. 홍보/서포터 판단 금지(bias.py 전담). kind 는 4종만.
+- **불변식**(D6): Layer 1 미적용. 홍보/서포터 판단 금지(bias.py 전담).
   소스 편향(부정 디시/긍정 인스타)은 1급 기능 — 관련성 필터가 절대 건드리지 않는다.
+  **부정 감성 항목은 E 와 무관하게 후보에서 빼지 않는다**(AC8 하드게이트, `bias_hold`).
 
 플랫폼 차이는 코드가 아니라 데이터 설정(`RELEVANCE_CONF`)으로. 신규 소스 = 설정 한 줄.
 """
@@ -39,8 +45,8 @@ log = logging.getLogger("relevance")
 # 잠정 기본값 — 게이트 로직/카운트/랜박 테스트는 이 값으로 동작하지만, precision/recall
 # 하드게이트(AC4)는 보정 후에만 유효. margin = 경계(near_boundary) 폭(보수적 KEEP 마킹).
 RELEVANCE_CONF: dict[str, dict] = {
-    "dcinside":  {"tau_topic": 0.45, "kind_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment")},
-    "instagram": {"tau_topic": 0.45, "kind_axis": False, "domain_gate": True,  "margin": 0.05, "types": ("post",)},
+    "dcinside":  {"tau_topic": 0.45, "mqe_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment")},
+    "instagram": {"tau_topic": 0.45, "mqe_axis": False, "domain_gate": True,  "margin": 0.05, "types": ("post",)},
 }
 
 # 안전 상한 배수(D9): examined == K*limit 도달 시 조기 종료(무료 컴퓨트 ≠ 무료 스크래핑).
@@ -58,21 +64,35 @@ if _TAU_PATH.exists():
     except Exception as _e:                          # 보정 파일이 깨져도 잠정 기본값으로 동작
         logging.getLogger("relevance").warning("τ 보정 로드 실패(%s): %s", _TAU_PATH, _e)
 
-# Axis 2 종류: KEEP 계열 vs DROP 계열.
-_KEEP_KINDS = ("review", "question")
-_DROP_KINDS = ("resale", "chitchat")
+# E 신뢰도 버킷(§C-3 정렬 키). 규칙·프로브가 둘 다 양성이면 상위, 하나면 중간, 둘 다 음성이면 하위.
+E_BUCKET_BOTH, E_BUCKET_ONE, E_BUCKET_NONE = 2, 1, 0
 
 _GOLD_PATH = ROOT / "evals" / "gold" / "relevance_gold.json"
+_PROBE_PATH = ROOT / "evals" / "gold" / "e_probe.npz"
 
 
 @dataclass
 class RelevanceVerdict:
     keep: bool
-    axis: str                 # 'topic' | 'kind' | 'domain' | 'none'  (DROP 사유 축, KEEP 이면 'none')
+    axis: str                 # 'topic' | 'meta' | 'domain' | 'none'  (DROP 사유 축, KEEP 이면 'none')
     topic_score: float        # 타깃 앵커에 대한 청크 최대 코사인
-    kind: str = ""            # 'review'|'question'|'resale'|'chitchat'|'' (kind_axis 미적용 시 '')
+    # --- 절대 축 3개 (mqe_axis 미적용 소스면 전부 0) ---
+    M: int = 0                # 갤 메타/드라마/뉴스 위젯 — 유일한 DROP 사유
+    Q: int = 0                # 질문 화행 — 관측용
+    E: int = 0                # 1인칭 실사용 평가 (규칙 ∪ 프로브 합집합)
+    e_rule: int = 0           # 규칙 캐스케이드 단독 판정
+    e_probe: float = 0.0      # 로지스틱 프로브 확률(0.0 = 프로브 없음)
+    e_bucket: int = 0         # 정렬 키 — 2:둘 다 / 1:하나만 / 0:둘 다 음성
+    bias_hold: bool = False   # AC8: 부정 감성이라 E 와 무관하게 후보 유지
+    rank: int = -1            # 배치 내 순위(예산 절단 기준). 게이트가 채운다.
+    unprocessed: bool = False # 예산 초과 — **드롭이 아니라 미처리**(AC10, 침묵 절단 금지)
     near_boundary: bool = False
     reason: str = ""
+
+    @property
+    def axes(self) -> str:
+        """로그용 한 줄 표기 — 'M0Q1E1'."""
+        return f"M{self.M}Q{self.Q}E{self.E}"
 
 
 # ---------------------------------------------------------------- Step 0: 앵커 + 청커 (순수 함수)
@@ -135,7 +155,7 @@ def _max_cosine(chunk_vecs: np.ndarray, anchor_vec: np.ndarray) -> float:
 
 
 # ---------------------------------------------------------------- Step 2: 프로토타입 로더 (Axis 2 / Axis 0)
-_prototypes: dict[str, np.ndarray] | None = None
+_e_probe: tuple[np.ndarray, float] | None = None      # (w, b) — 오프라인 학습본
 _domain_prototypes: dict[str, np.ndarray] | None = None
 
 
@@ -150,29 +170,34 @@ def _load_gold() -> list[dict]:
     return data.get("items", []) if isinstance(data, dict) else (data or [])
 
 
-def load_prototypes() -> dict[str, np.ndarray]:
+def load_e_probe() -> tuple[np.ndarray, float] | None:
     """
-    Axis 2 종류 centroid — 골드셋 예시를 kind 별로 임베딩해 평균 벡터. 지연 로드 + 캐시(1회).
-    골드셋 부재/비어있으면 {} (kind 축은 no-op → 온토픽 항목을 review 로 간주해 KEEP).
+    E 축 로지스틱 프로브(w, b) — `evals/train_e_probe.py` 가 오프라인 학습해 `.npz` 로 커밋한 것.
+    **런타임 학습 없음**(sklearn 불필요). BGE-M3 는 이미 로드돼 있으므로 추가 모델 의존성 0.
+    파일이 없으면 None → 규칙 캐스케이드 단독으로 동작한다(합집합이 규칙만 남는 형태, 무해).
     """
-    global _prototypes
-    if _prototypes is not None:
-        return _prototypes
-    by_kind: dict[str, list[str]] = {}
-    for it in _load_gold():
-        kind = (it.get("label") or {}).get("kind")
-        txt = it.get("text")
-        if kind and txt:
-            by_kind.setdefault(kind, []).append(txt)
-    proto: dict[str, np.ndarray] = {}
-    if by_kind:
-        for kind, texts in by_kind.items():
-            vecs = _normalize(np.asarray(_embed(texts), dtype=float))
-            proto[kind] = vecs.mean(axis=0)
-    else:
-        log.info("relevance: 종류 프로토타입 없음(골드셋 미시드) → kind 축 no-op")
-    _prototypes = proto
-    return proto
+    global _e_probe
+    if _e_probe is not None:
+        return _e_probe
+    if not _PROBE_PATH.exists():
+        log.info("relevance: E 프로브 없음(%s) → 규칙 단독", _PROBE_PATH)
+        return None
+    try:
+        z = np.load(_PROBE_PATH)
+        _e_probe = (np.asarray(z["w"], dtype=float), float(z["b"]))
+    except Exception as e:                      # 깨진 가중치에 수집이 죽지 않도록
+        log.warning("E 프로브 로드 실패(%s): %s", _PROBE_PATH, e)
+        return None
+    return _e_probe
+
+
+def e_probe_prob(mean_vec: np.ndarray) -> float:
+    """정규화된 평균 청크 벡터 → E 확률. 프로브 없으면 0.0."""
+    wb = load_e_probe()
+    if wb is None:
+        return 0.0
+    w, b = wb
+    return float(1.0 / (1.0 + np.exp(-(mean_vec @ w + b))))
 
 
 def load_domain_prototypes() -> dict[str, np.ndarray]:
@@ -202,7 +227,8 @@ def load_domain_prototypes() -> dict[str, np.ndarray]:
     return proto
 
 
-def _nearest_kind(vec: np.ndarray, proto: dict[str, np.ndarray]) -> str:
+def _nearest_centroid(vec: np.ndarray, proto: dict[str, np.ndarray]) -> str:
+    """벡터와 가장 가까운 centroid 이름. 이제 **도메인 축(Axis 0) 전용**이다."""
     v = vec / (np.linalg.norm(vec) + 1e-12)
     best, best_sim = "", -1.0
     for kind, cen in proto.items():
@@ -212,41 +238,72 @@ def _nearest_kind(vec: np.ndarray, proto: dict[str, np.ndarray]) -> str:
     return best
 
 
+# ---------------------------------------------------------------- Axis 2: M/Q/E 신호
+def mqe_signals(text: str, mean_vec: np.ndarray, conf: dict) -> dict:
+    """
+    절대 축 3개 + 합집합 후보 판정. `_verdict` 와 보정 스크립트(`evals/calibrate_relevance.py`)가
+    **같은 함수**를 쓴다 — 두 곳에 같은 규칙을 적어 두면 반드시 갈라지기 때문이다.
+
+    candidate = (규칙 E) OR (프로브 E) OR (부정 감성).
+    마지막 항이 AC8 편향 보존 하드게이트다: 부정 후기 1건의 손실이 헛호출 10회보다 비싸다(D6).
+    """
+    from . import relevance_rules as rules
+    ax = rules.axes(text)
+    prob = 0.0 if ax["M"] else e_probe_prob(mean_vec)
+    e_rule = ax["E"]
+    e_probe_pos = int(prob >= conf.get("tau_e_probe", 0.5))
+    bucket = (E_BUCKET_BOTH if (e_rule and e_probe_pos)
+              else E_BUCKET_ONE if (e_rule or e_probe_pos) else E_BUCKET_NONE)
+    hold = rules.is_negative(text)
+    return {"M": ax["M"], "Q": ax["Q"], "E": int(bucket > 0),
+            "e_rule": e_rule, "e_probe": round(prob, 4), "e_bucket": bucket,
+            "bias_hold": hold, "candidate": bool(bucket) or hold}
+
+
 # ---------------------------------------------------------------- Step 3: classify (스텁 대체)
-def _verdict(chunk_vecs: np.ndarray, anchor_vec: np.ndarray, conf: dict) -> RelevanceVerdict:
-    """미리 임베딩된 청크 벡터 + 앵커 벡터로 판정(배치 경로 공유)."""
+def _verdict(chunk_vecs: np.ndarray, anchor_vec: np.ndarray, conf: dict,
+             text: str = "") -> RelevanceVerdict:
+    """미리 임베딩된 청크 벡터 + 앵커 벡터로 판정(배치 경로 공유). text 는 규칙 캐스케이드용."""
     tau = conf.get("tau_topic", 0.45)
     margin = conf.get("margin", 0.05)
     domain_gate = conf.get("domain_gate", False)
 
     if len(chunk_vecs) == 0:
-        return RelevanceVerdict(False, "topic", 0.0, "", False, "빈 텍스트")
+        return RelevanceVerdict(False, "topic", 0.0, reason="빈 텍스트")
 
     # Axis 1 — 온토픽(양쪽 소스). 도메인 인식 앵커라 비슬라임 글은 대개 여기서 걸린다.
     topic_score = _max_cosine(chunk_vecs, anchor_vec)
     near = abs(topic_score - tau) < margin
     if topic_score < tau:
-        return RelevanceVerdict(False, "topic", topic_score, "", near, f"topic<{tau:.2f}")
+        return RelevanceVerdict(False, "topic", topic_score,
+                                near_boundary=near, reason=f"topic<{tau:.2f}")
 
     # Axis 0 — 슬라임 도메인 centroid(인스타 폴백, 기본 OFF).
     if domain_gate == "centroid":
         dom = load_domain_prototypes()
         if dom:
             mean_vec = _normalize(np.asarray(chunk_vecs, dtype=float)).mean(axis=0)
-            if _nearest_kind(mean_vec, dom) == "not_slime":
-                return RelevanceVerdict(False, "domain", topic_score, "", near, "비슬라임(domain centroid)")
+            if _nearest_centroid(mean_vec, dom) == "not_slime":
+                return RelevanceVerdict(False, "domain", topic_score,
+                                        near_boundary=near, reason="비슬라임(domain centroid)")
 
-    # Axis 2 — 종류(주로 디시). resale/chitchat DROP. 프로토타입 없으면 no-op(review 로 KEEP).
-    kind = ""
-    if conf.get("kind_axis"):
-        proto = load_prototypes()
-        if proto:
-            mean_vec = _normalize(np.asarray(chunk_vecs, dtype=float)).mean(axis=0)
-            kind = _nearest_kind(mean_vec, proto)
-            if kind in _DROP_KINDS:
-                return RelevanceVerdict(False, "kind", topic_score, kind, near, f"kind={kind}")
+    # Axis 2 — M/Q/E 이진 3축(주로 디시). **M 만 DROP 사유**다.
+    # Q(질문)는 드롭도 순위 조정도 하지 않는 **순수 관측 축**이다(정렬 키에 안 들어간다).
+    # 질문글이 뒤로 밀리는 건 Q 때문이 아니라 그런 글이 대개 E=0 이라서다 — 배타 4분류에서 질문을 KEEP/DROP 으로 가르던
+    # 설계가 §1-B 의 근본 문제였다.
+    if not conf.get("mqe_axis"):
+        return RelevanceVerdict(True, "none", topic_score, near_boundary=near, reason="keep")
 
-    return RelevanceVerdict(True, "none", topic_score, kind or "review", near, "keep")
+    sig = mqe_signals(text, _normalize(np.asarray(chunk_vecs, dtype=float)).mean(axis=0), conf)
+    if sig["M"]:
+        return RelevanceVerdict(False, "meta", topic_score, M=1, Q=sig["Q"], E=0,
+                                near_boundary=near, reason="meta/noise")
+    keep = sig["candidate"]
+    return RelevanceVerdict(
+        keep, "none" if keep else "e_union", topic_score,
+        M=0, Q=sig["Q"], E=sig["E"], e_rule=sig["e_rule"], e_probe=sig["e_probe"],
+        e_bucket=sig["e_bucket"], bias_hold=sig["bias_hold"], near_boundary=near,
+        reason="keep" if keep else "E 합집합 음성")
 
 
 def classify_batch(reviews: list[RawReview], target: dict, conf: dict) -> list[RelevanceVerdict]:
@@ -270,8 +327,8 @@ def classify_batch(reviews: list[RawReview], target: dict, conf: dict) -> list[R
     vecs = _embed(flat)
     anchor_vec = np.asarray(vecs[0], dtype=float)
     out: list[RelevanceVerdict] = []
-    for (s, e) in spans:
-        out.append(_verdict(np.asarray(vecs[s:e], dtype=float), anchor_vec, conf))
+    for r, (s, e) in zip(reviews, spans):
+        out.append(_verdict(np.asarray(vecs[s:e], dtype=float), anchor_vec, conf, r.text))
     return out
 
 
@@ -292,4 +349,4 @@ if __name__ == "__main__":
         RawReview(text="오늘 점심 뭐 먹지 배고프다 사과 먹음", url="u2", platform="instagram"),
     ]
     for r, v in zip(samples, classify_batch(samples, tgt, RELEVANCE_CONF["instagram"])):
-        print(f"  keep={v.keep} axis={v.axis} score={v.topic_score:.3f} kind={v.kind} :: {r.text[:20]}")
+        print(f"  keep={v.keep} axis={v.axis} score={v.topic_score:.3f} {v.axes} :: {r.text[:20]}")

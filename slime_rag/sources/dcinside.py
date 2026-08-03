@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 from .base import (
     RawReview, Source, Throttle, RelevanceGate, robots_allowed, get,
-    is_low_quality, toxic_via_llm, log,
+    is_low_quality, strip_chrome, toxic_via_llm, log,
 )
 
 
@@ -100,10 +100,8 @@ class DCInsideSource(Source):
 
     @staticmethod
     def _clean(text: str) -> str:
-        t = re.sub(r"\n{3,}", "\n\n", text or "")
-        t = re.sub(r"https?://\S+", "", t)          # 링크 제거
-        t = re.sub(r"-\s*dc(official)?\s*app.*$", "", t, flags=re.I | re.M)  # 앱 푸터 등
-        return t.strip()
+        t = re.sub(r"https?://\S+", "", text or "")   # 링크 제거
+        return strip_chrome(t)                        # 뉴스 위젯·앱 푸터·멘션 (base.strip_chrome)
 
     # ---- 댓글 (AJAX) ----
     COMMENT_URL = "https://gall.dcinside.com/board/comment/"   # [ADJUST] 라이브 검증

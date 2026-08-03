@@ -88,6 +88,32 @@ def get(session: requests.Session, url: str, throttle: Throttle,
     return None
 
 
+# ---------------------------------------------------------------- chrome strip (사이트 UI 잔재)
+# 크롤러 단계에서 걷어내는 '본문이 아닌 것'. 분류기보다 앞이어야 한다 — 여기서 남으면
+# 임베딩·LLM 이 뉴스 헤드라인이나 닉네임을 본문 신호로 착각한다(계획 B-0 / AC5).
+#
+# 1) 디시 실시간 뉴스 위젯 블리드: `<헤드라인> 1 / 20 이전 다음`.
+#    페이저 토큰(`n / m 이전 다음`)이 위젯의 끝이고, 헤드라인은 같은 줄 앞부분이다.
+#    → 줄 시작부터 페이저까지를 통째로 제거(줄 단위라 본문 다른 줄은 보존).
+_NEWS_WIDGET_RE = re.compile(r"^.*?\d+\s*/\s*\d+\s*이전\s*다음[ \t]*", re.M)
+# 2) 앱 푸터. 실제 표기는 `- dc official App`(중간 공백) — 공백 없는 변형도 함께 흡수.
+_APP_FOOTER_RE = re.compile(r"-\s*dc\s*official\s*app.*$", re.I | re.M)
+# 3) 멘션. `@글쓴 아갤러(58.78)` 은 중간 공백 때문에 단순 `@\S+` 로 안 지워져 '아갤러'가 남고,
+#    그 잔재가 메타 오탐을 유발한다. '글쓴' 접두 형태를 먼저 소비한 뒤 일반 형태를 지운다.
+_MENTION_RE = re.compile(r"@(?:글쓴\s+)?\S+")
+
+
+def strip_chrome(text: str) -> str:
+    """본문에서 사이트 UI 잔재(뉴스 위젯·앱 푸터·멘션)를 제거한다. 무손실 정제 — 후기 텍스트 불변."""
+    t = text or ""
+    t = _NEWS_WIDGET_RE.sub("", t)
+    t = _APP_FOOTER_RE.sub("", t)
+    t = _MENTION_RE.sub("", t)
+    t = re.sub(r"[ \t]{2,}", " ", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return "\n".join(line.strip() for line in t.splitlines()).strip()
+
+
 # ---------------------------------------------------------------- 노이즈/유해 필터
 # NOTE: 시드 수준. 운영에선 분류기/LLM로 대체 권장(아래 toxic_via_llm 훅 참고).
 _TOXIC_SEED = [
@@ -131,9 +157,12 @@ class RelevanceGate:
     관련성 게이트 — 수집 루프가 후보 배치(post+댓글 / 캡션들)를 넘기면 KEEP 만 흘려보낸다.
 
     - 비관련은 yield 안 하고 **카운트 안 함**(예산=관련 항목, 계획 §1·D8).
-    - 상한(D9): 정지 = relevant==limit OR examined>=K*limit OR 소스 자체 페이지 상한.
+    - 상한(D9): 정지 = relevant==budget OR examined>=K*limit OR 소스 자체 페이지 상한.
       수집 루프는 매 배치 전 `should_stop()` 으로 네트워크 조기 종료.
-    - 관측성(AC7): DROP 마다 axis/score/kind/url 로깅, 경계 KEEP 별도 마킹, 종료 시 요약 1줄.
+    - **순위·예산**(kind-axis-resolution §C-3 / AC10): 배치 안의 KEEP 후보를 E 신뢰도로 정렬한 뒤
+      예산만큼만 흘린다. 초과분은 **드롭이 아니라 '미처리'(unprocessed)** 로 따로 세고 로깅한다 —
+      침묵 절단 금지. 질문글은 걸러지는 게 아니라 꼬리로 밀려 예산이 안 닿으면 자연히 안 나간다.
+    - 관측성(AC7): DROP 마다 axis/score/axes/url 로깅, 경계 KEEP 별도 마킹, 종료 시 요약 1줄.
     - 앵커 없음(target 미주입+keywords 없음) 또는 미설정 플랫폼 → 비활성(패스스루, 하위호환).
     - 임베딩은 `relevance.classify_batch` 가 배치로 처리(BGE-M3 encode 호출 amortize).
     """
@@ -148,18 +177,27 @@ class RelevanceGate:
         self.conf = RELEVANCE_CONF.get(platform)
         self.active = bool(self.conf) and self.target is not None
         self.cap = (self.conf.get("k", RELEVANCE_K) if self.conf else RELEVANCE_K) * limit
+        # 예산 N — 기본은 limit(관련 항목 수). conf['budget'] 로 소스별 상한을 따로 줄 수 있다.
+        self.budget = (self.conf or {}).get("budget") or limit
         self.relevant = 0
         self.examined = 0
         self.emitted = 0                              # 패스스루 카운터
-        self.dropped = {"topic": 0, "kind": 0, "domain": 0}
+        self.unprocessed = 0                          # 예산 초과(드롭 아님) — AC10
+        self.dropped = {"topic": 0, "meta": 0, "domain": 0, "e_union": 0}
 
     def should_stop(self) -> bool:
         if not self.active:
             return self.emitted >= self.limit
-        return self.relevant >= self.limit or self.examined >= self.cap
+        return self.relevant >= self.budget or self.examined >= self.cap
+
+    @staticmethod
+    def _rank_key(v) -> tuple:
+        """정렬 키 — E 신뢰도 버킷(2:규칙·프로브 둘 다 / 1:하나만 / 0:둘 다 음성) 우선,
+        동률이면 편향 보존 항목(AC8)을 앞으로, 그다음 topic 점수."""
+        return (v.e_bucket, int(v.bias_hold), v.topic_score)
 
     def filter(self, reviews: list[RawReview]) -> Iterator[RawReview]:
-        """후보 배치 → KEEP 만 yield. 카운터 갱신·로그. 비활성이면 limit 까지 그대로 흘림."""
+        """후보 배치 → 순위대로 예산만큼 yield. 비활성이면 limit 까지 그대로 흘림."""
         if not reviews:
             return
         if not self.active:                           # 하위호환 패스스루
@@ -171,36 +209,54 @@ class RelevanceGate:
             return
         from ..relevance import classify_batch
         verdicts = classify_batch(reviews, self.target, self.conf)
+
+        keepers: list[tuple[RawReview, object]] = []
         for review, v in zip(reviews, verdicts):
-            if self.relevant >= self.limit or self.examined >= self.cap:
-                return
+            if self.examined >= self.cap:             # 책임 수집 상한(D9) — 더 안 본다
+                break
             self.examined += 1
             if not v.keep:
                 self.dropped[v.axis] = self.dropped.get(v.axis, 0) + 1
-                self.log.info("relevance drop axis=%s score=%.3f kind=%s url=%s",
-                              v.axis, v.topic_score, v.kind, review.url)
+                self.log.info("relevance drop axis=%s score=%.3f axes=%s url=%s",
+                              v.axis, v.topic_score, v.axes, review.url)
+                continue
+            keepers.append((review, v))
+
+        keepers.sort(key=lambda pair: self._rank_key(pair[1]), reverse=True)
+        for rank, (review, v) in enumerate(keepers):
+            v.rank = rank
+            if self.relevant >= self.budget:
+                # 예산 초과 = **미처리**. DROP 카운터에 넣지 않는다 — 둘을 섞으면 리포트가
+                # "걸러냈다"와 "예산이 모자랐다"를 구분 못 하고, 그게 곧 침묵 절단이다.
+                v.unprocessed = True
+                self.unprocessed += 1
+                self.log.info("relevance unprocessed(예산 초과, 드롭 아님) rank=%d %s url=%s",
+                              rank, v.axes, review.url)
                 continue
             if v.near_boundary:
                 self.log.info("relevance near-boundary keep score=%.3f url=%s",
                               v.topic_score, review.url)
             review.meta["relevance"] = {
                 "axis": v.axis, "topic_score": round(v.topic_score, 4),
-                "kind": v.kind, "near_boundary": v.near_boundary,
+                "M": v.M, "Q": v.Q, "E": v.E,
+                "e_rule": v.e_rule, "e_probe": v.e_probe, "e_bucket": v.e_bucket,
+                "bias_hold": v.bias_hold, "rank": rank,
+                "near_boundary": v.near_boundary,
             }
             yield review
             self.relevant += 1
 
     def finish(self) -> None:
-        """소스 종료 시 shortfall(AC5) + 요약 카운터(AC7) 로깅."""
+        """소스 종료 시 shortfall(AC5) + 요약 카운터(AC7) + 미처리 노출(AC10) 로깅."""
         if not self.active:
             return
         # examined==0 은 관련성 미달이 아니라 '수집할 후보가 애초에 없음'(토큰/네트워크) →
         # 그건 소스가 이미 로깅하므로 여기서 shortfall 로 오탐하지 않는다.
-        if self.relevant < self.limit and self.examined > 0:
+        if self.relevant < self.budget and self.examined > 0:
             reason = "examined 상한(K*limit) 도달" if self.examined >= self.cap else "후보 소진"
             self.log.warning(
-                "relevance shortfall [%s]: relevant=%d < limit=%d (%s, examined=%d, cap=%d)",
-                self.platform, self.relevant, self.limit, reason, self.examined, self.cap)
+                "relevance shortfall [%s]: relevant=%d < budget=%d (%s, examined=%d, cap=%d)",
+                self.platform, self.relevant, self.budget, reason, self.examined, self.cap)
         if self.examined:
-            self.log.info("relevance summary [%s] examined=%d relevant=%d dropped=%s",
-                          self.platform, self.examined, self.relevant, self.dropped)
+            self.log.info("relevance summary [%s] examined=%d relevant=%d unprocessed=%d dropped=%s",
+                          self.platform, self.examined, self.relevant, self.unprocessed, self.dropped)

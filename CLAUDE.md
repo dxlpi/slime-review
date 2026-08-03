@@ -26,8 +26,10 @@ something to correct for** — never average it; show it per source, plus the ga
 - Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
   blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
 - The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
-  independent binary axes **M/Q/E** ([.omc/plans/kind-axis-resolution.md](.omc/plans/kind-axis-resolution.md)).
-  Only `M` drops; `Q`/`E` rank. Extraction now runs **thread-batched** (input was 99.4% fixed prompt).
+  independent binary axes **M/Q/E** ([ADR-0006](docs/adr/0006-mqe-three-axis-relevance.md) — the
+  source plan `kind-axis-resolution.md` is author-local and not part of this repo).
+  Only `M` drops and only `E` ranks — `Q` is a pure observation axis, absent from the sort key.
+  Extraction now runs **thread-batched** (input was 99.4% fixed prompt).
 - The 15 boundary rulings are **user-confirmed** (2026-08-03,
   [evals/gold/boundary_rulings.json](evals/gold/boundary_rulings.json)); the gold's absolute axes are final.
 - Still to do: decide the `collected_for` target policy (product-level vs market-level) — this, not the

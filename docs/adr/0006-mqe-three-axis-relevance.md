@@ -1,7 +1,9 @@
 # ADR-0006: 관련성 `kind` 축을 M/Q/E 독립 이진 3축으로 교체
 
 - 상태: 채택 (2026-08-02)
-- 관련: [ADR-0002 소스 편향 1급](0002-source-bias-first-class.md) · 계획 [`.omc/plans/kind-axis-resolution.md`](../../.omc/plans/kind-axis-resolution.md)
+- 관련: [ADR-0002 소스 편향 1급](0002-source-bias-first-class.md)
+- 근거 계획: `kind-axis-resolution.md` — 작성자 로컬 문서라 **리포에 없다**. 경로로 적지 말 것:
+  가리키는 파일이 클론에 없으면 CI 경로 검증이 막는다(의도된 동작). 결정 근거는 이 ADR 이 전부 담는다.
 - 영향: `slime_rag/relevance.py`, `slime_rag/relevance_rules.py`(신규), `slime_rag/sources/base.py`,
   `evals/gold/relevance_gold.json`(라벨 스키마)
 

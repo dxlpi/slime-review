@@ -6,8 +6,15 @@ venv/
 .DS_Store
 *.egg-info/
 
-# Claude Code / OMC 작업 환경 (프로젝트 소스 아님 — 로컬에만 유지)
-.claude/
+# Claude Code
+.claude/*
+!.claude/settings.json
+!.claude/precommit-cmd
+!.claude/skills/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# OMC 런타임 상태(세션 로그·머신 로컬 state — 스크랩 원문이 섞일 수 있음)
 .omc/
 
 # 관련성 골드셋 원시 시드(디시 스크랩 raw, 저작권 — 스니펫만 evals/gold 에 남김; ADR/계획 §4a)

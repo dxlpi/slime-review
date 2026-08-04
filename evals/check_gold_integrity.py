@@ -59,6 +59,7 @@ def check(gold: dict) -> tuple[list[str], list[str]]:
     for it in items:
         groups[(it.get("text") or "").strip()].append(it)
     dup_groups = 0
+    has_differing_keep_group = False
     for text, members in groups.items():
         if len(members) < 2:
             continue
@@ -71,9 +72,13 @@ def check(gold: dict) -> tuple[list[str], list[str]]:
                 f"  «{text[:30]}…»")
         # keep 불일치는 정상 — 쿼리 조건부. 확인만 하고 통과시킨다.
         if len({m["label"].get("keep") for m in members}) > 1:
+            has_differing_keep_group = True
             notes.append(f"· 쿼리 조건부 네거티브 정상 동작: {', '.join(m['id'] for m in members)} "
                          f"(같은 텍스트, 다른 타깃 → 다른 keep)")
     notes.append(f"· 동일 텍스트 그룹 {dup_groups}개 검사")
+    if not has_differing_keep_group:
+        errors.append("[AC1] 쿼리 조건부 하드 네거티브 자산 소실 — 동일 텍스트 그룹 중 keep 이 "
+                       "갈리는 그룹이 하나도 없음 (AC3 자산이 반드시 하나는 있어야 함)")
 
     # --- AC3: 경계 판정 진행 상황(정보) ---
     prov = [it["id"] for it in items if (it.get("label") or {}).get("provisional")]

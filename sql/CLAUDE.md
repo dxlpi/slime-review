@@ -11,7 +11,8 @@ dense 벡터(BGE-M3) + BM25(앱단)로 하이브리드. `docker-compose.yml` 이
 
 ## Schema 요약
 - `specs (market, product, scent, base_combo, slime_type, beads[])` · UNIQUE(market, product)
-- `reviews (source, market, product, spec_id→specs, review_class, attributes JSONB, embedding vector(1024), tokens[])`
+- `reviews (source, market, product, spec_id→specs, review_class, attributes JSONB, relevance_meta JSONB, embedding vector(1024), tokens[])`
+  — `relevance_meta` = 관련성 게이트 판정 전문(M/Q/E·topic_score·target/target_scope/τ·rank_score, ADR-0007). 게이트 미경유 행은 NULL.
 - 조인 키: `reviews.spec_id → specs.id`. 메타필터 컬럼: `market`, `slime_type`, `source`, `review_class`.
 
 ## Common patterns (workflow)

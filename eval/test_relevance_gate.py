@@ -314,6 +314,22 @@ def test_kax_ac10_ranking_and_budget():
     print(f"✓ KAX-AC10 순위·예산·미처리 로깅 OK (unprocessed={gate.unprocessed})")
 
 
+def test_kax_ac8b_bias_hold_within_bucket():
+    """AC8b(WS1) — **같은 e_bucket 안에서는** bias_hold 가 topic 점수 차이를 항상 이긴다.
+    (_rank_key = (e_bucket, int(bias_hold), score) — 버킷이 다르면 e_bucket 이 정당하게
+    우선하므로, 교차 버킷 주장을 하면 거짓 AC8 이 된다. 검사는 버킷 내로 한정한다.)"""
+    for bucket in (0, 1, 2):
+        held = R.RelevanceVerdict(True, "none", 0.01, e_bucket=bucket, bias_hold=True)
+        loose = R.RelevanceVerdict(True, "none", 0.99, e_bucket=bucket, bias_hold=False)
+        assert RelevanceGate._rank_key(held) > RelevanceGate._rank_key(loose), \
+            f"bucket={bucket}: bias_hold 항목이 점수 높은 일반 항목에 밀림"
+    # 교차 버킷은 e_bucket 이 우선하는 것이 맞다(회귀 방향 고정).
+    assert (RelevanceGate._rank_key(R.RelevanceVerdict(True, "none", 0.01, e_bucket=2, bias_hold=False))
+            > RelevanceGate._rank_key(R.RelevanceVerdict(True, "none", 0.99, e_bucket=1, bias_hold=True))), \
+        "교차 버킷에서 e_bucket 우선이 깨짐"
+    print("✓ KAX-AC8b 버킷 내 bias_hold 우선(정렬 불변식) OK")
+
+
 if __name__ == "__main__":
     test_ac1_counts_only_relevant()
     test_ac1_relevant_scarcity_returns_fewer()
@@ -329,5 +345,6 @@ if __name__ == "__main__":
     test_kax_ac6_declarative_endings_not_questions()
     test_kax_ac7_hearsay_vs_direct_perception()
     test_kax_ac8_negative_survives_gate()
+    test_kax_ac8b_bias_hold_within_bucket()
     test_kax_ac10_ranking_and_budget()
     print("\n관련성 게이트 오프라인 테스트 통과 ✅")

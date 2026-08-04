@@ -16,7 +16,9 @@
 | `migrate_gold_mqe.py` | `kind` 4분류 → M/Q/E 마이그레이션(멱등). 판정이 바뀌면 다시 돌린다 |
 | `train_e_probe.py` | E 프로브 오프라인 학습 → `gold/e_probe.npz` (numpy only, 런타임 학습 없음) |
 | `calibrate_relevance.py` | τ_topic 보정 + M/Q/E 축 리포트(AC8 편향 보존·AC9 거짓DROP·버킷 순도) |
-| `cost_profile.py` | 추출 호출 비용 구조 실측(AC11) + 프롬프트 캐싱 확인(AC14) |
+| `cost_profile.py` | 추출 호출 비용 구조 실측(AC11) + 프롬프트 캐싱 확인(AC14). `--thread` = 스레드 경로 n∈{12,16,20,24} 실측 → `results/cost_profile_thread.json`(배치 캡 결정 근거, ADR-0007 교차 참조) |
+| `simulate_c_prime.py` | C′(keep/rank 분리) 오프라인 시뮬레이션 — ADR-0007 기각 근거 재현(무 LLM) |
+| `gold/thread_map.json` | 관련성 골드 71건 ↔ 디시 스레드 URL 조인(9스레드) — 시뮬레이션 재현용 |
 | `results/latest.json` | 최근 실행 지표(자동 생성) |
 
 ## 스위트

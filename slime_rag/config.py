@@ -40,6 +40,10 @@ class Settings:
     # --- 개체연결 보류 임계값 ---
     link_abstain_threshold: float = float(os.getenv("LINK_ABSTAIN_THRESHOLD", "0.6"))
 
+    # --- 2층 스레드 배치 추출 상한 (extract.py) ---
+    # 실측 근거·상세 코멘트는 extract.py 의 MAX_THREAD_SOURCES 정의부 참조.
+    max_thread_sources: int = int(os.getenv("MAX_THREAD_SOURCES", "12"))
+
     # --- 인스타 Graph API (1층 스펙, 선택) ---
     ig_access_token: str | None = os.getenv("IG_ACCESS_TOKEN")
     ig_user_id: str | None = os.getenv("IG_USER_ID")

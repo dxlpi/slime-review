@@ -1,9 +1,13 @@
 {
-  "_doc": "관련성 골드셋. 절대 축 = label.M/Q/E(이진, 텍스트 속성 — collected_for 와 무관). 쿼리 조건부 축 = label.keep(+collected_for). 경계 판정 근거는 gold/boundary_rulings.json. label.kind_deprecated 는 폐기된 4분류 초안(resale 범주 폐기). 동일 텍스트를 공유하는 항목의 M/Q/E 는 반드시 일치해야 한다(check_gold_integrity.py).",
+  "_doc": "관련성 골드셋. 절대 축 = label.M/Q/E(이진, 텍스트 속성 — collected_for 와 무관). 쿼리 조건부 축 = label.keep(+collected_for). 경계 판정 근거는 gold/boundary_rulings.json. label.kind_deprecated 는 폐기된 4분류 초안(resale 범주 폐기). 동일 텍스트를 공유하는 항목의 M/Q/E 는 반드시 일치해야 한다(check_gold_integrity.py). keep_scope_ruling = 플랫폼별 label.keep 이 판정된 target scope(ADR-0007) — ACTIVE scope 와 다르면 calibrate_relevance --write 가 거부한다.",
+  "keep_scope_ruling": {
+    "dcinside": "market",
+    "instagram": "product"
+  },
   "counts": {
     "total": 138,
-    "keep": 52,
-    "drop": 86,
+    "keep": 76,
+    "drop": 62,
     "dcinside": 123,
     "instagram": 15,
     "M": 13,
@@ -244,7 +248,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -281,7 +285,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -354,7 +358,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "'그래놀라진짜개좋음' — 초안 chitchat/DROP 은 오류(AC9)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -390,7 +394,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -426,7 +430,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -444,7 +448,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -462,7 +466,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "'잘맞을것같대서' = 전언 표지 → E=0 (AC7)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -498,7 +502,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -516,7 +520,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -534,7 +538,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "'층분리랑 수분감 개심해' 부정 평가 — AC8 하드게이트 대상",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -552,7 +556,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -588,7 +592,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -660,7 +664,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -733,7 +737,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -752,7 +756,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -824,7 +828,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -914,7 +918,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -968,7 +972,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1040,7 +1044,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1058,7 +1062,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1148,7 +1152,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "'카피바라는 만져봤는데 진짜 극락임' — 초안 chitchat 은 오류(AC9)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1166,7 +1170,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1184,7 +1188,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,
@@ -1220,7 +1224,7 @@
         "slime": "허니푸냥이"
       },
       "label": {
-        "keep": false,
+        "keep": true,
         "why": "제품 무관 잡담(추정)",
         "kind_deprecated": "chitchat",
         "M": 0,

@@ -1,0 +1,104 @@
+{
+  "system_fixed_prompt_tokens": 4511,
+  "model": "gpt-5.4-mini",
+  "rows": [
+    {
+      "n": 12,
+      "prompt_tokens": 4979,
+      "body_tokens": 468,
+      "cached_tokens": 4864,
+      "fixed_share": 0.906,
+      "cost_usd": 0.001945,
+      "cost_usd_per_fragment": 0.00016209,
+      "composition": [
+        {
+          "thread_no": "201423",
+          "used": 12,
+          "of": 20
+        }
+      ]
+    },
+    {
+      "n": 16,
+      "prompt_tokens": 5245,
+      "body_tokens": 734,
+      "cached_tokens": 4864,
+      "fixed_share": 0.8601,
+      "cost_usd": 0.005655,
+      "cost_usd_per_fragment": 0.00035341,
+      "composition": [
+        {
+          "thread_no": "201423",
+          "used": 16,
+          "of": 20
+        }
+      ]
+    },
+    {
+      "n": 20,
+      "prompt_tokens": 5322,
+      "body_tokens": 811,
+      "cached_tokens": 4864,
+      "fixed_share": 0.8476,
+      "cost_usd": 0.004641,
+      "cost_usd_per_fragment": 0.00023206,
+      "composition": [
+        {
+          "thread_no": "201423",
+          "used": 20,
+          "of": 20
+        }
+      ]
+    },
+    {
+      "n": 24,
+      "prompt_tokens": 5504,
+      "body_tokens": 993,
+      "cached_tokens": 4864,
+      "fixed_share": 0.8196,
+      "cost_usd": 0.006384,
+      "cost_usd_per_fragment": 0.00026601,
+      "composition": [
+        {
+          "thread_no": "201423",
+          "used": 20,
+          "of": 20
+        },
+        {
+          "thread_no": "199959",
+          "used": 4,
+          "of": 16
+        }
+      ]
+    }
+  ],
+  "warm_n12": {
+    "n": 12,
+    "prompt_tokens": 4979,
+    "cached_tokens": 4864,
+    "cost_usd": 0.001945,
+    "cost_usd_per_fragment": 0.00016209,
+    "composition": [
+      {
+        "thread_no": "201423",
+        "used": 12,
+        "of": 20
+      }
+    ]
+  },
+  "floor": {
+    "body_tokens": 468,
+    "output_tokens": 332,
+    "floor_cost_usd": 0.001845,
+    "floor_cost_usd_per_fragment": 0.00015375,
+    "warm_over_floor_ratio": 1.0542
+  },
+  "ledger_summary": {
+    "calls": 6,
+    "errors": 0,
+    "input_tokens": 30540,
+    "cached_tokens": 28672,
+    "output_tokens": 3920,
+    "cost_usd": 0.0212
+  }
+}

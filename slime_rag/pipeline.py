@@ -149,7 +149,8 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
         rc = u.meta.get("review_class", "genuine")
         doc = extract.extract_review(u.text, llm, settings.model_extract)
         index.index_post(doc, source="instagram",
-                         post_id=u.meta.get("shortcode"), review_class=rc)
+                         post_id=u.meta.get("shortcode"), review_class=rc,
+                         relevance_meta=u.meta.get("relevance"))
         if rc == "promo":
             n_promo += 1
         else:
@@ -203,7 +204,8 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
             # 순번을 넣지 않으면 같은 스레드 댓글들이 한 post_id 로 뭉개진다.
             post_id = raw.url if raw.meta.get("type") == "post" else \
                 f"{raw.url}:{raw.meta.get('parent_no')}:{i}"
-            n_rows += index.index_post(doc, source="amos", post_id=post_id, conn=conn)
+            n_rows += index.index_post(doc, source="amos", post_id=post_id, conn=conn,
+                                       relevance_meta=raw.meta.get("relevance"))
         conn.commit()
     counts["indexed_rows"] = n_rows
     counts["llm"] = {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}

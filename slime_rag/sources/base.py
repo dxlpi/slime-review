@@ -169,13 +169,26 @@ class RelevanceGate:
 
     def __init__(self, platform: str, target: Optional[dict], keywords: list[str],
                  limit: int, logger=log):
-        from ..relevance import RELEVANCE_CONF, RELEVANCE_K
+        from ..relevance import RELEVANCE_CONF, RELEVANCE_K, TAU_SCOPE_MISMATCH
         self.platform = platform
         self.limit = limit
         self.log = logger
         self.target = resolve_target(target, keywords)
         self.conf = RELEVANCE_CONF.get(platform)
         self.active = bool(self.conf) and self.target is not None
+        # WS1 step 10 — τ 가 다른 target_scope 로 보정됐으면 fail-loud. 잠정 기본값으로
+        # 조용히 내려가는 게 이 검사가 막으려는 정확한 실패 모드다(ADR-0007).
+        if self.active and platform in TAU_SCOPE_MISMATCH:
+            file_scope = TAU_SCOPE_MISMATCH[platform]
+            active_scope = (self.conf or {}).get("target_scope", "product")
+            raise RuntimeError(
+                f"relevance τ 스코프 불일치[{platform}]: 보정 파일의 τ 는 target_scope="
+                f"'{file_scope}' 로 산출됐으나 운용 설정(RELEVANCE_CONF)은 target_scope="
+                f"'{active_scope}' 다. 이 상태로는 활성화할 수 없다(잠정 기본값 대체 금지) — "
+                f"필요 조치: '{active_scope}' 스코프에서 keep 을 재판정하고 "
+                f"evals/calibrate_relevance.py 로 재보정해 relevance_tau.json 의 "
+                f"target_scope 를 '{active_scope}' 로 맞출 것."
+            )
         self.cap = (self.conf.get("k", RELEVANCE_K) if self.conf else RELEVANCE_K) * limit
         # 예산 N — 기본은 limit(관련 항목 수). conf['budget'] 로 소스별 상한을 따로 줄 수 있다.
         self.budget = (self.conf or {}).get("budget") or limit
@@ -242,6 +255,9 @@ class RelevanceGate:
                 "e_rule": v.e_rule, "e_probe": v.e_probe, "e_bucket": v.e_bucket,
                 "bias_hold": v.bias_hold, "rank": rank,
                 "near_boundary": v.near_boundary,
+                "target": self.target, "target_scope": self.conf.get("target_scope", "product"),
+                "tau": self.conf.get("tau_topic", 0.45),
+                "rank_score": None,   # C′(ADR-0007) 미구축 — 항상 null
             }
             yield review
             self.relevant += 1

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 
+from .config import settings
 from .llm_ops import LLM
 
 _NO_RE = re.compile(r"[?&]no=(\d+)")
@@ -383,10 +384,14 @@ def _empty_doc() -> dict:
     return {"market": None, "shipping_cs": None, "reviews": [], "flags": {"toxic": False}}
 
 # 한 호출에 넣을 조각(글+댓글) 최대 개수. 크게 잡을수록 호출은 줄지만 항목별 귀속 정확도가
-# 떨어진다(§5 위험표). 실측 근거: 고정 프롬프트가 입력의 99.4%(evals/cost_profile.py)라
-# 조각 12개면 호출당 낭비가 1/12 로 떨어지고, 그 이상 키워도 절감은 미미한데 귀속 위험만 는다.
+# 떨어진다(§5 위험표). 실측 근거(스레드 경로, 2026-08-04, evals/results/cost_profile_thread.json):
+# LAYER2_THREAD_SYSTEM 고정 프롬프트 4,511 토큰(n=1 최소 본문, gpt-5.4-mini) 기준, n=12 에서
+# 고정 비중 90.6%·cached_tokens=4,864(고정 프롬프트 거의 전부가 캐시됨)로, 웜캐시 비용/조각
+# $0.000162 vs 본문만의 이론적 하한 $0.000154 — 비율 1.054 ≤ 1.10 캐시 하드스탑 기준 →
+# 16/20/24 확장 트라이얼 없이 12 유지. Settings.max_thread_sources(config.py, env
+# MAX_THREAD_SOURCES)가 단일 출처이며, 이 값은 그 기본값을 그대로 반영한다.
 # AC12 동등성 테스트가 이 값에서 통과하는 것을 확인한 뒤에만 올릴 것.
-MAX_THREAD_SOURCES = 12
+MAX_THREAD_SOURCES = settings.max_thread_sources
 
 
 def build_thread_prompt(title: str | None, texts: list[str]) -> str:
@@ -428,9 +433,10 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
     수집된 RawReview(글 + 댓글)를 **스레드 단위 배치**로 추출한다(계획 C-1).
     이 갤은 후기가 댓글에 많아(sources.py 주석) 댓글도 1급 후기로 취급한다.
 
-    왜 배치인가: 호출당 입력 토큰의 **99.4%가 고정 프롬프트**다(실측, `evals/cost_profile.py`).
+    왜 배치인가: **배치 도입 전의 per-comment 경로**는 호출당 입력 토큰의 99.4%가 고정
+    프롬프트였다(실측, `evals/cost_profile.py` 기본 모드 — 배치가 대체한 경로의 역사적 근거).
     댓글 1건당 1회 호출은 그 2,900자짜리 지시문을 댓글 수만큼 재전송한다는 뜻이다.
-    분류기를 아무리 잘 튜닝해도 이 부분은 안 줄어든다 — 줄이는 건 호출 단위를 바꾸는 것뿐이다.
+    현행 스레드 경로의 배치 크기 근거는 위 `MAX_THREAD_SOURCES` 주석(캐시 하드스탑 실측)이다.
 
     부수 이득(AC13): 같은 호출 안에 형제 댓글이 있으므로 **제품명을 생략한 댓글의 귀속**이 가능해진다.
     per-comment 경로에서는 원리적으로 불가능했던 케이스다.

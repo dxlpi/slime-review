@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [app](app/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -32,8 +32,16 @@ something to correct for** — never average it; show it per source, plus the ga
   Extraction now runs **thread-batched** (input was 99.4% fixed prompt).
 - The 15 boundary rulings are **user-confirmed** (2026-08-03,
   [evals/gold/boundary_rulings.json](evals/gold/boundary_rulings.json)); the gold's absolute axes are final.
-- Still to do: decide the `collected_for` target policy (product-level vs market-level) — this, not the
-  labels, is what still blocks `τ_topic` on dcinside · expand the entity-linking gold set
+- The `collected_for` target policy is **ruled** — per-platform C (dcinside=market, IG=product,
+  [ADR-0007](docs/adr/0007-collected-for-target-policy.md)) — but dcinside **activation is held**:
+  the production-faithful eval measured AC4 infeasible at any τ (recall ceiling 0.500 holdout /
+  0.516 all-items, from `e_union` candidacy vs relevance-defined keeps; near-zero market-anchor
+  separation). ACTIVE scope stays
+  `product`; re-activation needs one of the three re-rulings in the ADR. The relevance verdict now
+  persists to the DB (`reviews.relevance_meta` JSONB — hard gate #3 failure tracing); the extraction
+  batch cap stays 12 by measured cache hard-stop (`Settings.max_thread_sources`,
+  [extract.py](slime_rag/extract.py) evidence comment).
+- Still to do: the ADR-0007 re-ruling (above) · expand the entity-linking gold set
   ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
   toxicity filter criteria.
 
@@ -56,6 +64,9 @@ python .github/scripts/validate_context_paths.py               # context path in
 - **Only `M` (meta/noise) may drop an item.** Questions and low-E items are ranked to the tail, never
   filtered out; anything past the budget is logged as `unprocessed`, not dropped. Negative-sentiment
   items stay in the candidate set regardless of `E` — that is the source-bias hard gate.
+  (Known divergence, ruled intentional: the shipped gate also excludes negative-`e_union`
+  non-`bias_hold` items from candidacy — D2, [ADR-0007](docs/adr/0007-collected-for-target-policy.md);
+  re-ruling it to match this rule verbatim is option 1 there.)
 - **Label source bias; never average.** Scent mismatches and source gaps come from joins/aggregation
   (`consolidated_view.py`), not from the LLM.
 - **The LLM vendor is a dependency of `llm_ops.py` only.** New sources and models go behind the interface.

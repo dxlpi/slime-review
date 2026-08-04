@@ -30,11 +30,14 @@ from .config import settings
 log = logging.getLogger("llm_ops")
 
 # 비용 집계 단가 (USD / 1M tokens). 출처: developers.openai.com/api/docs/pricing (2026-06).
+# cached_input: 동일 출처 재확인(2026-08-04) — gpt-5.4/5.5 계열은 캐시 적중 시 입력가의
+# 90% 할인(= input 의 1/10)이 공통 규칙이라 표로 그대로 확인됨. 모델에 cached_input 키가
+# 없으면 _cost_usd 가 전량 input 단가로 청구한다(구모델 동작 불변).
 PRICING = {
-    "gpt-5.4":      {"input": 2.50, "output": 15.00},
-    "gpt-5.4-mini": {"input": 0.75, "output": 4.50},
-    "gpt-5.4-nano": {"input": 0.20, "output": 1.25},
-    "gpt-5.5":      {"input": 5.00, "output": 30.00},
+    "gpt-5.4":      {"input": 2.50, "cached_input": 0.25, "output": 15.00},
+    "gpt-5.4-mini": {"input": 0.75, "cached_input": 0.075, "output": 4.50},
+    "gpt-5.4-nano": {"input": 0.20, "cached_input": 0.02, "output": 1.25},
+    "gpt-5.5":      {"input": 5.00, "cached_input": 0.50, "output": 30.00},
 }
 
 
@@ -42,7 +45,11 @@ def _cost_usd(model: str, usage) -> float:
     p = PRICING.get(model)
     if not p:
         return 0.0
-    return (usage.prompt_tokens * p["input"] + usage.completion_tokens * p["output"]) / 1_000_000
+    cached = _cached_tokens(usage)
+    cached_rate = p.get("cached_input", p["input"])   # 미지원 모델은 input 단가로 대체 청구
+    uncached = usage.prompt_tokens - cached
+    return (uncached * p["input"] + cached * cached_rate
+            + usage.completion_tokens * p["output"]) / 1_000_000
 
 
 def _cached_tokens(usage) -> int:

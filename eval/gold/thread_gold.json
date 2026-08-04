@@ -1,0 +1,445 @@
+{
+  "_note": "스레드 배치 추출(extract_thread/extract_collected) 귀속 검증용 골드. evals/gold/relevance_gold.json 의 디시 아모스갤 항목 중 같은 스레드(dc-030..045, dc-052..067, dc-086..098)를 data/dcinside_sample_raw.json(gitignore, 원문 200자 스니펫 컷 — evals/seed_dcinside_relevance.py:snip())으로 대조해 조각순서를 복원했다. mentioned_product 는 이 골드 파일 전용 신규 축(M/Q/E 와 무관) — 조각 자기 텍스트에 실제로 등장한 제품명만 담았고(미언급=null, 지어내기 금지), 유일한 예외는 thread_no=199959 S7(형제 댓글 문맥 귀속, AC13 — label_basis 필드로 표시). 값은 null | 단일 제품명(str) | 복수 제품명(list[str], 한 조각에 여러 제품이 함께 언급된 경우). thread_no=199757 은 마켓 쇼핑리스트 잡담(해당 스레드 gold 항목 전부 E=0)이라 전부 null — 정답이 없는 하드 네거티브로도 쓴다.",
+  "source": "data/dcinside_sample_raw.json + evals/gold/relevance_gold.json (dcinside amos gallery)",
+  "labeled_date": "2026-08-04",
+  "labeled_by": "human-reviewed via slime_rag executor agent (conservative literal/sibling-context derivation)",
+  "snippet_policy": "<=200 chars per fragment, matches evals/seed_dcinside_relevance.py:snip()",
+  "total_fragments": 51,
+  "threads": [
+    {
+      "thread_no": "201423",
+      "title": "이번에 ㅂ 뭐살거얌?",
+      "url": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201423",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "fragments": [
+        {
+          "source_id": "S0",
+          "type": "post",
+          "text": "이번에 ㅂ 뭐살거얌?\n난 7개 사려고 하다가 기존 라인업 살게 없어서... 4개로 바꿈\n총알 열심히 모았는데,, 4월에 더 샀어야 했나봐\n그 뒤로 나오는 마켓 엄청 끌리는게 없어\n초코비크런키\n미니베이킹클래스(이건 묵매크 아니라고 해서,,, 새롭다고 하길래 넣음 ㅋㅋ)\n베어브런치타임 (카피바라, 푸냥이 할까 하다가 질감 겹치는 것 같아서, 걍 이걸로 감)\n딸",
+          "mentioned_product": [
+            "초코비크런키",
+            "미니베이킹클래스",
+            "베어브런치타임",
+            "미니베이킹",
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-030"
+        },
+        {
+          "source_id": "S1",
+          "type": "comment",
+          "text": "그냥 나처럼 이번 패스 다음마켓 ㄱㄱ 뭔가안땡김",
+          "mentioned_product": null,
+          "gold_id": "dc-031"
+        },
+        {
+          "source_id": "S2",
+          "type": "comment",
+          "text": "나도 패쓰하려구",
+          "mentioned_product": null,
+          "gold_id": "dc-032"
+        },
+        {
+          "source_id": "S3",
+          "type": "comment",
+          "text": "난 신상 3개땡기는데 담마켓 사자니 그땐 신상할인 없어질거아녀...고민중",
+          "mentioned_product": null,
+          "gold_id": "dc-033"
+        },
+        {
+          "source_id": "S4",
+          "type": "comment",
+          "text": "나도 윗댓들처럼 그냥 넘길까 고민되는데... ㅋㅋ 신상 담 마켓에서 안가지고 올까봐... 좀 고민됨",
+          "mentioned_product": null,
+          "gold_id": "dc-034"
+        },
+        {
+          "source_id": "S5",
+          "type": "comment",
+          "text": "@글쓴 아갤러(58.78) 그니까....ㅜ차라리 땡기는거 많으면 막 담겠는데 나도 콩포트 안땡기고 ㅈㄴ고민됨 난 스타후르트링, 미니베이킹, 트리플치즈 이렇게 3개 땡김",
+          "mentioned_product": [
+            "콩포트",
+            "스타후르트링",
+            "미니베이킹",
+            "트리플치즈"
+          ],
+          "gold_id": "dc-035"
+        },
+        {
+          "source_id": "S6",
+          "type": "comment",
+          "text": "\"단돈 2만 원에 예약 폭주\"…500km 달리는 신차 등장에 현대차 '비상' 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-006"
+        },
+        {
+          "source_id": "S7",
+          "type": "comment",
+          "text": "나두 패스",
+          "mentioned_product": null,
+          "gold_id": null
+        },
+        {
+          "source_id": "S8",
+          "type": "comment",
+          "text": "나도 패스",
+          "mentioned_product": null,
+          "gold_id": null
+        },
+        {
+          "source_id": "S9",
+          "type": "comment",
+          "text": "나도 안삼ㅋㅋㅋ",
+          "mentioned_product": null,
+          "gold_id": "dc-036"
+        },
+        {
+          "source_id": "S10",
+          "type": "comment",
+          "text": "향 아쉬워서 패스 ㅇㅇㅈ기대해보게",
+          "mentioned_product": null,
+          "gold_id": "dc-037"
+        },
+        {
+          "source_id": "S11",
+          "type": "comment",
+          "text": "에스파 카리나, 운전면허 시험 결과…충격적인 점수 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-038"
+        },
+        {
+          "source_id": "S12",
+          "type": "comment",
+          "text": "안사 비슷하기도 하고 서폿영상도 소리때문에 못보겟어서 걍 패스",
+          "mentioned_product": null,
+          "gold_id": "dc-039"
+        },
+        {
+          "source_id": "S13",
+          "type": "comment",
+          "text": "딸바크런키 푸냥이 카피바라 츄로토스트 살듯??\n푸냥이 카피바라를 아직도 안만져봐서 ㅈㄴ궁금함\n글고 누텔라바이트 매트꾸덕 좋아하면 제발사봐 난 재밌게만짐 다신 초반에 좀 탈출있음ㅜ",
+          "mentioned_product": [
+            "딸바크런키",
+            "츄로토스트",
+            "누텔라바이트",
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-040"
+        },
+        {
+          "source_id": "S14",
+          "type": "comment",
+          "text": "누텔라 바이트 사봐야겠다!! 혹시 수명은 어땠어?? 나도 푸냥이 카피바라 궁금한데 서폿이 베어 뭐시기랑 중간 질감이라고 해서 일단 저거 시도해보려고 ㅋㅋ 신상 할인 받아서...",
+          "mentioned_product": [
+            "누텔라바이트",
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-041"
+        },
+        {
+          "source_id": "S15",
+          "type": "comment",
+          "text": "@글쓴 아갤러(58.78) 좀 뜨문뜨문 만지긴했는데 생각보다 잘살아있어서 놀랬음ㅋㅋ 나도 그런생각으로 전차수에 신상촉감골랐다가 개안부풀어서 걍 이번에 푸냥이 카피바라 꼭사려공ㅇ",
+          "mentioned_product": [
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-042"
+        },
+        {
+          "source_id": "S16",
+          "type": "comment",
+          "text": "안살거얌",
+          "mentioned_product": null,
+          "gold_id": null
+        },
+        {
+          "source_id": "S17",
+          "type": "comment",
+          "text": "천재이승국 \"20대 도둑맞은 느낌\" 16년 투병 밝혔다 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-043"
+        },
+        {
+          "source_id": "S18",
+          "type": "comment",
+          "text": "나도 안땡기는데 다른 마켓 기다리기가 어려움",
+          "mentioned_product": null,
+          "gold_id": "dc-044"
+        },
+        {
+          "source_id": "S19",
+          "type": "comment",
+          "text": "나도 이상태 더 만질게 없음 ㅜ",
+          "mentioned_product": null,
+          "gold_id": "dc-045"
+        }
+      ]
+    },
+    {
+      "thread_no": "199959",
+      "title": "ㅂ 카피바라 푸냥이 둘다만져본사람",
+      "url": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199959",
+      "collected_for": {
+        "market": "봄",
+        "slime": "허니푸냥이"
+      },
+      "fragments": [
+        {
+          "source_id": "S0",
+          "type": "post",
+          "text": "ㅂ 카피바라 푸냥이 둘다만져본사람\n뭐가 더 좋았음? 카피바라 못사서 ㅈㄴ 울고있어\n- dc official App",
+          "mentioned_product": [
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-052"
+        },
+        {
+          "source_id": "S1",
+          "type": "comment",
+          "text": "취향차이일듯 어떤 촉감류좋아하는데?",
+          "mentioned_product": null,
+          "gold_id": "dc-053"
+        },
+        {
+          "source_id": "S2",
+          "type": "comment",
+          "text": "음 설명 잘 못해서 콩포트랑 과치샐로 비교하면 압도적으로 과치샐 좋아해 ㅠㅠ 빵반죽보단 가볍고 생크림질감?",
+          "mentioned_product": [
+            "콩포트",
+            "과치샐"
+          ],
+          "gold_id": "dc-054"
+        },
+        {
+          "source_id": "S3",
+          "type": "comment",
+          "text": "@글쓴 아갤러(220.119) 흠 카피바라 솝퐁말 그자체로 거품같이사르르한느낌도있음 푸냥이는 실키하면서 푸둥물먹은 퐁말",
+          "mentioned_product": [
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-055"
+        },
+        {
+          "source_id": "S4",
+          "type": "comment",
+          "text": "@아갤러2(106.101) 설명만 들어서는 카피바라가 내스타일에 가까울듯.. 고마버 담에 꼭 산다",
+          "mentioned_product": "카피바라",
+          "gold_id": "dc-056"
+        },
+        {
+          "source_id": "S5",
+          "type": "comment",
+          "text": "너=나 나도 카피바라안사서 우는중",
+          "mentioned_product": "카피바라",
+          "gold_id": "dc-057"
+        },
+        {
+          "source_id": "S6",
+          "type": "comment",
+          "text": "@엄마나똥꼬에서슬라임이나와 샤갈 푸냥이는 겟함?",
+          "mentioned_product": "푸냥이",
+          "gold_id": "dc-058"
+        },
+        {
+          "source_id": "S7",
+          "type": "comment",
+          "text": "@글쓴 아갤러(220.119) 웅 근데 향이 좀 에바ㅠ 고구마케이크향에 좀 이상한 향 입힌느낌이야..",
+          "mentioned_product": "푸냥이",
+          "gold_id": "dc-059",
+          "label_basis": "sibling_context(S6)"
+        },
+        {
+          "source_id": "S8",
+          "type": "comment",
+          "text": "@엄마나똥꼬에서슬라임이나와 식향러버도 힘드려나 오히려 기대돼",
+          "mentioned_product": null,
+          "gold_id": "dc-060"
+        },
+        {
+          "source_id": "S9",
+          "type": "comment",
+          "text": "“가상 자산에 과세 확정, 비트코인 수익 ‘이만큼’ 넘으면 세금 내야 합니다\" 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-061"
+        },
+        {
+          "source_id": "S10",
+          "type": "comment",
+          "text": "나 3월 마켓 때 사서 푸냥이는 안 만져봤고 카피바라는 만져봤는데 진짜 극락임 ㅈㄴ 좋아",
+          "mentioned_product": [
+            "카피바라",
+            "푸냥이"
+          ],
+          "gold_id": "dc-062"
+        },
+        {
+          "source_id": "S11",
+          "type": "comment",
+          "text": "꼭 가질거야 카피바라...",
+          "mentioned_product": "카피바라",
+          "gold_id": "dc-063"
+        },
+        {
+          "source_id": "S12",
+          "type": "comment",
+          "text": "과치샐 좋아하면 푸냥이 더 좋아할듯?\n내 기준 푸냥이가 과치샐이랑 더 비슷하게 느껴짐\n근데 카피바라도 비슷하게 좋긴함 걍 둘다 잘맞을것같은데",
+          "mentioned_product": [
+            "카피바라",
+            "푸냥이",
+            "과치샐"
+          ],
+          "gold_id": "dc-064"
+        },
+        {
+          "source_id": "S13",
+          "type": "comment",
+          "text": "오 그래?? 꼭 둘 다 만져보겠어 둘 다 좋아보이긴 해 봄 촉감류 취향은 갈려도 실패는 없는 느낌,,,",
+          "mentioned_product": null,
+          "gold_id": "dc-065"
+        },
+        {
+          "source_id": "S14",
+          "type": "comment",
+          "text": "나도 과치샐파인데 난 푸냥이가 훨 좋았음",
+          "mentioned_product": [
+            "푸냥이",
+            "과치샐"
+          ],
+          "gold_id": "dc-066"
+        },
+        {
+          "source_id": "S15",
+          "type": "comment",
+          "text": "하운드13 '드래곤소드: 어웨이크닝', 출시 일주일 만에 20만 장 판매 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-067"
+        }
+      ]
+    },
+    {
+      "thread_no": "199757",
+      "title": "아 ㅁㅁㄴ살지말지 ㅈㄴ고민돼 시발시발시발",
+      "url": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199757",
+      "collected_for": {
+        "market": "머머",
+        "slime": "슬라임"
+      },
+      "fragments": [
+        {
+          "source_id": "S0",
+          "type": "post",
+          "text": "아 ㅁㅁㄴ살지말지 ㅈㄴ고민돼 시발시발시발\n이번달 산 거\n늪지8.1 / 캐치4.4 / 욤4.3 / 파스텔로7.5 / 폴린11\n총 36만원\n살거\n오니 / 쥬리 / 페페롱 / 머머 / 예찬\n페페롱 예찬 최애라 각각 10넘을 거 같음\n고민중 모모네4.4  아아아아악\n뭐 골랏냐면\n1. 스누피쿠킹\n2. 베리프루팁스\n3. 끼리와플\n4. 에그노그\n+내리꽃\n모모네까지하면 ",
+          "mentioned_product": null,
+          "gold_id": "dc-086"
+        },
+        {
+          "source_id": "S1",
+          "type": "comment",
+          "text": "참는다ㅜ",
+          "mentioned_product": null,
+          "gold_id": null
+        },
+        {
+          "source_id": "S2",
+          "type": "comment",
+          "text": "ㅁㅊ 난 아니라고 본다 진짜 산거 다 만지긴 함? 정신차려 이년아",
+          "mentioned_product": null,
+          "gold_id": "dc-087"
+        },
+        {
+          "source_id": "S3",
+          "type": "comment",
+          "text": "년은 먄",
+          "mentioned_product": null,
+          "gold_id": null
+        },
+        {
+          "source_id": "S4",
+          "type": "comment",
+          "text": "다 못만져ㅜㅜㅜ시발 안깐슬 100개ㅜ ㅜㅜㅜㅜㅠ",
+          "mentioned_product": null,
+          "gold_id": "dc-088"
+        },
+        {
+          "source_id": "S5",
+          "type": "comment",
+          "text": "퓨리아 '타투', CBLoL 1경기 출장정지-벌금 징계 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-089"
+        },
+        {
+          "source_id": "S6",
+          "type": "comment",
+          "text": "사 나도 ㅇㅊ ㅁㅁㄴ ㅍㅍㄹ 다산다 그대신 4+1로만..",
+          "mentioned_product": null,
+          "gold_id": "dc-090"
+        },
+        {
+          "source_id": "S7",
+          "type": "comment",
+          "text": "비매욕심땜에 사쁠원은 가혹해ㅜㅜㅡㅜㅜㅜㅜ",
+          "mentioned_product": null,
+          "gold_id": "dc-091"
+        },
+        {
+          "source_id": "S8",
+          "type": "comment",
+          "text": "넌 그만사라 ㅋㅋㅋㅋ 상시인데 머하러 몰아삼",
+          "mentioned_product": null,
+          "gold_id": "dc-092"
+        },
+        {
+          "source_id": "S9",
+          "type": "comment",
+          "text": "참으께ㅜㅜㅜㅜㅜ하",
+          "mentioned_product": null,
+          "gold_id": "dc-093"
+        },
+        {
+          "source_id": "S10",
+          "type": "comment",
+          "text": "상시라 굳이긴 해",
+          "mentioned_product": null,
+          "gold_id": "dc-094"
+        },
+        {
+          "source_id": "S11",
+          "type": "comment",
+          "text": "참는다 눈물로 보내준다",
+          "mentioned_product": null,
+          "gold_id": "dc-095"
+        },
+        {
+          "source_id": "S12",
+          "type": "comment",
+          "text": "\"이 정도면 살인미수 분명\" 네티즌들이 보고 경악한 영상 1 / 20 이전 다음",
+          "mentioned_product": null,
+          "gold_id": "dc-096"
+        },
+        {
+          "source_id": "S13",
+          "type": "comment",
+          "text": "상시인데 걍 담달에 사",
+          "mentioned_product": null,
+          "gold_id": "dc-097"
+        },
+        {
+          "source_id": "S14",
+          "type": "comment",
+          "text": "나 보는거같다.. 맘에드는거 있으면 당장 만질거 아니라도 일단 당장 내옆에 있었으면 좋겠는 그런 마음이고 충동구매까지 있음..\n근데 이번엔 참아보게 ㅜ 산게 너무많다",
+          "mentioned_product": null,
+          "gold_id": "dc-098"
+        }
+      ]
+    }
+  ]
+}

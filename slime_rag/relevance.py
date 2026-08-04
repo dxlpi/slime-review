@@ -45,8 +45,12 @@ log = logging.getLogger("relevance")
 # 잠정 기본값 — 게이트 로직/카운트/랜박 테스트는 이 값으로 동작하지만, precision/recall
 # 하드게이트(AC4)는 보정 후에만 유효. margin = 경계(near_boundary) 폭(보수적 KEEP 마킹).
 RELEVANCE_CONF: dict[str, dict] = {
-    "dcinside":  {"tau_topic": 0.45, "mqe_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment")},
-    "instagram": {"tau_topic": 0.45, "mqe_axis": False, "domain_gate": True,  "margin": 0.05, "types": ("post",)},
+    # dcinside target_scope: 정책 C(ADR-0007)는 market 이나, 보정 실측에서 market 앵커("봄 슬라임")가
+    # τ 실현 불가(keep/drop 평균 0.402/0.370, AC4 recall 상한 0.516)로 판명 → 재판정 전까지
+    # product 로 운용(계획 리스크표의 per-platform revert 경로). "market" 전환은 keep 재판정 +
+    # 재보정(relevance_tau.json 스코프 바인딩) 후에만.
+    "dcinside":  {"tau_topic": 0.45, "mqe_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment"), "target_scope": "product"},
+    "instagram": {"tau_topic": 0.45, "mqe_axis": False, "domain_gate": True,  "margin": 0.05, "types": ("post",), "target_scope": "product"},
 }
 
 # 안전 상한 배수(D9): examined == K*limit 도달 시 조기 종료(무료 컴퓨트 ≠ 무료 스크래핑).
@@ -54,13 +58,39 @@ RELEVANCE_K = 3
 
 # 보정된 τ 오버라이드(evals/calibrate_relevance.py --write 산출). 하드코딩 근거=보정 리포트.
 # 파일이 있으면 소스별 tau_topic 을 갱신한다(없으면 위 잠정 기본값 유지).
+#
+# WS1 step 10 — τ 는 특정 target_scope(product/market) 로 보정된 값이라 스코프가 바뀌면 무효다.
+# 파일에 target_scope 가 없는 **레거시 형식**은 "product" 스코프로 취급(경고만, 적용은 함) —
+# 보정이 도입되기 전엔 product 가 유일한 스코프였으므로 이 가정은 안전하다. target_scope 가
+# 있는데 운용 설정(RELEVANCE_CONF[p]["target_scope"])과 **다르면** 그 플랫폼의 τ 를 적용하지 않고
+# TAU_SCOPE_MISMATCH 에 기록만 한다 — RelevanceGate.__init__ 이 활성화 시점에 raise 한다
+# (base.py). 여기서 조용히 잠정 기본값으로 내려가면, 그게 바로 이 검사가 막으려는 실패다.
+TAU_SCOPE_MISMATCH: dict[str, str] = {}     # platform -> 보정 파일이 산출한 target_scope(운용값과 다름)
+
 _TAU_PATH = ROOT / "evals" / "gold" / "relevance_tau.json"
 if _TAU_PATH.exists():
     try:
-        _tau = json.loads(_TAU_PATH.read_text(encoding="utf-8")).get("tau_topic", {})
+        _tau_data = json.loads(_TAU_PATH.read_text(encoding="utf-8"))
+        _tau = _tau_data.get("tau_topic", {})
+        _tau_scope = _tau_data.get("target_scope")
+        if _tau_scope is None:
+            _tau_scope = {_plat: "product" for _plat in _tau}
+            logging.getLogger("relevance").warning(
+                "τ 보정 파일(%s)에 target_scope 없음 — 레거시 파일로 간주해 전 플랫폼 'product' "
+                "스코프로 취급한다", _TAU_PATH)
         for _plat, _val in _tau.items():
-            if _plat in RELEVANCE_CONF and isinstance(_val, (int, float)):
-                RELEVANCE_CONF[_plat]["tau_topic"] = float(_val)
+            if _plat not in RELEVANCE_CONF or not isinstance(_val, (int, float)):
+                continue
+            _file_scope = _tau_scope.get(_plat, "product")
+            _active_scope = RELEVANCE_CONF[_plat].get("target_scope", "product")
+            if _file_scope != _active_scope:
+                TAU_SCOPE_MISMATCH[_plat] = _file_scope
+                logging.getLogger("relevance").error(
+                    "τ 스코프 불일치[%s]: 보정 파일 스코프=%s, 운용 설정 스코프=%s — 이 τ 는 "
+                    "미적용(잠정 기본값 유지). keep 재판정 + 재보정 후 재시도할 것.",
+                    _plat, _file_scope, _active_scope)
+                continue
+            RELEVANCE_CONF[_plat]["tau_topic"] = float(_val)
     except Exception as _e:                          # 보정 파일이 깨져도 잠정 기본값으로 동작
         logging.getLogger("relevance").warning("τ 보정 로드 실패(%s): %s", _TAU_PATH, _e)
 
@@ -96,21 +126,32 @@ class RelevanceVerdict:
 
 
 # ---------------------------------------------------------------- Step 0: 앵커 + 청커 (순수 함수)
-def build_anchor(target: dict, *, domain: bool) -> str:
+def build_anchor(target: dict, *, domain: bool, scope: str = "product") -> str:
     """
     수집 타깃 → 코사인 비교용 앵커 텍스트.
     target = {"market": str|None, "slime": str}. 마켓 있으면 "{market} {slime}", 없으면 "{slime}".
     약칭은 linking.load_product_aliases() 로 해당 마켓 스코프에서 정규 제품명으로 치환.
     domain=True(인스타)면 슬라임 도메인 접미('… 슬라임') 부착 → name-collision 방어(§2 D4):
       일상어 제품명(예: '사과몽땅')이 음식 글을 끌어와도 앵커가 슬라임 공간이라 코사인 낮음.
+
+    scope(WS1, `RELEVANCE_CONF["target_scope"]`)는 2×2 로 domain 과 직교한다:
+      - scope="product" (기본): 위와 동일한 현재 동작(약칭 정규화 포함).
+      - scope="market" + market 있음: 앵커 = "{market} 슬라임" — 제품명은 버린다(약칭 조회 불필요).
+      - scope="market" + market 없음/빈값: product 스코프로 폴백 — dc-132/133/134 하드네거티브,
+        인스타 키워드 폴백 타깃을 보존하기 위한 필수 예외다.
+      domain=True 접미는 스코프와 무관하게 마지막에 적용되되, base 가 이미 '슬라임'으로 끝나면
+      중복 부착하지 않는다("봄 슬라임 슬라임" 방지).
     """
     slime = (target.get("slime") or "").strip()
     market = (target.get("market") or "").strip()
-    if market and slime:                       # 약칭 정규화(마켓 스코프)
-        scope = linking.load_product_aliases().get(market, {})
-        slime = scope.get(slime, slime)
-    base = f"{market} {slime}".strip() if market else slime
-    if domain and base:
+    if scope == "market" and market:
+        base = f"{market} 슬라임"
+    else:
+        if market and slime:                   # 약칭 정규화(마켓 스코프)
+            alias_scope = linking.load_product_aliases().get(market, {})
+            slime = alias_scope.get(slime, slime)
+        base = f"{market} {slime}".strip() if market else slime
+    if domain and base and not base.endswith("슬라임"):
         base = f"{base} 슬라임"
     return " ".join(base.split())
 
@@ -314,7 +355,7 @@ def classify_batch(reviews: list[RawReview], target: dict, conf: dict) -> list[R
     if not reviews:
         return []
     domain = bool(conf.get("domain_gate", False))     # True/'centroid' 모두 도메인 인식 앵커
-    anchor = build_anchor(target, domain=domain)
+    anchor = build_anchor(target, domain=domain, scope=conf.get("target_scope", "product"))
     per_chunks = [chunk(r.text) for r in reviews]
 
     flat: list[str] = [anchor if anchor else " "]     # 앵커 빈 문자열 방어

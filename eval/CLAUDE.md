@@ -12,7 +12,9 @@
 | `test_consolidated_sections.py` | 리뷰 요약(향/질감/장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 (5 케이스) |
 | `test_relevance_gate.py` | 관련성 게이트 — topic/domain 축 + **M/Q/E 3축**(KAX-AC4~AC10: chrome-strip·평서형 종결어미·전언 분리·편향 보존·순위/예산) |
 | `test_extract_hearsay.py` | 전언 하드닝(AC15) — 프롬프트 스냅샷 + `firsthand_evidence` 결정적 게이트 + 실호출 통합 |
-| `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원 |
+| `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원. `--batch-size`(반복 가능) + `gold/thread_gold.json` 기반 귀속 채점(`grade_thread_attribution`) |
+| `test_index_meta.py` | `index_post` 의 `relevance_meta` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL (무네트워크·무모델) |
+| `gold/thread_gold.json` | 스레드 골드 — 실제 디시 3스레드 51조각, 조각별 `mentioned_product` 라벨(~200자 스니펫 정책) |
 | `test_ui_render.py` | 종합뷰 렌더 헤드리스(AppTest) — 3블록·URL 링크·빈 섹션 생략, 예외 0 |
 | `layer2_gold.json` | 2층 추출 골드셋(사람 검수, 현재 비교글 1건) |
 

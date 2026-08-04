@@ -13,18 +13,30 @@ AC13 — 형제 댓글을 참조하는 댓글("웅 근데 향이 좀 에바ㅠ")
 
 호출 수·귀속은 가짜 LLM 으로 결정적으로 검증하고(키 불필요), 문맥 복원은 실호출로만 확인한다.
 
-실행:  python -m eval.test_extract_thread   (repo 루트에서)
+`eval/gold/thread_gold.json`(실제 디시 스레드 3개, 조각 51개, mentioned_product 사람 검수)이
+AC12 실호출 케이스의 근거다 — `grade_thread_attribution()` 이 그 골드 대비 귀속 정확도를 채점하고
+(순수 함수, 오프라인 단위테스트 있음), `test_ac12_thread_gold_live()` 가 실호출로 돌린다.
+`--batch-size` 로 `extract_collected(batch_size=...)` 값을 반복 지정해 여러 크기를 한 번에 잰다
+(워크스트림 3의 배치 크기 결정용 계측 — 결정 자체는 `evals/cost_profile.py` 몫).
+
+실행:
+  python -m eval.test_extract_thread                        (오프라인 전부 + 키 있으면 실호출)
+  python -m eval.test_extract_thread --batch-size 16         (실호출 케이스를 batch_size=16 으로)
+  python -m eval.test_extract_thread --batch-size 12 --batch-size 24   (여러 크기 반복 계측)
 """
 from __future__ import annotations
 
+import json
 import os
 import re
+from pathlib import Path
 
 from slime_rag import extract as X
 from slime_rag.sources.base import RawReview
 
 _POST_URL = "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=777"
 _S_RE = re.compile(r"^\[S(\d+)\]\s?(.*)$", re.M)
+_THREAD_GOLD_PATH = Path(__file__).resolve().parent / "gold" / "thread_gold.json"
 
 
 class FakeLLM:
@@ -148,6 +160,82 @@ def test_ac12_orphan_comments_without_post():
     print("✓ AC12 글 없는 스레드(댓글만) 처리 OK")
 
 
+# ---------------------------------------------------------------- 귀속 채점(순수 함수, LLM 무관)
+def grade_thread_attribution(gold_fragments: list[dict], extracted_docs: list[dict]) -> dict:
+    """
+    조각별 기대 `mentioned_product`(골드) vs 실제 추출 결과(위치로 정렬된 doc 리스트)를 대조해
+    '올바른 source_id 자리에 정확히 귀속됐는가' 를 채점한다. 순수 함수 — LLM·네트워크 무관,
+    오프라인 단위테스트 가능.
+
+    gold_fragments: `thread_gold.json` 의 `fragments` 리스트(순서 = source_id 순서).
+        각 원소의 `mentioned_product` 는 None(미언급) | str(단일 제품) | list[str](복수 제품).
+    extracted_docs: `extract_thread`/`extract_collected` 출력과 **같은 순서로 정렬된** doc 리스트
+        (`doc["reviews"] = [{"mentioned_product": ...}, ...]`). 길이가 gold_fragments 와
+        다르면 그 자체가 귀속 실패(조각이 밀렸다는 뜻)라 바로 예외를 낸다.
+
+    반환: {"correct": int, "total": int, "fraction": float, "mismatches": [...]}
+    채점 규칙: 기대가 없으면(None) 실제도 비어 있어야 정답(유령 항목 없음). 기대가 있으면
+    기대 목록 중 하나라도 실제 제품명에 부분일치하면 정답(AC13 처럼 표현이 갈릴 수 있어 부분일치).
+    """
+    if len(gold_fragments) != len(extracted_docs):
+        raise ValueError(
+            f"길이 불일치: gold 조각 {len(gold_fragments)}개 vs 추출 결과 {len(extracted_docs)}개 "
+            "— 조각 하나라도 밀리면 이 함수 자체가 무의미하다")
+    correct = 0
+    mismatches: list[dict] = []
+    for frag, doc in zip(gold_fragments, extracted_docs):
+        expected = frag.get("mentioned_product")
+        expected_list = [] if expected is None else (
+            expected if isinstance(expected, list) else [expected])
+        actual_list = [r.get("mentioned_product") or "" for r in (doc.get("reviews") or [])]
+        if not expected_list:
+            ok = not any(actual_list)                 # 없는 걸 지어내면(유령) 오답
+        else:
+            ok = any(exp in act for exp in expected_list for act in actual_list if act)
+        if ok:
+            correct += 1
+        else:
+            mismatches.append({"source_id": frag.get("source_id"),
+                               "expected": expected_list, "actual": actual_list})
+    total = len(gold_fragments)
+    return {"correct": correct, "total": total,
+            "fraction": (correct / total) if total else 0.0, "mismatches": mismatches}
+
+
+def test_grade_attribution_offline():
+    """`grade_thread_attribution` 자체를 합성 케이스로 오프라인 검증(LLM 무관)."""
+    gold = [
+        {"source_id": "S0", "mentioned_product": "카피바라"},
+        {"source_id": "S1", "mentioned_product": None},
+        {"source_id": "S2", "mentioned_product": ["푸냥이", "과치샐"]},
+        {"source_id": "S3", "mentioned_product": "누텔라바이트"},
+    ]
+    extracted = [
+        {"reviews": [{"mentioned_product": "카피바라"}]},   # 정답
+        {"reviews": []},                                     # 정답(유령 없음)
+        {"reviews": [{"mentioned_product": "과치샐"}]},      # 정답(둘 중 하나 매치)
+        {"reviews": [{"mentioned_product": "카피바라"}]},    # 오답(엉뚱한 제품 = 귀속 밀림)
+    ]
+    result = grade_thread_attribution(gold, extracted)
+    assert result["total"] == 4, result
+    assert result["correct"] == 3, result
+    assert abs(result["fraction"] - 0.75) < 1e-9, result
+    assert len(result["mismatches"]) == 1 and result["mismatches"][0]["source_id"] == "S3", result
+
+    # 길이 불일치는 채점이 아니라 즉시 예외 — 침묵하고 틀린 숫자를 내면 더 위험하다.
+    try:
+        grade_thread_attribution(gold, extracted[:-1])
+        raise AssertionError("길이 불일치를 조용히 통과시킴")
+    except ValueError:
+        pass
+    print(f"✓ 귀속 채점 함수 오프라인 검증 OK ({result['correct']}/{result['total']})")
+
+
+def _load_thread_gold() -> dict:
+    """`eval/gold/thread_gold.json` 로더 — 스레드별 조각 리스트(사람 검수 mentioned_product 포함)."""
+    return json.loads(_THREAD_GOLD_PATH.read_text(encoding="utf-8"))
+
+
 # ---------------------------------------------------------------- AC13 (실호출)
 def test_ac13_sibling_context_attribution():
     """형제 댓글 문맥으로 제품명이 생략된 댓글의 귀속이 성공한다."""
@@ -231,12 +319,74 @@ def test_ac12_batch_equivalence():
           f"제목 유래 유령 항목 {g_per}→{g_batch}, 본문 명시 제품 보존 OK")
 
 
+def _raws_from_gold_thread(thread: dict) -> list[RawReview]:
+    """`thread_gold.json` 의 한 스레드 → `extract_collected` 입력(RawReview 리스트).
+    `extract_collected` 는 글 URL의 `no=`(자기 자신)와 댓글 `meta.parent_no` 로 스레드를
+    묶으므로, 둘 다 골드의 `thread_no` 로 맞춘다."""
+    no = thread["thread_no"]
+    title = thread["title"]
+    out = []
+    for frag in thread["fragments"]:
+        if frag["type"] == "post":
+            out.append(RawReview(text=frag["text"], url=thread["url"], platform="dcinside",
+                                 raw_title=title, meta={"type": "post"}))
+        else:
+            out.append(RawReview(text=frag["text"], url=f"{thread['url']}#cmt", platform="dcinside",
+                                 meta={"type": "comment", "parent_no": no, "parent_title": title}))
+    return out
+
+
+def test_ac12_thread_gold_live(batch_sizes: list[int] | None = None):
+    """
+    AC12 실호출, `thread_gold.json` 기반: `eval/gold/thread_gold.json` 의 실제 디시 스레드
+    3개(조각 51개)를 지정된 `batch_size` 들로 `extract_collected` 에 흘려, 크기별 호출 수와
+    `grade_thread_attribution` 귀속 정확도를 잰다. 워크스트림 3(배치 크기 결정)의 계측
+    산출물 — 결정 자체(캐시/비용 기준)는 `evals/cost_profile.py` 몫이라 여긴 채점만 한다.
+    """
+    if not os.getenv("OPENAI_API_KEY"):
+        print("· AC12 스레드골드 실호출 skip (OPENAI_API_KEY 없음)")
+        return
+    from slime_rag import llm_ops
+    from slime_rag.llm_ops import LLM
+
+    gold = _load_thread_gold()
+    sizes = batch_sizes or [X.MAX_THREAD_SOURCES]
+    llm = LLM()
+    for bs in sizes:
+        for thread in gold["threads"]:
+            raws = _raws_from_gold_thread(thread)
+            n0 = len(llm_ops.LEDGER)
+            pairs = X.extract_collected(raws, llm, batch_size=bs)
+            n_calls = len(llm_ops.LEDGER) - n0
+            docs = [doc for _, doc in pairs]
+            result = grade_thread_attribution(thread["fragments"], docs)
+            print(f"  batch_size={bs:>2} thread={thread['thread_no']} "
+                  f"({thread['title'][:16]!r}) 호출 {n_calls}회, "
+                  f"귀속 {result['correct']}/{result['total']} ({result['fraction']:.0%})")
+            if result["mismatches"]:
+                print(f"    미스매치: {result['mismatches']}")
+    print("✓ AC12 스레드골드 실호출 완료")
+
+
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="스레드 배치 추출 테스트(eval.test_extract_thread) — 오프라인은 항상 실행, "
+                    "실호출 케이스는 OPENAI_API_KEY 없으면 자동 skip.")
+    parser.add_argument("--batch-size", type=int, action="append", default=None,
+                        help="AC12 스레드골드 실호출에 쓸 extract_collected(batch_size=...) 값. "
+                             "반복 지정 가능(예: --batch-size 12 --batch-size 24). "
+                             "미지정 시 slime_rag.extract.MAX_THREAD_SOURCES 하나만 사용.")
+    args = parser.parse_args()
+
     test_ac12_call_count()
     test_ac12_per_comment_attribution()
     test_ac12_missing_doc_is_padded()
     test_hearsay_gate_applies_to_batch_path()
     test_ac12_orphan_comments_without_post()
+    test_grade_attribution_offline()
     test_ac13_sibling_context_attribution()
     test_ac12_batch_equivalence()
+    test_ac12_thread_gold_live(args.batch_size)
     print("\n스레드 배치 추출 테스트 통과 ✅")

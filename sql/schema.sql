@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   evidence           TEXT,                   -- 근거 스니펫 모음(인용용)
   tokens             TEXT[],                 -- kiwipiepy 형태소 토큰(BM25)
   embedding          vector(1024),           -- BGE-M3 dense (1024차원)
+  relevance_meta     JSONB,                  -- 관련성 게이트 판정(axis/M/Q/E/tau/rank 등, 미적용이면 NULL)
   created_at         TIMESTAMPTZ DEFAULT now()
 );
 
@@ -55,3 +56,6 @@ CREATE INDEX IF NOT EXISTS reviews_class_idx ON reviews (review_class);
 -- 기존 배포 DB 멱등 마이그레이션: specs.beads 컬럼이 없으면 추가(기본 {} → 기존 행 무해).
 ALTER TABLE specs ADD COLUMN IF NOT EXISTS beads TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE specs ADD COLUMN IF NOT EXISTS source_permalink TEXT;
+
+-- 기존 배포 DB 멱등 마이그레이션: reviews.relevance_meta 컬럼이 없으면 추가(NULL 기본 → 기존 행 무해).
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS relevance_meta JSONB;

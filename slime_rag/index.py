@@ -77,12 +77,17 @@ def _sent(review: dict, block: str) -> str | None:
 
 def index_post(doc: dict, *, source: str, post_id: str | None = None,
                aliases: dict[str, str] | None = None, review_class: str = "genuine",
-               relevance_meta: dict | None = None, conn=None) -> int:
+               relevance_meta: dict | None = None, source_ref: dict | None = None,
+               conn=None) -> int:
     """
     추출 후기 1건(doc) → 제품별로 연결·렌더·임베딩 후 reviews 테이블에 적재.
     review_class='genuine'|'promo' — 홍보성 후기는 종합뷰에서 실사용과 분리 집계된다.
     relevance_meta — 관련성 게이트 판정(있으면). 소스 조각(post_id) 단위 속성이라
     제품별 팬아웃 행 전체에 그대로 복제된다.
+    source_ref — 원문 조각 식별자(`slime_rag.source_links` 참조). relevance_meta 와 같은
+    규칙으로 팬아웃 행 전체에 복제되지만 **소비 방식이 다르다**: relevance_meta 는 행 단위
+    집계 입력이고, 이건 식별자라 읽는 쪽에서 중복 제거가 필요하다
+    (`source_links.evidence_group_key`). 안 하면 한 조각이 제품 수만큼 링크로 도배된다.
     반환: 적재한 행 수.
     """
     kb = linking.load_kb()
@@ -104,6 +109,7 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
 
     from psycopg.types.json import Jsonb
     rel_meta = Jsonb(relevance_meta) if relevance_meta else None
+    src_ref = Jsonb(source_ref) if source_ref else None
     own = conn is None
     conn = conn or connect()
     try:
@@ -115,8 +121,8 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                       (source, post_id, market, market_confidence, product,
                        slime_type, scent_sentiment, texture_sentiment,
                        sound_sentiment, overall_sentiment, review_class,
-                       attributes, evidence, tokens, embedding, relevance_meta)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                       attributes, evidence, tokens, embedding, relevance_meta, source_ref)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (source, post_id, lk.market, lk.market_confidence,
                      lk.product,
@@ -124,7 +130,7 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                      _sent(r, "scent"), _sent(r, "texture"),
                      _sent(r, "sound"), (r.get("overall") or {}).get("model_sentiment"),
                      review_class,
-                     Jsonb(r), text, _tokenize(text), vec, rel_meta),
+                     Jsonb(r), text, _tokenize(text), vec, rel_meta, src_ref),
                 )
         conn.commit()
         return len(texts)

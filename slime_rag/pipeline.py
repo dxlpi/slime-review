@@ -19,7 +19,7 @@ import logging
 
 from .config import settings, ROOT
 from .db import connect, apply_schema
-from . import layer1, index, linking, search
+from . import layer1, index, linking, search, source_links
 from . import consolidated_view as cv
 from .llm_ops import LLM, summary
 
@@ -145,12 +145,18 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
         log.info("판매자 글 중 제품 해시태그 없음 %d건 스킵(비매품/공지)", n_skip_nohash)
 
     n_genuine = n_promo = 0
+    n_ref = n_noref = 0                              # 관측성: 원문 링크 식별자 유/무 행수
     for u in users:                                  # 실사용/홍보성 → 2층 색인
         rc = u.meta.get("review_class", "genuine")
         doc = extract.extract_review(u.text, llm, settings.model_extract)
-        index.index_post(doc, source="instagram",
-                         post_id=u.meta.get("shortcode"), review_class=rc,
-                         relevance_meta=u.meta.get("relevance"))
+        ref = source_links.build_source_ref("instagram", u.url, u.meta)
+        rows = index.index_post(doc, source="instagram",
+                                post_id=u.meta.get("shortcode"), review_class=rc,
+                                relevance_meta=u.meta.get("relevance"), source_ref=ref)
+        if ref:
+            n_ref += rows
+        else:
+            n_noref += rows
         if rc == "promo":
             n_promo += 1
         else:
@@ -161,7 +167,8 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     counts = {"collected": len(raws), "seller_specs": n_spec,
               "seller_no_hashtag": n_skip_nohash,
               "promo": n_promo, "genuine": n_genuine, "joined_now": n_join,
-              "gate_suspect": n_suspect, "llm_calls_saved": n_saved}
+              "gate_suspect": n_suspect, "llm_calls_saved": n_saved,
+              "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref}
     log.info("ingest_hashtag 완료: %s", counts)
     return counts
 
@@ -196,7 +203,7 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
 
     llm = LLM()
     pairs = extract.extract_collected(raws, llm, settings.model_extract)
-    n_rows = 0
+    n_rows = n_ref = n_noref = 0                      # 관측성: 원문 링크 식별자 유/무 행수
     with connect() as conn:
         for i, (raw, doc) in enumerate(pairs):
             # post_id 는 조각별로 달라야 한다 — 스레드 배치라도 귀속은 조각 단위(AC12).
@@ -204,10 +211,20 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
             # 순번을 넣지 않으면 같은 스레드 댓글들이 한 post_id 로 뭉개진다.
             post_id = raw.url if raw.meta.get("type") == "post" else \
                 f"{raw.url}:{raw.meta.get('parent_no')}:{i}"
-            n_rows += index.index_post(doc, source="amos", post_id=post_id, conn=conn,
-                                       relevance_meta=raw.meta.get("relevance"))
+            # 링크용 식별자는 post_id 와 별개다 — post_id 가 담는 건 댓글 id 가 아니라 런 전체의
+            # enumerate 위치라 원문 주소로 되돌릴 수 없다(그래서 별도 컬럼, ADR-0009).
+            ref = source_links.build_source_ref("dcinside", raw.url, raw.meta)
+            rows = index.index_post(doc, source="amos", post_id=post_id, conn=conn,
+                                    relevance_meta=raw.meta.get("relevance"), source_ref=ref)
+            n_rows += rows
+            if ref:
+                n_ref += rows
+            else:
+                n_noref += rows
         conn.commit()
     counts["indexed_rows"] = n_rows
+    counts["rows_with_source_ref"] = n_ref
+    counts["rows_without_source_ref"] = n_noref
     counts["llm"] = {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}
     log.info("ingest_dcinside 완료: %s", counts)
     return counts
@@ -215,7 +232,12 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
 
 # ---------------------------------------------------------------- 2층 색인(골드)
 def index_gold(conn) -> int:
-    """eval/layer2_gold.json 의 후기들을 색인(멱등: 같은 post_id 있으면 스킵)."""
+    """eval/layer2_gold.json 의 후기들을 색인(멱등: 같은 post_id 있으면 스킵).
+
+    골드 레코드의 `source.url` 이 있으면 원문 링크 식별자로 넘긴다(없으면 링크 없이 색인).
+    ⚠️ 이미 색인된 행은 스킵되므로 `source.url` 을 나중에 채워도 `setup(reset=False)` 로는
+    반영되지 않는다 — 데모 DB 는 `setup(reset=True)` 로 재적재한다(ADR-0009 백필 정책).
+    """
     gold = json.loads((ROOT / "eval" / "layer2_gold.json").read_text(encoding="utf-8"))
     n = 0
     for rec in gold["records"]:
@@ -223,7 +245,9 @@ def index_gold(conn) -> int:
         if conn.execute("SELECT 1 FROM reviews WHERE post_id=%s LIMIT 1", [pid]).fetchone():
             log.info("색인 스킵(이미 있음): %s", pid)
             continue
-        n += index.index_post(rec["expected"], source="amos", post_id=pid, conn=conn)
+        ref = source_links.build_source_ref("dcinside", (rec.get("source") or {}).get("url"))
+        n += index.index_post(rec["expected"], source="amos", post_id=pid, conn=conn,
+                              source_ref=ref)
     return n
 
 
@@ -271,19 +295,27 @@ def _records_for(conn, market: str, product: str | None) -> list[dict]:
 
     product=None 이면 마켓 전체(제품 연결 보류 행 포함) — 마켓 단위 종합뷰 입력.
     product_ref 는 행의 정규화 product 를 담는다(마켓 모드 요약이 제품 라벨로 씀).
+    source_ref 는 원문 링크 식별자 — 요약 프롬프트가 아니라 근거 목록 표시에만 쓰인다.
+
+    ⚠️ 안전 속성(깨뜨리지 말 것): `consolidated_view._source_material` 이 `ATTR_FIELDS`/`_SALIENT`
+    키만 통과시키는 화이트리스트라, 여기서 rec 에 무엇을 더 넣든 **섹션 요약 프롬프트엔 닿지
+    않는다**. `source_ref`(URL·id)가 LLM 입력으로 새지 않는 근거가 이 화이트리스트 하나다 —
+    payload 를 '남는 키 전부 통과'로 넓히는 순간 이 보장이 사라진다.
     """
-    sql = "SELECT source, product, attributes, review_class FROM reviews WHERE market=%s"
+    sql = ("SELECT source, product, attributes, review_class, source_ref "
+           "FROM reviews WHERE market=%s")
     params: list = [market]
     if product:
         sql += " AND product=%s"
         params.append(product)
     rows = conn.execute(sql, params).fetchall()
     out = []
-    for src, prod, attrs, review_class in rows:
+    for src, prod, attrs, review_class, source_ref in rows:
         rec = dict(attrs)                       # attributes = 추출 후기 항목 원본
         rec["source"] = {"platform": SOURCE_PLATFORM.get(src, src)}
         rec["review_class"] = review_class      # genuine/promo → 종합뷰가 분리 집계
         rec["product_ref"] = {"market": market, "product": prod}
+        rec["source_ref"] = source_ref          # 원문 링크 식별자(조각 단위, 팬아웃 복제됨)
         out.append(rec)
     return out
 

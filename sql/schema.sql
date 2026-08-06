@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   tokens             TEXT[],                 -- kiwipiepy 형태소 토큰(BM25)
   embedding          vector(1024),           -- BGE-M3 dense (1024차원)
   relevance_meta     JSONB,                  -- 관련성 게이트 판정(axis/M/Q/E/tau/rank 등, 미적용이면 NULL)
+  source_ref         JSONB,                  -- 원문 조각 식별자({platform,url,thread_no,comment_no,shortcode}), 미보유면 NULL
   created_at         TIMESTAMPTZ DEFAULT now()
 );
 
@@ -59,3 +60,8 @@ ALTER TABLE specs ADD COLUMN IF NOT EXISTS source_permalink TEXT;
 
 -- 기존 배포 DB 멱등 마이그레이션: reviews.relevance_meta 컬럼이 없으면 추가(NULL 기본 → 기존 행 무해).
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS relevance_meta JSONB;
+
+-- 기존 배포 DB 멱등 마이그레이션: reviews.source_ref 컬럼이 없으면 추가(NULL 기본 → 기존 행 무해).
+-- ⚠️ 백필 없음(ADR-0009): 기존 행은 NULL 로 남고 index_gold 는 존재 post_id 를 스킵하므로
+-- setup(reset=False) 로는 영원히 안 채워진다. 데모 DB 는 setup(reset=True) 로 재적재한다.
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS source_ref JSONB;

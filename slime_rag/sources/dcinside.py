@@ -3,6 +3,9 @@
 
 [ADJUST] GALLERY_ID, 검색 URL 파라미터, 셀렉터는 라이브 사이트로 검증할 것.
 댓글은 e_s_n_o 토큰 자동추출 후 AJAX(`_GALLTYPE_=M`) — 2026-06-17 라이브 검증 완료.
+댓글 식별자 — 2026-08-06 라이브 검증: 고유 id 키는 `no`, 스레드번호는 `parent`(대댓글 부모는 `c_no`).
+**점프 앵커는 없음**: 댓글이 AJAX 렌더라 서버 HTML 에 댓글 id·`comment_li`·`#comment` 가 전무 →
+원문 링크는 앵커 없이 스레드 URL 로 간다(`source_links` 참조). id 는 옵션으로 보존만.
 """
 
 from __future__ import annotations
@@ -113,7 +116,15 @@ class DCInsideSource(Source):
         return m.group(1) if m else None
 
     def _parse_comments(self, j: dict) -> list[dict]:
-        """댓글 JSON → 텍스트 댓글만. 디시콘/보이스/빈 댓글은 제외."""
+        """댓글 JSON → 텍스트 댓글만. 디시콘/보이스/빈 댓글은 제외.
+
+        `no` = 댓글 고유 id (2026-08-06 라이브 확인: 댓글 JSON 키는 `no`, 스레드번호는 `parent`,
+        대댓글의 부모 댓글은 `c_no`). 이걸 보존해야 원문 링크가 스레드 안에서 조각을 구분한다 —
+        `post_id` 에 들어가는 건 댓글 id 가 아니라 런 전체의 enumerate 위치라 복구 불가.
+        ⚠️ 다만 **점프 앵커는 없다**: 댓글은 AJAX 로 클라이언트가 그려서 서버 HTML 에 댓글 id
+        문자열도 `comment_li`/`#comment` 앵커도 없다(같은 날 확인). 그래서 `source_links` 는
+        앵커를 붙이지 않고 스레드 URL 로 간다 — id 는 나중에 켤 옵션으로 보존만 한다.
+        """
         out = []
         for c in (j.get("comments") or []):
             memo = c.get("memo")
@@ -122,7 +133,7 @@ class DCInsideSource(Source):
             txt = BeautifulSoup(memo, "html.parser").get_text(" ", strip=True)
             if not txt:                              # 이미지(디시콘) 댓글 → 텍스트 없음
                 continue
-            out.append({"text": txt, "name": c.get("name"),
+            out.append({"text": txt, "name": c.get("name"), "no": c.get("no"),
                         "ip": c.get("ip"), "date": c.get("reg_date")})
         return out
 
@@ -192,15 +203,21 @@ class DCInsideSource(Source):
                         token = self._extract_token(phtml)
                         m = self._NO_RE.search(purl)
                         if token and m:
-                            for c in self._fetch_comments(m.group(1), purl, token):
+                            for i, c in enumerate(self._fetch_comments(m.group(1), purl, token)):
                                 ctext = self._clean(c["text"])
                                 if is_low_quality(ctext):
                                     continue
                                 candidates.append(RawReview(
                                     text=ctext, url=f"{purl}#cmt", platform=self.platform,
                                     posted_at=c.get("date"),
+                                    # comment_no = 댓글 고유 id, thread_no = 글번호. 원문 링크의
+                                    # 조각 식별자(source_links.build_source_ref)가 이 둘을 쓴다.
+                                    # ordinal 은 id 를 못 잡았을 때만 채우는 스레드 내 순번 폴백 —
+                                    # 이름을 분리해 앵커 조립에 절대 안 쓰이게 한다.
                                     meta={"keyword": kw, "gallery": self.gid, "type": "comment",
                                           "parent_no": m.group(1), "parent_title": title,
+                                          "thread_no": m.group(1), "comment_no": c.get("no"),
+                                          "ordinal": i,
                                           "ip": c.get("ip"),
                                           "toxic": toxic_via_llm(ctext, self.classify_fn)},
                                 ))

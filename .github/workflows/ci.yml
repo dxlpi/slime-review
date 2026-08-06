@@ -34,11 +34,15 @@ jobs:
         # test_relevance_gate 는 BGE-M3(torch) 가 필요해 이 경량 게이트에서 제외 — 로컬 전용.
         # 아래 둘은 키 없으면 실호출 케이스만 skip 하고 결정적 부분(프롬프트 스냅샷·
         # firsthand_evidence 게이트·배치 호출 수/귀속)은 그대로 검증한다.
+        # test_source_links 는 원문 링크·임베드가 **어떤 조건에서** 나오는가(정책)를 덮는다 —
+        # 렌더 배선(test_ui_render)은 streamlit 이 필요해 로컬 게이트로 남긴다. 여기에
+        # streamlit 을 설치하기 시작하면 이 잡이 '앱을 설치해야 도는 테스트'로 미끄러진다.
         run: |
           python -m eval.test_bias
           python -m eval.test_apify_source
           python -m eval.test_extract_hearsay
           python -m eval.test_extract_thread
+          python -m eval.test_source_links
 
       - name: Eval pass-rate gate
         run: python -m evals.run --min 1.0

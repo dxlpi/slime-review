@@ -109,12 +109,64 @@ def test_no_sectionize_all_none():
     print("✓ no-LLM: review_summaries 전부 None, 결정적 집계 유지 OK")
 
 
+def test_official_spec_never_in_summary_prompts():
+    """스펙↔후기 완전 분리: 공식 스펙(1층)이 어떤 요약 프롬프트에도 안 들어간다.
+    scent_divergence(1층 파생)는 뷰에는 남되(코드 계산 표시 블록) 통합 프롬프트에서 제외."""
+    prompts: list[str] = []
+
+    def _capture(prompt: str, schema: dict) -> dict:
+        assert schema is SOURCE_REVIEW_SCHEMA
+        prompts.append(prompt)
+        return {"scent": "향요약", "texture": None, "pros": [], "cons": []}
+
+    reviews = [
+        _rec("instagram", "pos", scent={"sentiment": "pos", "evidence": "레몬", "perceived": "레몬향"}),
+        _rec("dcinside", "neg", scent={"sentiment": "neg", "evidence": "비누", "perceived": "비누향"}),
+    ]
+    spec = {"official_scent": "공식딸기토큰"}     # 후기 어디에도 없는 유일 토큰
+    v = build_consolidated({"market": "머머", "product": "X"}, spec, reviews,
+                           llm_sectionize=_capture)
+    assert v["scent_divergence"] is not None         # 표시 블록은 살아있다(코드 계산)
+    assert v["review_summaries"]["integrated"] is not None
+    assert len(prompts) == 3                          # ig, dc, integrated
+    for p in prompts:
+        assert "공식딸기토큰" not in p, "공식 스펙이 요약 프롬프트에 유입됨(분리 위반)"
+    assert "scent_divergence" not in prompts[-1], "통합 프롬프트에 1층 파생 지표 유입"
+    assert "diverged_ratio" not in prompts[-1]
+    print("✓ 분리: 공식 스펙·scent_divergence 가 요약 프롬프트에 미유입 OK")
+
+
+def test_market_mode_tags_products():
+    """마켓 모드(product=None): 요약 재료 항목에 product 라벨. 제품 모드에선 라벨 없음."""
+    ig = _rec("instagram", "pos", scent={"sentiment": "pos", "evidence": "레몬"})
+    ig["product_ref"] = {"market": "머머", "product": "한줌"}
+    dc = _rec("dcinside", "neg", scent={"sentiment": "neg", "evidence": "비누"})
+    dc["product_ref"] = {"market": "머머", "product": None}   # linking 보류 행
+
+    mat = _source_material([ig, dc], tag_products=True)
+    labels = [i["product"] for i in mat["scent"]]
+    assert labels == ["한줌", "제품미상"], labels
+    assert "product" not in _source_material([ig])["scent"][0]   # 제품 모드: 라벨 없음
+
+    prompts: list[str] = []
+    def _capture(prompt: str, schema: dict) -> dict:
+        prompts.append(prompt)
+        return {"scent": "향요약", "texture": None, "pros": [], "cons": []}
+
+    build_consolidated({"market": "머머", "product": None}, None, [ig, dc],
+                       llm_sectionize=_capture)
+    assert any('"product": "한줌"' in p for p in prompts), "마켓 모드 소스 프롬프트에 제품 라벨 없음"
+    print("✓ market mode: 재료 product 라벨(보류=제품미상)·제품 모드 무라벨 OK")
+
+
 def _run_all():
     test_source_material_only_mentioned()
     test_blank_section_when_attr_absent()
     test_integrated_only_when_both_sources()
     test_promo_excluded_from_review_summaries()
     test_no_sectionize_all_none()
+    test_official_spec_never_in_summary_prompts()
+    test_market_mode_tags_products()
     print("\n리뷰 요약 섹션 오프라인 테스트 전부 통과 ✅")
 
 

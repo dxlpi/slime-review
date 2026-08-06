@@ -19,7 +19,9 @@ from .llm_ops import LLM
 from .config import settings
 
 # 메타필터에 허용하는 컬럼(화이트리스트 — SQL 인젝션 방지).
-_FILTERABLE = {"market", "slime_type", "scent_sentiment", "texture_sentiment",
+# product 필터 주의: linking 이 보류(abstain)한 행은 product=NULL 이라 제품 필터에서 빠진다 —
+# 배송/CS 같은 마켓 단위 후기는 '특정 제품' 검색엔 안 나오는 게 의도된 범위다.
+_FILTERABLE = {"market", "product", "slime_type", "scent_sentiment", "texture_sentiment",
                "sound_sentiment", "overall_sentiment", "source"}
 _RRF_K = 60
 

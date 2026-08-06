@@ -121,13 +121,16 @@ SOURCE_REVIEW_SCHEMA: dict = {
 
 # 소스별(인스타 또는 디시) 후기 요약 프롬프트. 이 소스 후기만 근거로.
 SECTION_PROMPT = """\
-너는 슬라임 한 제품에 대한 '한 소스(플랫폼)'의 실사용 후기를 향/질감/장단점으로 요약한다.
+너는 슬라임 한 제품(또는 한 마켓의 여러 제품)에 대한 '한 소스(플랫폼)'의 실사용 후기를
+향/질감/장단점으로 요약한다.
 입력 by_attr 의 evidence 에 실제로 나온 내용만 근거로 삼는다. 지어내기 금지.
 규칙:
 - scent: 향(냄새) 언급이 있으면 1~2문장으로 요약. 향 언급이 전혀 없으면 null (억지 서술 금지).
 - texture: 질감(말랑·쫀득·흐름성 등) 언급이 있으면 1~2문장 요약. 없으면 null.
 - pros/cons: 향·질감을 포함한 모든 측면(배송·가격·지속력·소리 등)의 장점/단점을 각각 짧은 항목으로.
   해당 없으면 빈 배열 []. 근거 없는 장단점 창작 금지.
+- 항목에 product 라벨이 있으면(마켓 단위 요약) 제품별로 갈리는 평가는 제품명을 표기해 구분한다
+  (예: '[한글과자한줌] 비누향 지적'). 서로 다른 제품의 평가를 하나로 뭉뚱그리지 않는다.
 - 이 소스의 후기만 본다. 다른 소스와 비교하지 않는다.
 (대가·무상 '홍보성' 후기와 판매자 게시물은 이미 분리됐다 — 입력은 실사용분만.)
 """
@@ -146,12 +149,14 @@ INTEGRATED_PROMPT = """\
 
 # 서포터(홍보성) 후기 전용 요약 — 실사용과 '분리'하되, 실제 언급된 향/질감/장단점을 담백히 요약.
 SUPPORTER_SECTION_PROMPT = """\
-아래는 이 제품의 '서포터/무상 제공(협찬)' 인스타 후기다. 실제 언급된 향/질감/장단점만 요약한다.
+아래는 이 제품(또는 이 마켓)의 '서포터/무상 제공(협찬)' 인스타 후기다. 실제 언급된
+향/질감/장단점만 요약한다.
 지어내기 금지, 미언급은 null/빈배열. 실사용 후기와 합치지 말고 이 버킷만 요약한다.
 규칙:
 - scent: 향 언급이 있으면 1~2문장, 없으면 null.
 - texture: 질감 언급이 있으면 1~2문장, 없으면 null.
 - pros/cons: 향·질감을 포함한 모든 측면의 장점/단점을 항목화. 없으면 빈 배열 [].
+- 항목에 product 라벨이 있으면(마켓 단위) 제품별로 갈리는 평가는 제품명을 표기한다.
 """
 
 
@@ -170,8 +175,12 @@ _SALIENT = {
 }
 
 
-def _source_material(reviews: list[dict]) -> dict:
-    """한 소스 후기 → 속성별 evidence 재료(LLM 섹션 요약 입력). 근거 없는 속성은 키 자체를 뺀다."""
+def _source_material(reviews: list[dict], *, tag_products: bool = False) -> dict:
+    """한 소스 후기 → 속성별 evidence 재료(LLM 섹션 요약 입력). 근거 없는 속성은 키 자체를 뺀다.
+
+    tag_products=True(마켓 단위 요약): 항목마다 product 라벨을 붙여 서로 다른 제품의 평가가
+    요약에서 뭉개지지 않게 한다. 제품 단위 요약에선 라벨이 불필요한 노이즈라 붙이지 않는다.
+    """
     by_attr: dict[str, list] = {}
     for f in ATTR_FIELDS:
         items = []
@@ -180,6 +189,8 @@ def _source_material(reviews: list[dict]) -> dict:
             if not isinstance(blk, dict):
                 continue
             item = {"sentiment": blk.get("sentiment"), "evidence": blk.get("evidence")}
+            if tag_products:
+                item["product"] = (r.get("product_ref") or {}).get("product") or "제품미상"
             for k in _SALIENT.get(f, []):
                 v = blk.get(k)
                 if v not in (None, [], ""):
@@ -191,27 +202,33 @@ def _source_material(reviews: list[dict]) -> dict:
 
 
 def _sectionize_source(reviews: list[dict], platform: str,
-                       llm_sectionize: Callable[[str, dict], dict]) -> Optional[dict]:
+                       llm_sectionize: Callable[[str, dict], dict],
+                       *, tag_products: bool = False) -> Optional[dict]:
     """소스(인스타/디시) 후기 → {scent, texture, pros, cons}. 후기 없으면 호출 안 함(상위 가드)."""
-    payload = {"platform": platform, "by_attr": _source_material(reviews)}
+    payload = {"platform": platform,
+               "by_attr": _source_material(reviews, tag_products=tag_products)}
     prompt = SECTION_PROMPT + "\n\n[입력]\n" + json.dumps(payload, ensure_ascii=False, indent=2)
     return llm_sectionize(prompt, SOURCE_REVIEW_SCHEMA)
 
 
 def _sectionize_supporter(reviews: list[dict],
-                          llm_sectionize: Callable[[str, dict], dict]) -> dict:
+                          llm_sectionize: Callable[[str, dict], dict],
+                          *, tag_products: bool = False) -> dict:
     """서포터(홍보성) 후기 → {scent, texture, pros, cons}. 실사용과 분리하되 실내용 요약."""
-    payload = {"by_attr": _source_material(reviews)}
+    payload = {"by_attr": _source_material(reviews, tag_products=tag_products)}
     prompt = SUPPORTER_SECTION_PROMPT + "\n\n[입력]\n" + json.dumps(payload, ensure_ascii=False, indent=2)
     return llm_sectionize(prompt, SOURCE_REVIEW_SCHEMA)
 
 
 def _sectionize_integrated(ig_sum: dict, dc_sum: dict, gap: Optional[dict],
-                           scent_div: Optional[dict],
                            llm_sectionize: Callable[[str, dict], dict]) -> dict:
-    """두 소스 요약 + 갭 → 통합 리뷰(reconciliation). 두 소스 모두 있을 때만 호출."""
-    payload = {"instagram": ig_sum, "dcinside": dc_sum,
-               "sentiment_gap": gap, "scent_divergence": scent_div}
+    """두 소스 요약 + 갭 → 통합 리뷰(reconciliation). 두 소스 모두 있을 때만 호출.
+
+    입력은 2층(후기) 파생물만 — 1층(공식 스펙)에서 파생된 scent_divergence 는 넣지 않는다.
+    스펙↔후기 완전 분리: 향 불일치는 코드 계산 지표로 뷰에 별도 표시되며, 요약 LLM 은
+    공식 스펙을 볼 수 없어야 한다(스펙이 요약 문장에 스며드는 것 방지).
+    """
+    payload = {"instagram": ig_sum, "dcinside": dc_sum, "sentiment_gap": gap}
     prompt = INTEGRATED_PROMPT + "\n\n[입력]\n" + json.dumps(payload, ensure_ascii=False, indent=2)
     return llm_sectionize(prompt, SOURCE_REVIEW_SCHEMA)
 
@@ -220,15 +237,21 @@ def build_consolidated(product_ref: dict,
                        official_spec: Optional[dict],
                        reviews: list[dict],
                        llm_sectionize: Optional[Callable[[str, dict], dict]] = None) -> dict:
-    """제품 하나에 대한 종합 뷰(구조화).
+    """제품 하나(또는 product=None 이면 마켓 전체)에 대한 종합 뷰(구조화).
 
     - llm_sectionize 주입 시 review_summaries(인스타/디시/통합)를 향/질감/장단점으로 산출.
       · 향/질감은 해당 소스에 언급이 없으면 null(빈칸) — 지어내기 금지.
       · 통합은 두 소스 모두 실사용 후기가 있을 때만 생성(reconciliation, 평균 금지). 아니면 None.
+      · 요약 입력은 2층(후기)만 — official_spec 은 어떤 요약 프롬프트에도 들어가지 않는다
+        (스펙↔후기 완전 분리). 스펙은 뷰의 official_spec 키로만 나간다.
+    - 마켓 모드(product_ref["product"] 가 없음): official_spec 은 제품 단위 개념이라 None 전제
+      (scent_divergence 도 자연히 None). 요약 재료엔 항목별 product 라벨을 붙여 제품 간
+      평가가 뭉개지지 않게 한다.
 
     서포터(review_class='promo') 후기는 headline·review_summaries 에서 제외하되, 별도 promo_view 에
     '서포터 리뷰'로 향/질감/장단점을 실제 내용 그대로 요약(소수라도 포함). 없으면 promo_view=None.
     """
+    market_mode = not product_ref.get("product")
     genuine = [r for r in reviews if not _is_promo(r)]
     promo = [r for r in reviews if _is_promo(r)]
     ig = [r for r in genuine if _platform(r) == "instagram"]
@@ -253,19 +276,21 @@ def build_consolidated(product_ref: dict,
     if llm_sectionize:
         rs = view["review_summaries"]
         if ig:
-            rs["instagram"] = _sectionize_source(ig, "instagram", llm_sectionize)
+            rs["instagram"] = _sectionize_source(ig, "instagram", llm_sectionize,
+                                                 tag_products=market_mode)
         if dc:
-            rs["dcinside"] = _sectionize_source(dc, "dcinside", llm_sectionize)
+            rs["dcinside"] = _sectionize_source(dc, "dcinside", llm_sectionize,
+                                                tag_products=market_mode)
         if rs["instagram"] and rs["dcinside"]:          # 두 소스 다 있어야 통합(평균 아님)
             rs["integrated"] = _sectionize_integrated(
-                rs["instagram"], rs["dcinside"],
-                view["sentiment_gap"], view["scent_divergence"], llm_sectionize)
+                rs["instagram"], rs["dcinside"], view["sentiment_gap"], llm_sectionize)
 
     if promo:                                           # 서포터(홍보성) 분리 버킷 — 실내용 요약
         promo_view = {"n_promo": len(promo),
                       "scent": None, "texture": None, "pros": [], "cons": []}
         if llm_sectionize:
-            promo_view.update(_sectionize_supporter(promo, llm_sectionize))
+            promo_view.update(_sectionize_supporter(promo, llm_sectionize,
+                                                    tag_products=market_mode))
         view["promo_view"] = promo_view
     return view
 

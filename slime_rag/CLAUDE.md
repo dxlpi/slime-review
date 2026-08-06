@@ -16,11 +16,11 @@ DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [A
 | `bias.py` | 편향 태깅(IG) — 홍보성 게이트→LLM 캐스케이드, 판매자 라우팅 `partition` |
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
-| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/장단점 섹션, 미언급=빈칸; 홍보성 분리) |
+| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/장단점 섹션, 미언급=빈칸; 홍보성 분리). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
-| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치) + UI 데이터접근 캡슐화 |
+| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 단위) |
 
 ## Common patterns (workflow)
 ```bash

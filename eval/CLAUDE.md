@@ -15,7 +15,7 @@
 | `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원. `--batch-size`(반복 가능) + `gold/thread_gold.json` 기반 귀속 채점(`grade_thread_attribution`) |
 | `test_index_meta.py` | `index_post` 의 `relevance_meta` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL (무네트워크·무모델) |
 | `gold/thread_gold.json` | 스레드 골드 — 실제 디시 3스레드 51조각, 조각별 `mentioned_product` 라벨(~200자 스니펫 정책) |
-| `test_ui_render.py` | 종합뷰 렌더 헤드리스(AppTest) — 3블록·URL 링크·빈 섹션 생략, 예외 0 |
+| `test_ui_render.py` | UI 헤드리스(AppTest) — 종합뷰 3블록·URL 링크·빈 섹션 생략 + **제품 타이핑 검색**(부분일치/공백무시/초성)·**선택 흐름**(마켓→범위→제품→무매치), 예외 0 |
 | `layer2_gold.json` | 2층 추출 골드셋(사람 검수, 현재 비교글 1건) |
 
 ## Common patterns (workflow)

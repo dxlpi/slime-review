@@ -408,3 +408,37 @@ LLM 이 빈 향/질감을 지어낼 여지가 없다. 소스당 structured outpu
 **AI생성 vs 사람수정**: 사람수정 0건. 메모: `review-summary-display-prefs`.
 
 **남은 것**: Render 배포가 마지막 하드게이트.
+
+
+## 2026-08-04 — 검색 범위 토글(마켓 전체/특정 제품) + 1층 스펙↔2층 요약 완전 분리
+
+**무엇을**(사용자 결정): 사용자가 검색 대상을 '마켓 전체' 또는 '특정 제품'으로 고를 수 있게 —
+마켓이면 마켓 단위 후기 종합, 제품이면 그 제품 후기만. 특정 제품 검색 시 공식 스펙(1층)은
+후기 요약(2층)과 **완전 분리**된 결정적 카드로 표시(스펙이 요약/답변 프롬프트에 유입 금지).
+
+**한 일**:
+- `search.py` — `_FILTERABLE` 에 `product` 추가(챗 제품 필터). linking 보류 행(product=NULL)이
+  제품 필터에서 빠지는 건 의도된 범위라고 주석으로 명시.
+- `consolidated_view.py` — 분리 하드닝: `_sectionize_integrated` 입력에서 `scent_divergence`
+  (1층 파생) 제거 — 공식 스펙이 어떤 요약 프롬프트에도 안 들어간다(향 불일치는 코드 계산
+  블록으로 계속 표시). 마켓 모드: `build_consolidated` 가 `product_ref.product` 부재를 마켓
+  모드로 인식, `_source_material(tag_products=True)` 가 항목별 product 라벨(보류 행=제품미상)을
+  붙이고 SECTION/SUPPORTER 프롬프트에 '제품별 평가 뭉개기 금지' 규칙 추가.
+- `pipeline.py` — `_records_for` 가 product 컬럼을 `product_ref` 로 주입(마켓 모드 라벨 재료),
+  `consolidated_for_market` 신설(스펙 None — 제품 단위 개념; ADR-0007 범위 주의를 docstring 에).
+- `app/ui.py` — 사이드바 '검색 범위' 라디오(마켓 전체/특정 제품 → 제품 선택박스). 챗 탭 제품
+  모드: '📋 공식 스펙 (1층)' 결정적 카드 + "챗 답변은 2층만 근거" 분리 캡션. 종합뷰 탭:
+  제품 모드=기존 `consolidated_for`, 마켓 모드=`consolidated_for_market` + ADR-0007 범위 캡션
+  ("추적 중인 제품들의 후기 집계 — 마켓 전체 여론 아님"). `_render_spec` 분리·재사용, 종합뷰의
+  스펙 블록은 별도 서브헤더로 분리.
+- 테스트: `test_consolidated_sections` +2 — 공식 스펙 유일 토큰이 3개 프롬프트 어디에도 미유입 +
+  `scent_divergence` 뷰 잔존 확인 / 마켓 모드 product 라벨·제품 모드 무라벨. `test_ui_render`
+  market_mode 뷰(스펙 None → 스펙 헤더 생략) + 스펙 분리 헤더 3개 어서션.
+
+**테스트**: `test_consolidated_sections` 7/7 · `test_ui_render` · `test_bias` ·
+`test_relevance_gate` · `test_index_meta` 전량 그린(오프라인, LLM 0호출).
+
+**AI생성 vs 사람수정**: 초안 그대로 통과, 사람수정 0건.
+
+**남은 것**: Render 배포(마지막 하드게이트). 마켓 모드의 실질 범위는 제품 앵커 수집(ADR-0007
+ACTIVE scope=product)에 묶여 있음 — 재판정으로 market scope 가 활성화되면 범위 캡션 완화 가능.

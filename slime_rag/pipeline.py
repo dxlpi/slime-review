@@ -267,18 +267,23 @@ def list_products(market: str) -> list[dict]:
 
 
 def _records_for(conn, market: str, product: str | None) -> list[dict]:
-    """DB 후기 → 종합뷰 입력 레코드(소스→platform 주입)."""
-    sql = "SELECT source, attributes, review_class FROM reviews WHERE market=%s"
+    """DB 후기 → 종합뷰 입력 레코드(소스→platform 주입).
+
+    product=None 이면 마켓 전체(제품 연결 보류 행 포함) — 마켓 단위 종합뷰 입력.
+    product_ref 는 행의 정규화 product 를 담는다(마켓 모드 요약이 제품 라벨로 씀).
+    """
+    sql = "SELECT source, product, attributes, review_class FROM reviews WHERE market=%s"
     params: list = [market]
     if product:
         sql += " AND product=%s"
         params.append(product)
     rows = conn.execute(sql, params).fetchall()
     out = []
-    for src, attrs, review_class in rows:
+    for src, prod, attrs, review_class in rows:
         rec = dict(attrs)                       # attributes = 추출 후기 항목 원본
         rec["source"] = {"platform": SOURCE_PLATFORM.get(src, src)}
         rec["review_class"] = review_class      # genuine/promo → 종합뷰가 분리 집계
+        rec["product_ref"] = {"market": market, "product": prod}
         out.append(rec)
     return out
 
@@ -302,6 +307,24 @@ def consolidated_for(market: str, product: str, *, with_summary: bool = True) ->
             prompt, model=settings.model_judge, schema=schema, label="consolidated.section")
     return cv.build_consolidated({"market": market, "product": product},
                                  official_spec, records, llm_sectionize=sectionize)
+
+
+def consolidated_for_market(market: str, *, with_summary: bool = True) -> dict:
+    """마켓 단위 종합 뷰 — 이 마켓의 후기 전 행(제품 연결 보류 행 포함) 집계.
+
+    official_spec 은 제품 단위 개념이라 None(스펙은 UI 의 1층 패널이 제품별로 따로 보여준다).
+    범위 주의(ADR-0007): 수집이 제품 앵커(ACTIVE scope=product)라 이 뷰는 '마켓 후기 전체'가
+    아니라 '이 마켓에서 추적 중인 제품들의 후기 + 게이트를 통과한 마켓 단위 후기' 집계다 —
+    UI 라벨도 이 범위로 표기할 것.
+    """
+    with connect() as conn:
+        records = _records_for(conn, market, None)
+    sectionize = None
+    if with_summary and records:
+        sectionize = lambda prompt, schema: LLM().complete(
+            prompt, model=settings.model_judge, schema=schema, label="consolidated.section")
+    return cv.build_consolidated({"market": market, "product": None},
+                                 None, records, llm_sectionize=sectionize)
 
 
 # ---------------------------------------------------------------- 데모 실행

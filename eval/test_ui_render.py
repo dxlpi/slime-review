@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-UI 종합뷰 렌더 헤드리스 테스트 — DB/LLM 미호출. streamlit AppTest 로 예외 0 + 요소 확인.
+UI 렌더·선택 헤드리스 테스트 — DB/LLM 미호출. streamlit AppTest 로 예외 0 + 요소 확인.
 
 app/ui.py 는 app body 를 main() 가드(__name__=='__main__') 뒤에 둬서, import 시 부트스트랩
-(DB/키)을 타지 않는다 → 렌더 헬퍼(_render_consolidated)만 목 view 로 검증 가능.
+(DB/키)을 타지 않는다 → 렌더 헬퍼(_render_consolidated)·선택 UI(render_selection)를
+목 데이터로 검증할 수 있다(제품 목록은 콜러블 주입이라 DB 불필요).
 
 검증:
   - 향/질감/장단점 3블록(인스타/디시/통합)이 렌더된다.
   - texture=None 등 미언급 섹션은 렌더 안 됨(빈칸).
   - review_summaries 가 전부 None 이면 '리뷰 요약' 헤더 자체 생략.
   - 공식 스펙 source_permalink 가 있으면 링크 캡션 렌더.
+  - 제품 타이핑 검색: 부분일치·초성·공백무시·무매치 경고.
+  - 선택 흐름: 마켓 미선택 → 안내 / 마켓 선택 → 범위 / '특정 제품' → 검색+제품 드롭다운.
 
 실행:  python -m eval.test_ui_render   (repo 루트에서)
 """
@@ -56,6 +59,14 @@ def _views() -> dict:
             "review_summaries": {"instagram": None, "dcinside": None, "integrated": None},
             "promo_view": None,
         },
+        "market_mode": {   # 마켓 단위 뷰 — official_spec 없음 → 스펙 블록 자체 생략
+            "official_spec": None,
+            "n_reviews": 4,
+            "by_source": {"dcinside": {"net": -0.5, "pos": 0, "neu": 2, "neg": 2, "n": 4}},
+            "sentiment_gap": None, "scent_divergence": None, "praised": {}, "criticized": {},
+            "review_summaries": {"instagram": None, "dcinside": None, "integrated": None},
+            "promo_view": None,
+        },
     }
 
 
@@ -94,9 +105,87 @@ def test_ui_render_no_exception_and_blocks():
     # 요약 헤더는 요약/서포터 있는 뷰 2개(full, single_source)에만, no_summaries 뷰엔 생략.
     n_hdr = sum("리뷰 요약" in s for s in subs)
     assert n_hdr == 2, f"요약 헤더 {n_hdr}개 (기대 2)"
-    print("✓ UI 렌더: 예외 0 · 3블록 · 서포터 블록 · URL · 쏠림 라벨 제거 OK")
+    # 스펙(1층) 블록은 별도 헤더로 분리 렌더 — spec 있는 뷰 3개에만, market_mode(스펙 None)엔 생략.
+    n_spec_hdr = sum("공식 스펙 (1층" in s for s in subs)
+    assert n_spec_hdr == 3, f"스펙 헤더 {n_spec_hdr}개 (기대 3 — market_mode 는 생략)"
+    print("✓ UI 렌더: 예외 0 · 3블록 · 서포터 블록 · URL · 스펙 분리 헤더 · 쏠림 라벨 제거 OK")
+
+
+# ---------------------------------------------------------------- 제품 타이핑 검색
+def _products() -> list[dict]:
+    """1층 fixture 와 같은 모양의 제품 리스트(빈짱 마켓)."""
+    return [{"product": "한글과자한줌", "official_scent": "과자향", "base_combo": "플레인",
+             "slime_type": "버터", "beads": [], "source_permalink": None},
+            {"product": "빠삭귤", "official_scent": "귤향", "base_combo": None,
+             "slime_type": "클라우드", "beads": ["6mm"], "source_permalink": None}]
+
+
+def test_filter_products():
+    from app.ui import filter_products
+    names = lambda q: [p["product"] for p in filter_products(_products(), q)]
+
+    assert names("") == ["한글과자한줌", "빠삭귤"], "빈 질의는 전체"
+    assert names("한줌") == ["한글과자한줌"], "부분일치 실패"
+    assert names("한글 과자") == ["한글과자한줌"], "공백 무시 매칭 실패"
+    assert names("ㅎㄱㄱㅈ") == ["한글과자한줌"], "초성 검색 실패"
+    assert names("ㅃㅅ") == ["빠삭귤"], "쌍자음 초성 검색 실패"
+    assert names("없는제품") == [], "무매치인데 결과가 나옴"
+    print("✓ 제품 검색: 부분일치·공백무시·초성·무매치 OK")
+
+
+# ---------------------------------------------------------------- 선택 흐름
+def _selection_script() -> None:
+    """AppTest 스크립트: DB 없이 render_selection 만 — 제품 조회는 가짜 콜러블 주입."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import streamlit as st
+    from app.ui import render_selection
+    from eval.test_ui_render import _products
+    sel = render_selection(["빈짱", "봄슬라임"], lambda market: _products())
+    st.markdown(f"SEL market={sel['market']} product={sel['product']} scope={sel['scope']}")
+
+
+def test_selection_flow():
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_function(_selection_script).run(timeout=30)
+    assert not at.exception, at.exception
+
+    # ① 마켓 미선택 → 안내만, 범위/제품 위젯 없음
+    assert at.selectbox[0].label == "마켓"
+    assert len(at.selectbox) == 1 and not at.radio, "마켓 전이라 범위·제품이 이미 떠 있음"
+    assert any("마켓을 먼저" in i.value for i in at.info), "마켓 선택 안내 없음"
+
+    # ② 마켓 선택 → 범위 라디오(기본 '마켓 전체'), 제품 위젯은 아직 없음
+    at = at.selectbox[0].select("빈짱").run(timeout=30)
+    assert not at.exception, at.exception
+    assert at.radio[0].value == "마켓 전체"
+    assert not at.text_input, "'마켓 전체' 범위인데 제품 검색창이 떴음"
+    assert any("market=빈짱 product=None" in m.value for m in at.markdown), "마켓 선택 미반영"
+
+    # ③ '특정 제품' → 검색창 + 제품 드롭다운(전체 2개)
+    at = at.radio[0].set_value("특정 제품").run(timeout=30)
+    assert not at.exception, at.exception
+    assert at.text_input[0].label == "제품 검색"
+    assert at.selectbox[1].label == "제품 (2개)", at.selectbox[1].label
+
+    # ④ 초성 타이핑 → 후보 1개로 좁힘 → 선택하면 그 제품이 반환값에 실린다
+    at = at.text_input[0].set_value("ㅎㄱㄱㅈ").run(timeout=30)
+    assert at.selectbox[1].label == "제품 (1개)", at.selectbox[1].label
+    at = at.selectbox[1].select("한글과자한줌").run(timeout=30)
+    assert not at.exception, at.exception
+    assert any("product=한글과자한줌" in m.value for m in at.markdown), "제품 선택 미반영"
+
+    # ⑤ 무매치 → 경고 + 제품 드롭다운 없음(선택 불가 상태를 숨기지 않는다)
+    at = at.text_input[0].set_value("없는제품").run(timeout=30)
+    assert not at.exception, at.exception
+    assert any("맞는 제품이 없습니다" in w.value for w in at.warning), "무매치 경고 없음"
+    assert len(at.selectbox) == 1, "무매치인데 제품 드롭다운이 남아 있음"
+    print("✓ 선택 흐름: 마켓→범위→제품 검색(초성)→선택→무매치 경고 OK")
 
 
 if __name__ == "__main__":
     test_ui_render_no_exception_and_blocks()
-    print("\nUI 렌더 헤드리스 테스트 통과 ✅")
+    test_filter_products()
+    test_selection_flow()
+    print("\nUI 렌더·선택 헤드리스 테스트 통과 ✅")

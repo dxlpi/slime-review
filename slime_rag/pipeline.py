@@ -45,10 +45,12 @@ def _tag_exclusions(market_word: str) -> frozenset[str]:
     return frozenset(extract.market_tag_exclusions(kb_market) if kb_market else {market_word})
 
 
-def _upsert_spec(cur, market, product, scent, base_combo, stype, beads=None,
-                 source_permalink=None) -> None:
+def _upsert_spec(cur, market, product, scent, base_combo, stype, official_texture=None,
+                 beads=None, source_permalink=None) -> None:
     """specs (market,product) upsert — fixture 시드와 판매자 자동추출이 공유하는 단일 경로.
 
+    official_texture: 판매자가 캡션에 쓴 질감 서술의 요약(없으면 None). slime_type 과 별개 칸이다 —
+    종류어('폼볼')는 분류지 질감 설명이 아니라서, 이게 없으면 화면의 '질감' 줄이 분류코드만 보여준다.
     beads: 비즈/토핑 구성요소 리스트(오픈 어휘). None/빈 → []. 제품행에 붙는 부가 메타이며,
     비즈 단독으로는 제품이 되지 않는다(호출부 백스톱이 scent/base_combo/slime_type 로 제품성 판정).
     source_permalink: 공식 스펙 출처 인스타 게시물 URL(없으면 None). COALESCE 로 기존 값 보존 —
@@ -56,14 +58,17 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, beads=None,
     """
     cur.execute(
         """
-        INSERT INTO specs (market, product, scent, base_combo, slime_type, beads, source_permalink)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO specs (market, product, scent, base_combo, slime_type,
+                           official_texture, beads, source_permalink)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (market, product) DO UPDATE SET
           scent=EXCLUDED.scent, base_combo=EXCLUDED.base_combo,
           slime_type=EXCLUDED.slime_type, beads=EXCLUDED.beads,
+          official_texture=COALESCE(EXCLUDED.official_texture, specs.official_texture),
           source_permalink=COALESCE(EXCLUDED.source_permalink, specs.source_permalink)
         """,
-        (market, product, scent, base_combo, stype, list(beads or []), source_permalink),
+        (market, product, scent, base_combo, stype, official_texture,
+         list(beads or []), source_permalink),
     )
 
 
@@ -74,8 +79,9 @@ def load_specs(conn, kb: dict | None = None) -> int:
     layer1.seed_kb_products(kb["markets"])           # in-place: products[] 채움
     rows = list(layer1.iter_specs(kb["markets"]))
     with conn.cursor() as cur:
-        for market, product, scent, base_combo, stype, beads, permalink in rows:
-            _upsert_spec(cur, market, product, scent, base_combo, stype, beads, permalink)
+        for market, product, scent, base_combo, stype, texture, beads, permalink in rows:
+            _upsert_spec(cur, market, product, scent, base_combo, stype, texture,
+                         beads, permalink)
     conn.commit()
     log.info("specs 적재 %d행", len(rows))
     return len(rows)
@@ -153,9 +159,12 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
                         continue
                     if not any(p.get(k) for k in ("scent", "base_combo", "slime_type")):
                         continue                     # 스펙 필드 전부 null → 비즈·토핑 노이즈, 제품 아님
-                    # beads 는 제품성 판정에 포함하지 않는다(구성요소일 뿐) → 위 백스톱 통과분에만 부가.
+                    # beads·official_texture 는 제품성 판정에 넣지 않는다(각각 구성요소·서술일 뿐,
+                    # 스펙 세 칸이 전부 비었는데 질감 얘기만 있는 글은 제품 안내가 아니다)
+                    # → 위 백스톱 통과분에만 부가.
                     _upsert_spec(cur, market, p["product"], p.get("scent"),
-                                 p.get("base_combo"), p.get("slime_type"), p.get("beads"),
+                                 p.get("base_combo"), p.get("slime_type"),
+                                 p.get("official_texture"), p.get("beads"),
                                  sp.url)                # 공식 스펙 출처 = 판매자 게시물 URL
                     n_spec += 1
         conn.commit()
@@ -319,11 +328,11 @@ def list_products(market: str) -> list[dict]:
     """해당 마켓의 1층 제품 스펙 리스트."""
     with connect() as conn:
         rows = conn.execute(
-            "SELECT product, scent, base_combo, slime_type, beads, source_permalink FROM specs "
-            "WHERE market=%s ORDER BY product", [market]).fetchall()
+            "SELECT product, scent, base_combo, slime_type, official_texture, beads, "
+            "source_permalink FROM specs WHERE market=%s ORDER BY product", [market]).fetchall()
     return [{"product": p, "official_scent": s, "base_combo": b, "slime_type": t,
-             "beads": list(beads or []), "source_permalink": url}
-            for p, s, b, t, beads, url in rows]
+             "official_texture": tx, "beads": list(beads or []), "source_permalink": url}
+            for p, s, b, t, tx, beads, url in rows]
 
 
 def _records_for(conn, market: str, product: str | None) -> list[dict]:

@@ -310,11 +310,16 @@ def test_layer1_schema_strict():
     _assert_strict(LAYER1_SCHEMA)
     # 스펙 항목 필드가 실제로 존재하는지(계약 회귀 방지)
     item = LAYER1_SCHEMA["properties"]["products"]["items"]
-    assert set(item["properties"]) == {"product", "scent", "base_combo", "slime_type", "beads", "evidence"}
+    assert set(item["properties"]) == {"product", "scent", "base_combo", "slime_type",
+                                       "official_texture", "beads", "evidence"}
     # beads = 오픈 어휘 문자열 배열(제품 구성요소, 없으면 [])
     assert item["properties"]["beads"]["type"] == "array"
     assert item["properties"]["beads"]["items"]["type"] == "string"
-    print("✓ LAYER1_SCHEMA strict 구조 OK (beads 포함)")
+    # official_texture = 판매자가 쓴 질감 서술 요약. slime_type(통제어휘 분류)과 **별개 칸**이다 —
+    # 합치자는 리팩터가 오면 화면의 '질감' 줄이 다시 분류코드만 보여주는 상태로 되돌아간다.
+    assert item["properties"]["official_texture"]["type"] == ["string", "null"]
+    assert "enum" not in item["properties"]["official_texture"]
+    print("✓ LAYER1_SCHEMA strict 구조 OK (beads·official_texture 포함)")
 
 
 if __name__ == "__main__":

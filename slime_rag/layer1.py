@@ -85,9 +85,12 @@ def seed_kb_products(markets: list[dict], fixture: Optional[dict[str, dict]] = N
 def iter_specs(kb_markets: list[dict]):
     """시드된 KB 마켓 → specs 테이블 행 튜플을 순회.
 
-    (market_word, product, scent, base_combo, slime_type, beads, source_permalink) 를 내준다.
+    (market_word, product, scent, base_combo, slime_type, official_texture, beads,
+     source_permalink) 를 내준다.
     market 은 정규 market_word(빈짱/봄/머머) — reviews.market(linking 결과)과 조인 키 일치.
     slime_type 은 TYPE_ENUM 배열을 콤마결합, 비면 type_other(마켓 고유 베이스어)로 폴백.
+    official_texture 는 판매자 캡션의 질감 서술 요약(1~2문장), 없으면 None — slime_type 과 별개다
+    (종류어 폴백인 type_other 를 여기로 재활용하지 말 것: 저건 '종류' 칸의 대타지 질감 서술이 아니다).
     beads 는 비즈/토핑 구성요소 리스트(오픈 어휘), 없으면 [].
     source_permalink 은 그 제품의 공식 스펙 출처 게시물 URL(fixture 값 그대로), 없으면 None —
     마켓 게시물로 때우는 폴백은 없다(ADR-0009). 있으면 그 제품 게시물이 맞다는 뜻이다.
@@ -97,8 +100,8 @@ def iter_specs(kb_markets: list[dict]):
         for p in m.get("products", []):
             stype = ", ".join(p.get("type") or []) or p.get("type_other")
             yield (mw, p["product_name"], p.get("official_scent"),
-                   p.get("glue_composition"), stype, p.get("beads") or [],
-                   p.get("source_permalink"))
+                   p.get("glue_composition"), stype, p.get("official_texture"),
+                   p.get("beads") or [], p.get("source_permalink"))
 
 
 # ---------------------------------------------------------------- 셀프테스트

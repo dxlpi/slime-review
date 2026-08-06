@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS specs (
   scent       TEXT,                   -- 향료
   base_combo  TEXT,                   -- 풀조합
   slime_type  TEXT,                   -- 종류 (TYPE_ENUM)
+  -- 판매자 본인이 캡션에 쓴 질감 서술의 요약(1~2문장). slime_type 이 '무슨 종류인가'라면
+  -- 이건 '만지면 어떤가'다. 구매자가 실제로 읽는 쪽이라 별도 컬럼으로 둔다.
+  -- ⚠️ 후기(2층)가 아니다 — 요약 프롬프트에 절대 유입 금지(스펙↔후기 분리, ADR-0011).
+  official_texture TEXT,
   beads       TEXT[] NOT NULL DEFAULT '{}',  -- 비즈/토핑 구성요소(오픈 어휘, 없으면 {})
   source_permalink TEXT,                 -- 공식 스펙 출처 인스타 게시물 URL(없으면 NULL)
   UNIQUE (market, product)
@@ -57,6 +61,8 @@ CREATE INDEX IF NOT EXISTS reviews_class_idx ON reviews (review_class);
 -- 기존 배포 DB 멱등 마이그레이션: specs.beads 컬럼이 없으면 추가(기본 {} → 기존 행 무해).
 ALTER TABLE specs ADD COLUMN IF NOT EXISTS beads TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE specs ADD COLUMN IF NOT EXISTS source_permalink TEXT;
+-- 기존 배포 DB 멱등 마이그레이션: specs.official_texture 컬럼이 없으면 추가(NULL 기본 → 기존 행 무해).
+ALTER TABLE specs ADD COLUMN IF NOT EXISTS official_texture TEXT;
 
 -- 기존 배포 DB 멱등 마이그레이션: reviews.relevance_meta 컬럼이 없으면 추가(NULL 기본 → 기존 행 무해).
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS relevance_meta JSONB;

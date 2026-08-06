@@ -10,7 +10,10 @@ dense 벡터(BGE-M3) + BM25(앱단)로 하이브리드. `docker-compose.yml` 이
 | `schema.sql` | 전체 DDL — `specs`, `reviews`, HNSW/메타 인덱스, 멱등 마이그레이션 |
 
 ## Schema 요약
-- `specs (market, product, scent, base_combo, slime_type, beads[])` · UNIQUE(market, product)
+- `specs (market, product, scent, base_combo, slime_type, official_texture, beads[])` · UNIQUE(market, product)
+  — `official_texture` = 판매자가 캡션에 쓴 **질감 서술의 요약**(1~2문장). `slime_type` 은 '무슨
+    종류인가'(통제어휘), 이건 '만지면 어떤가'다. 둘을 한 칸으로 합치지 말 것 — 합친 상태가
+    화면의 '질감' 줄에 분류코드만 뜨던 원인이었다. 미언급이면 NULL.
 - `reviews (source, market, product, spec_id→specs, review_class, attributes JSONB, relevance_meta JSONB, source_ref JSONB, embedding vector(1024), tokens[])`
   — `relevance_meta` = 관련성 게이트 판정 전문(M/Q/E·topic_score·target/target_scope/τ·rank_score, ADR-0007). 게이트 미경유 행은 NULL.
   — `source_ref` = 원문 조각 식별자 `{platform,url,thread_no,comment_no,shortcode}`(ADR-0009). URL 이 아니라 **식별자**를 저장하고 렌더는 `slime_rag/source_links.py` 가 한다. 미보유 행은 NULL.

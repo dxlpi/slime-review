@@ -9,7 +9,7 @@
 - 1층(specs)은 KB market_word 를 키로 적재 → linking 이 정규화한 reviews.market 과 바로 조인.
 - 멱등: specs 는 UNIQUE(market,product) upsert, reviews 는 post_id 존재 시 색인 스킵.
 - 소스→플랫폼 매핑(amos→dcinside)은 여기 한 곳에서. 종합뷰는 플랫폼 라벨로 편향을 본다.
-- UI(app/ui.py)는 이 모듈의 list_*/consolidated_for/answer 만 호출(DB SQL 캡슐화).
+- 표시 계층은 이 모듈의 list_*/consolidated_for/answer 만 호출(DB SQL 캡슐화).
 """
 
 from __future__ import annotations
@@ -315,7 +315,7 @@ def market_logo(market_word: str | None) -> dict:
     """정규 market_word → 그릴 로고 자산(ADR-0010). **DB 미접촉** — KB JSON 만 읽는다.
 
     UI 가 `pipeline` 만 알면 되도록 여기 둔다(백엔드 글루 캡슐화 규칙). KB 는 리런마다
-    다시 파싱할 이유가 없어 프로세스 캐시 — streamlit 은 위젯 조작마다 스크립트를 통째로
+    다시 파싱할 이유가 없어 프로세스 캐시 — 재실행형 프런트엔드는 요청마다 스크립트를 통째로
     재실행하므로 캐시가 없으면 매 상호작용에 13마켓 JSON 을 다시 읽는다.
 
     판단은 전부 `source_links.logo_asset` 이 한다(순수·CI 게이트 대상). 여기는 조회만.

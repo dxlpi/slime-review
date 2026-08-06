@@ -17,7 +17,7 @@ slime_rag/              core RAG package → slime_rag/CLAUDE.md
   consolidated_view.py  consolidated view + source-bias aggregation (per source, gap, scent mismatch)
   llm_ops.py            observability + LLM call wrapper (logging, cost, retries)
   config.py             single source of truth for .env
-app/ui.py               Streamlit UI → app/CLAUDE.md                                  [Phase 6]
+web/                    Vite + React frontend (KDS tokens, ported design)            [Phase 6]
 sql/schema.sql          pgvector schema → sql/CLAUDE.md
 eval/                   offline unit tests + gold sets → eval/CLAUDE.md
 evals/                  pass-rate evaluation harness → evals/CLAUDE.md
@@ -54,8 +54,8 @@ python -m slime_rag.search    # hybrid search + grounded answers
 | Embeddings | **BGE-M3** | Korean-friendly, emits dense *and* sparse from one model → hybrid retrieval without a second model. Runs locally (zero per-call cost) |
 | Vector store | **pgvector** | Lets Layer 1 specs **join** Layer 2 reviews, with metadata filters (market / type / attribute) expressed in SQL |
 | Korean keyword search | **kiwipiepy + BM25** | Postgres FTS has no Korean tokenizer → morphological tokenization then BM25, fused with vector results via RRF |
-| UI | **Streamlit** | Python-native; chat + filters + consolidated view come together fast |
-| Deployment | **Render** (alt: Fly.io) | Managed Postgres (pgvector) and the web service in one place |
+| UI | **Vite + React + TS** | Data comes from a Python backend, so SSR buys nothing — a static SPA deploys as one artifact. The design bundle's KDS components are plain JSX and drop straight in ([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md); Streamlit was tried first and removed) |
+| Deployment | **Render** (alt: Fly.io) | Managed Postgres (pgvector), the API service, and the static frontend in one place (per-service root directory) |
 
 > Note: GPT-5-family models are reasoning models, so `temperature` may be ignored or restricted.
 > Determinism for extraction JSON therefore comes from **structured outputs
@@ -63,8 +63,10 @@ python -m slime_rag.search    # hybrid search + grounded answers
 
 ## Principles
 
-- **Responsible collection**: respect robots, delay between requests, cap pages, never redistribute
-  source text (snippets only).
+- **Responsible collection**: respect robots, delay between requests, cap pages. Source text follows
+  **processing vs publication** ([ADR-0013](docs/adr/0013-processing-vs-publication.md)): collection,
+  storage and LLM processing take the full text; the browser only ever receives a server-cut excerpt
+  plus a link back. Collected text lives in the database and is never committed to this repository.
 - **Verifiable against the original**: every displayed piece of evidence links back to its source post.
   Links and the seller-media embed are **references, not copies** — only addresses are stored and the
   bytes are served by the origin, so nothing is downloaded or re-hosted
@@ -87,7 +89,8 @@ python -m slime_rag.search    # hybrid search + grounded answers
 Keeps context-document path integrity and evaluation pass-rate free of regressions.
 
 ```bash
-git config core.hooksPath .githooks      # enable pre-push hook (path check + eval gate)
+git config core.hooksPath .githooks      # enable hooks: commit-msg (message format) + pre-push (path check + eval gate)
+git config commit.template ~/.gitmessage # optional: commit message skeleton
 python .github/scripts/validate_context_paths.py   # context path integrity (0 hallucinated paths)
 python -m evals.run --min 1.0            # entity-linking pass-rate gate
 ```

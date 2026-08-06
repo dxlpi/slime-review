@@ -9,14 +9,14 @@
 |---|---|
 | `test_bias.py` | 편향 태깅 — 게이트 recall/단락/precision 보존/config (18 케이스) |
 | `test_apify_source.py` | Apify 어댑터 오프라인 매핑·provenance·중복접힘·회복력 + **`fetch_profiles`**(로고 URL — HD 우선·폴백·결손 드롭, 게시물/타계정 아바타 미유출) (11 케이스) |
-| `test_consolidated_sections.py` | 리뷰 요약(향/질감/배송·CS/장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 + **배송·CS 섹션**(주문단위 필드의 행 복제 계약) (9 케이스) |
+| `test_consolidated_sections.py` | 리뷰 요약(**6기준** + 장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 + 배송·CS 섹션(주문단위 필드의 행 복제 계약) + **6기준 스키마 계약**(소리·지속력 재료 유입 / `cs`·`shipping` 분기 / `promo_view` 키) (13 케이스) |
 | `test_relevance_gate.py` | 관련성 게이트 — topic/domain 축 + **M/Q/E 3축**(KAX-AC4~AC10: chrome-strip·평서형 종결어미·전언 분리·편향 보존·순위/예산) |
 | `test_extract_hearsay.py` | 전언 하드닝(AC15) — 프롬프트 스냅샷 + `firsthand_evidence` 결정적 게이트 + 실호출 통합 |
 | `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원. `--batch-size`(반복 가능) + `gold/thread_gold.json` 기반 귀속 채점(`grade_thread_attribution`) |
 | `test_index_meta.py` | `index_post` 의 `relevance_meta`·`source_ref` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL/팬아웃 복제 (무네트워크·무모델). 파라미터는 **컬럼 이름**으로 찾는다 |
 | `test_source_links.py` | 원문 링크 **정책**(순수) — `permalink` degrade·`#cmt` 제거 · 식별자 조립 · 한 스레드 댓글 distinct · `embed_url` 게이트 · 근거 목록 그룹핑 · 댓글 id 보존 · 캡션 계약 + **로고 게이트**(`logo_asset` 3중 fail-closed·경로이탈 차단·링크백 보존·모노그램 결정성) |
 | `gold/thread_gold.json` | 스레드 골드 — 실제 디시 3스레드 51조각, 조각별 `mentioned_product` 라벨(~200자 스니펫 정책) |
-| `test_ui_render.py` | UI 헤드리스(AppTest) — 종합뷰 3블록·URL 링크·빈 섹션 생략 + **근거 원문 목록**(버킷 분리·구성 라벨·정직성 캡션 2종)·**판매자 임베드 양분기**·**마켓 로고**(모노그램 분기·링크백 상시·사이드바 배선) + **제품 타이핑 검색**(부분일치/공백무시/초성)·**선택 흐름**(마켓→범위→제품→무매치), 예외 0 |
+| `test_post_columns.py` | 원문·작성 메타 매핑(ADR-0013) — 라벨 붙은 카운트('조회 428') 파싱 · 연도 없는 날짜 폐기 · 디시 글/댓글 작성자 양경로 · 인스타 owner_username · 글단위 지표는 댓글에서 None. **실수집에서 두 번 조용히 빈 자리**라 회귀 게이트로 둔다 |
 | `layer2_gold.json` | 2층 추출 골드셋(사람 검수, 현재 비교글 1건) |
 
 ## Common patterns (workflow)
@@ -26,7 +26,7 @@ python -m eval.test_bias          # 모든 bias 오프라인 테스트
 python -m eval.test_apify_source  # Apify 어댑터 오프라인 테스트
 python -m eval.test_relevance_gate   # 관련성 3축 게이트 회귀
 python -m eval.test_source_links     # 원문 링크·임베드 정책(CI 게이트)
-python -m eval.test_ui_render        # 렌더 배선(streamlit 필요 — 로컬 게이트)
+python -m eval.test_post_columns     # 원문·작성 메타 매핑(CI 게이트)
 python -m eval.test_extract_thread   # 스레드 배치(키 없으면 실호출 케이스만 skip)
 python -m evals.run               # 추출/개체연결 pass-rate 지표 (→ ../evals/CLAUDE.md)
 ```

@@ -3,14 +3,16 @@
 색인 (Phase 4) — 추출·연결된 후기 → BGE-M3 임베딩 → pgvector 적재.
 
 청킹: 제품 항목 1개 = 1청크(1행).
-무재배포: 원문 본문을 저장하지 않는다. 구조화 필드로 만든 '렌더링 텍스트'를
-         임베딩·보관하고, 이 텍스트가 곧 검색 대상이자 인용 근거가 된다.
+임베딩 대상: 구조화 필드로 만든 '렌더링 텍스트'. 이 텍스트가 검색 대상이자 인용 근거다
+         (원문 본문도 ADR-0013 이후 별도 컬럼에 보관하지만, 검색은 렌더링 텍스트로 한다
+          — 추출된 항목 단위로 끊겨 있어 청크 경계가 명확하기 때문).
 메타필터용으로 마켓/종류/감성을 컬럼으로 승격, 원본 제품 객체는 attributes(jsonb)에.
 """
 
 from __future__ import annotations
 
 import json
+import re
 
 from .config import settings
 from .db import connect
@@ -70,6 +72,73 @@ def render_review(market: str | None, product: str | None, review: dict) -> str:
     return " / ".join(p for p in parts if p)
 
 
+def _int(v) -> int | None:
+    """'조회 428' · '댓글 4' · '1,234' · 1234 → 428 · 4 · 1234 · 1234. 숫자 없으면 None.
+
+    ⚠️ 라벨을 함께 벗겨야 한다. 디시 `.gall_count`/`.gall_comment` 는 숫자만이 아니라
+       **'조회 428' / '댓글 4'** 처럼 라벨이 붙은 텍스트를 준다(2026-08-06 실측). 반면
+       `.up_num` 은 순수 숫자다 — 그래서 추천만 들어오고 조회·댓글이 통째로 NULL 이 되는
+       조용한 결손이 났었다. 천 단위 쉼표도 함께 처리한다.
+       파싱 실패를 0 으로 접지 않는다 — '0회 조회'와 '모름'은 다르다.
+    """
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    m = re.search(r"-?\d[\d,]*", str(v))
+    return int(m.group().replace(",", "")) if m else None
+
+
+def _ts(v) -> str | None:
+    """작성일 문자열 → psycopg 가 TIMESTAMPTZ 로 받을 수 있는 형태. 못 읽으면 None.
+
+    디시 `.gall_date` 의 `title` 속성은 '2026-08-06 14:23:45', 인스타(Apify)는 ISO 8601 이다.
+    텍스트 폴백('08.06', '14:23')은 연도가 없어 **버린다** — 틀린 날짜가 빈 날짜보다 나쁘다.
+    """
+    if not v:
+        return None
+    s = str(v).strip()
+    from datetime import datetime
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+                "%Y.%m.%d %H:%M:%S", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(s, fmt).isoformat()
+        except ValueError:
+            pass
+    try:                                   # ISO 8601(인스타). 'Z' 는 파이썬이 3.11+ 에서만 받는다.
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).isoformat()
+    except ValueError:
+        return None
+
+
+def post_columns(raw) -> dict:
+    """RawReview → `reviews` 의 원문·작성 메타 컬럼(ADR-0013). 순수 함수(무DB·무네트워크).
+
+    수집기는 **원래부터** 이 값들을 들고 있었다. 예전 규칙이 색인 단계에서 버렸을 뿐이라
+    수집기는 손댈 필요가 없고, 여기서 플랫폼별 키 이름만 하나로 모은다.
+
+    ⚠️ 여기 담기는 `body` 는 **원문 전문**이다. 자르는 건 이 층의 일이 아니다 —
+       표시 직전(`pipeline.list_reviews`)에서 자른다(ADR-0013 §3). 저장은 전문, 표시는 발췌.
+    """
+    meta = getattr(raw, "meta", None) or {}
+    return {
+        "body": getattr(raw, "text", None),
+        "title": getattr(raw, "raw_title", None) or meta.get("parent_title"),
+        # 디시=nick(익명이면 'ㅇㅇ') · 인스타=owner_username. 표시 여부는 화면이 정한다.
+        "author": meta.get("nick") or meta.get("owner_username"),
+        "posted_at": _ts(getattr(raw, "posted_at", None)),
+        "likes": _int(meta.get("likes")),
+        "views": _int(meta.get("views")),
+        "comment_count": _int(meta.get("comment_count") or meta.get("comments")),
+        "votes_up": _int(meta.get("recommend_up")),
+        "votes_down": _int(meta.get("recommend_down")),
+    }
+
+
+_POST_COLS = ("body", "title", "author", "posted_at",
+              "likes", "views", "comment_count", "votes_up", "votes_down")
+
+
 def _sent(review: dict, block: str) -> str | None:
     b = review.get(block)
     return b.get("sentiment") if b else None
@@ -78,7 +147,7 @@ def _sent(review: dict, block: str) -> str | None:
 def index_post(doc: dict, *, source: str, post_id: str | None = None,
                aliases: dict[str, str] | None = None, review_class: str = "genuine",
                relevance_meta: dict | None = None, source_ref: dict | None = None,
-               conn=None) -> int:
+               raw=None, conn=None) -> int:
     """
     추출 후기 1건(doc) → 제품별로 연결·렌더·임베딩 후 reviews 테이블에 적재.
     review_class='genuine'|'promo' — 홍보성 후기는 종합뷰에서 실사용과 분리 집계된다.
@@ -88,6 +157,8 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     규칙으로 팬아웃 행 전체에 복제되지만 **소비 방식이 다르다**: relevance_meta 는 행 단위
     집계 입력이고, 이건 식별자라 읽는 쪽에서 중복 제거가 필요하다
     (`source_links.evidence_group_key`). 안 하면 한 조각이 제품 수만큼 링크로 도배된다.
+    raw — 원본 RawReview(선택). 주면 원문 본문·작성 메타를 함께 적재한다(ADR-0013).
+    안 주면 해당 컬럼은 NULL — 골드 시드처럼 RawReview 가 없는 경로가 그렇다.
     반환: 적재한 행 수.
     """
     kb = linking.load_kb()
@@ -110,6 +181,9 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     from psycopg.types.json import Jsonb
     rel_meta = Jsonb(relevance_meta) if relevance_meta else None
     src_ref = Jsonb(source_ref) if source_ref else None
+    # 조각 단위 속성이라 relevance_meta·source_ref 와 같은 규칙으로 팬아웃 행 전체에 복제된다.
+    post_cols = post_columns(raw) if raw is not None else {c: None for c in _POST_COLS}
+    post_vals = tuple(post_cols[c] for c in _POST_COLS)
     own = conn is None
     conn = conn or connect()
     try:
@@ -121,8 +195,11 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                       (source, post_id, market, market_confidence, product,
                        slime_type, scent_sentiment, texture_sentiment,
                        sound_sentiment, overall_sentiment, review_class,
-                       attributes, evidence, tokens, embedding, relevance_meta, source_ref)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                       attributes, evidence, tokens, embedding, relevance_meta, source_ref,
+                       body, title, author, posted_at,
+                       likes, views, comment_count, votes_up, votes_down)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (source, post_id, lk.market, lk.market_confidence,
                      lk.product,
@@ -130,7 +207,8 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                      _sent(r, "scent"), _sent(r, "texture"),
                      _sent(r, "sound"), (r.get("overall") or {}).get("model_sentiment"),
                      review_class,
-                     Jsonb(r), text, _tokenize(text), vec, rel_meta, src_ref),
+                     Jsonb(r), text, _tokenize(text), vec, rel_meta, src_ref,
+                     *post_vals),
                 )
         conn.commit()
         return len(texts)

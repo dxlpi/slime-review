@@ -179,7 +179,8 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
         ref = source_links.build_source_ref("instagram", u.url, u.meta)
         rows = index.index_post(doc, source="instagram",
                                 post_id=u.meta.get("shortcode"), review_class=rc,
-                                relevance_meta=u.meta.get("relevance"), source_ref=ref)
+                                relevance_meta=u.meta.get("relevance"), source_ref=ref,
+                                raw=u)                 # 원문 본문·작성 메타 동반 적재(ADR-0013)
         if ref:
             n_ref += rows
         else:
@@ -242,7 +243,8 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
             # enumerate 위치라 원문 주소로 되돌릴 수 없다(그래서 별도 컬럼, ADR-0009).
             ref = source_links.build_source_ref("dcinside", raw.url, raw.meta)
             rows = index.index_post(doc, source="amos", post_id=post_id, conn=conn,
-                                    relevance_meta=raw.meta.get("relevance"), source_ref=ref)
+                                    relevance_meta=raw.meta.get("relevance"), source_ref=ref,
+                                    raw=raw)           # 원문 본문·작성 메타 동반 적재(ADR-0013)
             n_rows += rows
             if ref:
                 n_ref += rows
@@ -365,18 +367,141 @@ def _records_for(conn, market: str, product: str | None) -> list[dict]:
     return out
 
 
+# 커뮤니티 리뷰 패널 정렬 — **DB 에 있는 컬럼으로만** 만든다.
+# 디자인의 좋아요/조회/추천순은 수집기(RawReview.meta)엔 있지만 `reviews` 테이블에 없다.
+# 없는 축을 메뉴에 띄우면 정렬을 누른 사용자에게 거짓말이 되므로 넣지 않는다 —
+# 컬럼이 생기면 여기 dict 에 한 줄 추가하는 것으로 켜진다.
+# ⚠️ '최근 수집순'은 작성일이 아니라 **수집일**(reviews.created_at) 기준이다. 원문 작성일은
+# 수집기(RawReview.posted_at)엔 있지만 테이블에 없다 — 없는 걸 '최신순'이라 부르면 거짓말이라
+# 이름·화면 라벨 양쪽에 '수집'을 남긴다.
+REVIEW_SORTS: dict[str, str] = {
+    "최근 수집순": "created_at DESC NULLS LAST, id DESC",
+    "긍정 먼저":   "CASE overall_sentiment WHEN 'pos' THEN 0 WHEN 'neu' THEN 1 ELSE 2 END, id DESC",
+    "부정 먼저":   "CASE overall_sentiment WHEN 'neg' THEN 0 WHEN 'neu' THEN 1 ELSE 2 END, id DESC",
+}
+
+# 소스별 표시 라벨(디자인 카피). 플랫폼 키 → 패널 제목.
+PLATFORM_LABELS = {"instagram": "인스타그램", "dcinside": "디시인사이드 아모스 갤러리"}
+
+# `reviews.evidence` 는 `index.render_review` 산출물이라 '[마켓 제품] / 향: … / 질감: …' 꼴이다.
+# 앞의 [마켓 제품] 은 BM25 용 앵커라 카드에선 제품 라벨과 겹친다 — 표시할 때만 떼어낸다.
+_EVIDENCE_ANCHOR = re.compile(r"^\s*\[[^\]]*\]\s*/\s*")
+
+
+def _display_evidence(evidence: str | None) -> str | None:
+    """근거 스니펫을 카드용으로 다듬는다 — 색인 앵커만 제거하고 내용은 그대로 둔다."""
+    if not evidence:
+        return None
+    return _EVIDENCE_ANCHOR.sub("", evidence).strip() or None
+
+
+def list_reviews(market: str | None = None, product: str | None = None, *,
+                 platform: str | None = None,
+                 sort: str = "최근 수집순", limit: int = 30) -> list[dict]:
+    """커뮤니티 리뷰 패널용 개별 후기 목록 — 실사용(genuine)만, 조각 단위 중복 제거.
+
+    반환 항목: {platform, market, product, evidence, sentiment, url, is_comment, collected_at,
+                body, title, author, posted_at, likes, views, comment_count, votes}.
+    `body` 는 **서버에서 자른 발췌**다(`source_links.excerpt`, ADR-0013 §3) — 전문이 아니다.
+
+    **market 은 선택이다.** `market=None, product="빠코볼"` 이면 마켓을 묻지 않고 제품명으로만
+    조회한다. 실측 근거(2026-08-06, 아모스갤 '빠코볼' 25건 수집): 원문 17조각 중 **10개가
+    마켓을 아예 언급하지 않았고**, 등장한 `ㅈㄴ` 6건도 대부분 마켓(슬라임지나)이 아니라 부사
+    '존나'였다. 갤러리 이용자는 제품명만 쓰고 마켓을 생략한다. 그래서 개체연결이 (정상적으로)
+    보류하면 `market` 이 NULL 로 남고, 마켓 필수 조회로는 **후기가 있어도 화면에 0건**이 된다.
+
+    ⚠️ 대가: 다른 마켓에 **같은 이름의 제품**이 있으면 섞인다. 그래서 각 항목에 그 행의
+       `market`(보류면 None)을 함께 실어 보낸다 — 호출자가 라벨을 붙이거나 걸러낼 수 있게.
+       근본 해결은 KB `products` 에 제품→마켓을 등록해 개체연결이 마켓을 붙이는 것이다
+       (지금 13개 마켓 전부 `products: []`).
+
+    ⚠️ `evidence` 는 **원문이 아니라 근거 스니펫**(~15자)이다.
+
+    📌 ADR-0013 이후 이 자리는 **원문 본문의 서버 발췌**로 바뀐다 — 아직 아니다.
+       `reviews` 에 본문 컬럼이 없어서(규칙이 스키마에서 버렸다) 재수집·backfill 이 선행이다.
+       바뀔 때 자르는 코드는 **반드시 여기** 있어야 한다: 전문을 반환하고 프런트에서
+       `line-clamp` 로 접으면 전문이 이미 브라우저에 도달한 것이라 발췌가 아니다.
+       공개 전환 시 길이를 줄이는 스위치도 같은 자리에 둔다(ADR-0013 §5).
+
+    ⚠️ `source_ref` 는 조각 단위 속성이라 제품별 팬아웃 행마다 복제돼 있다. 그대로 그리면
+    한 조각이 제품 수만큼 카드로 도배되므로 `source_links.evidence_group_key` 로 접는다
+    (근거 목록이 쓰는 것과 같은 키 — 링크를 세는 규칙이 화면마다 갈리면 안 된다).
+    """
+    if not market and not product:
+        # 둘 다 비면 조건 없는 전량 조회가 된다 — 화면이 실수로 테이블을 통째로 긁는 걸 막는다.
+        raise ValueError("list_reviews: market 과 product 중 최소 하나는 필요하다")
+    order = REVIEW_SORTS.get(sort) or REVIEW_SORTS["최근 수집순"]
+    # ⚠️ 모르는 platform 은 **예외**다. 예전엔 조용히 None 으로 떨어져 필터가 통째로 꺼졌고,
+    #    그러면 '아모스갤만' 을 요청한 화면에 인스타 후기가 섞여 나온다 — 소스 미평균(1급 규칙)이
+    #    조용히 깨지는 경로다. 디자인 탭 라벨이 '아모스갤'이라 오타가 아니어도 밟기 쉽다.
+    src = None
+    if platform:
+        src = {v: k for k, v in SOURCE_PLATFORM.items()}.get(platform)
+        if src is None:
+            raise ValueError(
+                f"list_reviews: 알 수 없는 platform {platform!r} "
+                f"(가능: {sorted(SOURCE_PLATFORM.values())}). 필터를 끄려면 platform=None.")
+    sql = ("SELECT source, market, product, evidence, overall_sentiment, source_ref, created_at, id, "
+           "body, title, author, posted_at, likes, views, comment_count, votes_up "
+           "FROM reviews WHERE review_class='genuine'")
+    params: list = []
+    if market:
+        sql += " AND market=%s"
+        params.append(market)
+    if product:
+        sql += " AND product=%s"
+        params.append(product)
+    if src:
+        sql += " AND source=%s"
+        params.append(src)
+    sql += f" ORDER BY {order}"                 # order 는 위 화이트리스트 값만 (사용자 입력 아님)
+    with connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+
+    out, seen = [], set()
+    for (source, mkt, prod, evidence, sentiment, source_ref, created_at, _id,
+         body, title, author, posted_at, likes, views, n_comment, votes) in rows:
+        key = source_links.evidence_group_key(source_ref)
+        # 링크 식별자가 없는 행은 접을 키도 없다 — 행 자체를 키로 써서 최소한 자기끼리는 안 겹치게.
+        key = key or ("_norow", _id)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "platform": SOURCE_PLATFORM.get(source, source),
+            "market": mkt,                          # 개체연결 보류면 None — 호출자가 라벨링/필터
+            "product": prod,
+            "evidence": _display_evidence(evidence),
+            "sentiment": sentiment,
+            "url": source_links.permalink(source_ref),
+            "is_comment": source_links.is_comment(source_ref),
+            "collected_at": created_at.strftime("%Y.%m.%d") if created_at else None,
+            # ADR-0013 §3: 브라우저로 나가는 본문은 **여기서 자른 발췌**가 전부다.
+            "body": source_links.excerpt(body),
+            "title": title,
+            "author": author,
+            "posted_at": posted_at.strftime("%Y.%m.%d") if posted_at else None,
+            "likes": likes, "views": views, "comment_count": n_comment, "votes": votes,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def consolidated_for(market: str, product: str, *, with_summary: bool = True) -> dict:
     """1층 스펙 + 2층 후기 → 종합 뷰(소스별·갭·향불일치 + 인스타/디시/통합 리뷰 요약)."""
     with connect() as conn:
         spec_row = conn.execute(
-            "SELECT product, scent, base_combo, slime_type, beads, source_permalink FROM specs "
-            "WHERE market=%s AND product=%s", [market, product]).fetchone()
+            "SELECT product, scent, base_combo, slime_type, official_texture, beads, "
+            "source_permalink FROM specs WHERE market=%s AND product=%s",
+            [market, product]).fetchone()
         records = _records_for(conn, market, product)
     official_spec = None
     if spec_row:
         official_spec = {"product": spec_row[0], "official_scent": spec_row[1],
                          "base_combo": spec_row[2], "slime_type": spec_row[3],
-                         "beads": list(spec_row[4] or []), "source_permalink": spec_row[5]}
+                         "official_texture": spec_row[4], "beads": list(spec_row[5] or []),
+                         "source_permalink": spec_row[6]}
     sectionize = None
     if with_summary and records:
         # 소스별(인스타/디시/통합/서포터) 향/질감/장단점 구조화 요약(structured outputs).

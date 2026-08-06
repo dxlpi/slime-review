@@ -27,8 +27,9 @@ psql postgresql://localhost:55432 -f sql/schema.sql   # 수동 재적용(멱등)
 - 컬럼 추가는 항상 `ADD COLUMN IF NOT EXISTS ... DEFAULT` 로 — 기존 배포 DB 무중단 마이그레이션.
 
 ## Non-obvious (주의 / Gotcha)
-- **Important:** 원문 미재배포 — 본문 전체가 아니라 `evidence` 스니펫 + 임베딩만 저장(저작권).
-  `source_ref` 도 **주소만** 담는다(참조지 복제가 아님, ADR-0009).
+- **Important:** 원문 본문은 **저장한다**(ADR-0013 — 저장·처리는 허용). 제한이 걸리는 곳은 DB 가
+  아니라 **표시**다: 화면에 나가는 건 서버에서 자른 발췌다. 수집물은 DB 에만 두고 git 에 커밋하지
+  않는다. `source_ref` 는 여전히 **주소만** 담는다(참조지 복제가 아님, ADR-0009).
 - **Warning:** `source_ref` 는 **백필하지 않는다**. 기존 행은 NULL 로 남고 `index_gold` 가 존재
   `post_id` 를 스킵하므로 `setup(reset=False)` 로는 안 채워진다 → 데모 DB 는 `setup(reset=True)` 재적재.
   ⚠️ `setup()` 이 재생성하는 건 fixture+골드뿐이라 **라이브 수집분은 리셋으로 사라진다**(git 에 없음).

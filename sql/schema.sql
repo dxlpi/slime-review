@@ -71,3 +71,21 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS relevance_meta JSONB;
 -- ⚠️ 백필 없음(ADR-0009): 기존 행은 NULL 로 남고 index_gold 는 존재 post_id 를 스킵하므로
 -- setup(reset=False) 로는 영원히 안 채워진다. 데모 DB 는 setup(reset=True) 로 재적재한다.
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS source_ref JSONB;
+
+-- 기존 배포 DB 멱등 마이그레이션: 원문 본문·작성 메타(ADR-0013).
+-- 이전 규칙("원문 미재배포")이 **스키마 레벨에서** 원문을 버려왔기 때문에 컬럼이 없었다.
+-- ADR-0013 이 저장·처리를 허용으로 바꿨고, 제한은 이제 **표시**에만 걸린다
+-- (화면에 나가는 건 `pipeline.list_reviews` 가 서버에서 자른 발췌).
+--
+-- ⚠️ 기존 행은 NULL 로 남는다 — 수집기는 원문을 늘 들고 있었지만 색인이 버렸으므로,
+--    과거 행을 채우려면 재수집이 필요하다. 다만 추출 결과(attributes/evidence/embedding)는
+--    안 바뀌므로 post_id 매칭 **backfill** 로 끝나고 LLM 재추출 비용은 들지 않는다.
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS body         TEXT;        -- 원문 본문(제목 포함 정제본)
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS title        TEXT;        -- 디시 글 제목(인스타는 NULL)
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS author       TEXT;        -- 디시 nick / 인스타 owner_username
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS posted_at    TIMESTAMPTZ; -- 작성일(created_at 은 색인 시각이라 별개)
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS likes        INTEGER;     -- 인스타 좋아요
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS views        INTEGER;     -- 디시 조회
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment_count INTEGER;    -- 디시 댓글 수 / 인스타 댓글 수
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_up     INTEGER;     -- 디시 추천
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_down   INTEGER;     -- 디시 비추천(화면 미표시, 무손실 보관)

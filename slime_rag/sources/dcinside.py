@@ -218,6 +218,10 @@ class DCInsideSource(Source):
                                           "parent_no": m.group(1), "parent_title": title,
                                           "thread_no": m.group(1), "comment_no": c.get("no"),
                                           "ordinal": i,
+                                          # 글 경로와 같은 키 이름으로 싣는다 — index.post_columns
+                                          # 가 `nick` 하나만 보므로, 여기서 이름이 갈리면 댓글만
+                                          # 작성자가 조용히 NULL 이 된다(2026-08-06 실측 결손).
+                                          "nick": c.get("name"),
                                           "ip": c.get("ip"),
                                           "toxic": toxic_via_llm(ctext, self.classify_fn)},
                                 ))

@@ -63,9 +63,8 @@ def render_review(market: str | None, product: str | None, review: dict) -> str:
         parts.append(phrase("소리", sd, sd.get("notes") or ""))
     if (lv := review.get("longevity")):
         parts.append(phrase("지속력", lv, lv.get("notes") or ""))
-    if (v := review.get("value")) and (v.get("krw") or v.get("sentiment")):
-        krw = f"{v['krw']}원" if v.get("krw") else ""
-        parts.append(phrase("가격", v, krw))
+    if (sc := review.get("shipping_cs")):
+        parts.append(phrase("배송·CS", sc, sc.get("notes") or ""))
     if (o := review.get("overall")) and o.get("summary"):
         parts.append(f"총평: {o['summary']}")
     return " / ".join(p for p in parts if p)
@@ -89,6 +88,12 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     kb = linking.load_kb()
     links = linking.link_post(doc, kb=kb, aliases=aliases)
     reviews = doc.get("reviews", [])
+    # shipping_cs 는 후기(주문) 단위 사실이라 doc 최상위에 산다(ADR-0005) — 제품 항목엔 없다.
+    # 그런데 attributes 에 들어가는 건 제품 항목뿐이라, 복제하지 않으면 종합뷰의
+    # ATTR_FIELDS['shipping_cs'] 가 행에서 그 키를 영영 못 찾아 배송·CS 섹션이 상시 빈칸이 된다.
+    # relevance_meta 와 같은 규칙: 조각 단위 속성은 제품별 팬아웃 행 전체에 그대로 복제한다.
+    if (ship := doc.get("shipping_cs")):
+        reviews = [{**r, "shipping_cs": ship} for r in reviews]
     # lk.product = 약칭 정규화된 제품명(aliases 적용분). raw mentioned_product 가 아니라
     # 이걸 써야 색인·렌더·조인이 KB 정규 제품명으로 통일된다.
     texts = [render_review(lk.market, lk.product, r)

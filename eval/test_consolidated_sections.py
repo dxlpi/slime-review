@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-리뷰 요약(향/질감/장단점) 오프라인 테스트 — LLM/DB/API 미호출·무비용.
+리뷰 요약(향/질감/배송·CS/장단점) 오프라인 테스트 — LLM/DB/API 미호출·무비용.
 
 검증(사용자 확정 규칙):
-  - 소스별 review_summaries: 인스타/디시 각각 {scent,texture,pros,cons}.
-  - '언급 없으면 빈칸': 향/질감 재료가 없는 소스엔 sectionize 가 그 키를 안 받는다 → 빈칸(None) 가능.
+  - 소스별 review_summaries: 인스타/디시 각각 {scent,texture,shipping,pros,cons}.
+  - '언급 없으면 빈칸': 향/질감/배송 재료가 없는 소스엔 sectionize 가 그 키를 안 받는다 → 빈칸(None) 가능.
   - 통합(integrated)은 '두 소스 모두 실사용 후기'가 있을 때만 생성(reconciliation, 평균 금지).
   - 홍보성은 review_summaries 에 미포함(genuine 만) — promo_view 로 분리(회귀 없음).
   - llm_sectionize 미주입 시 review_summaries 전부 None(결정적 부분은 그대로).
@@ -32,10 +32,11 @@ def _fake_sectionize(prompt: str, schema: dict) -> dict:
     assert schema is SOURCE_REVIEW_SCHEMA          # 스키마가 그대로 전달되는지
     tail = prompt.split("[입력]", 1)[-1]
     return {
-        "scent":   "향요약" if '"scent"' in tail else None,
-        "texture": "질감요약" if '"texture"' in tail else None,
-        "pros":    ["장점1"],
-        "cons":    [],
+        "scent":    "향요약" if '"scent"' in tail else None,
+        "texture":  "질감요약" if '"texture"' in tail else None,
+        "shipping": "배송요약" if '"shipping_cs"' in tail else None,
+        "pros":     ["장점1"],
+        "cons":     [],
     }
 
 
@@ -117,7 +118,7 @@ def test_official_spec_never_in_summary_prompts():
     def _capture(prompt: str, schema: dict) -> dict:
         assert schema is SOURCE_REVIEW_SCHEMA
         prompts.append(prompt)
-        return {"scent": "향요약", "texture": None, "pros": [], "cons": []}
+        return {"scent": "향요약", "texture": None, "shipping": None, "pros": [], "cons": []}
 
     reviews = [
         _rec("instagram", "pos", scent={"sentiment": "pos", "evidence": "레몬", "perceived": "레몬향"}),
@@ -151,7 +152,7 @@ def test_market_mode_tags_products():
     prompts: list[str] = []
     def _capture(prompt: str, schema: dict) -> dict:
         prompts.append(prompt)
-        return {"scent": "향요약", "texture": None, "pros": [], "cons": []}
+        return {"scent": "향요약", "texture": None, "shipping": None, "pros": [], "cons": []}
 
     build_consolidated({"market": "머머", "product": None}, None, [ig, dc],
                        llm_sectionize=_capture)
@@ -159,9 +160,52 @@ def test_market_mode_tags_products():
     print("✓ market mode: 재료 product 라벨(보류=제품미상)·제품 모드 무라벨 OK")
 
 
+def test_shipping_section_from_order_level_field():
+    """배송·CS 섹션 — shipping_cs 는 후기(주문) 단위 필드(ADR-0005)라 행에 '복제'돼야만 재료가 된다.
+
+    복제는 index.index_post 담당이고, 종합뷰는 이미 복제된 행을 읽는다. 그 계약이 깨지면
+    (= 행에 shipping_cs 키가 없으면) 섹션은 조용히 상시 빈칸이 된다 — 그래서 양쪽을 다 본다.
+    """
+    ship = {"notes": "3일 지연", "sentiment": "neg", "evidence": "배송 3일 지연"}
+    reviews = [
+        _rec("dcinside", "neg", scent={"sentiment": "neg", "evidence": "비누"}, shipping_cs=ship),
+        _rec("instagram", "pos", scent={"sentiment": "pos", "evidence": "레몬"}),   # 배송 미언급
+    ]
+    mat_dc = _source_material([reviews[0]])
+    assert mat_dc["shipping_cs"][0]["notes"] == "3일 지연", mat_dc
+    assert "shipping_cs" not in _source_material([reviews[1]])   # 미언급 → 키 없음
+
+    v = build_consolidated({"market": "머머", "product": "X"}, None, reviews,
+                           llm_sectionize=_fake_sectionize)
+    assert v["review_summaries"]["dcinside"]["shipping"] == "배송요약"
+    assert v["review_summaries"]["instagram"]["shipping"] is None   # 언급 없으면 빈칸
+    assert "shipping" in SOURCE_REVIEW_SCHEMA["required"]
+    print("✓ shipping: 주문단위 필드 복제분이 배송·CS 섹션 재료로 흐름, 미언급=빈칸 OK")
+
+
+def test_index_replicates_shipping_cs_to_rows():
+    """index_post 의 팬아웃 복제 계약 — doc 최상위 shipping_cs 가 제품 행마다 실려야 한다.
+
+    DB·모델 없이 render_review 로만 확인한다(임베딩 로드 회피).
+    """
+    from slime_rag.index import render_review
+
+    doc = {"market": "빈짱",
+           "shipping_cs": {"notes": "다음날 도착", "sentiment": "pos", "evidence": "다음날 왔"},
+           "reviews": [{"mentioned_product": "A"}, {"mentioned_product": "B"}]}
+    ship = doc["shipping_cs"]
+    rows = [{**r, "shipping_cs": ship} for r in doc["reviews"]]     # index_post 와 동일 규칙
+    texts = [render_review("빈짱", r["mentioned_product"], r) for r in rows]
+    assert all("배송·CS: 다음날 도착" in t for t in texts), texts   # 비교글 전 제품에 복제
+    assert "배송·CS" not in render_review("빈짱", "A", {"mentioned_product": "A"})
+    print("✓ index: shipping_cs 가 제품별 행에 복제·렌더 OK")
+
+
 def _run_all():
     test_source_material_only_mentioned()
     test_blank_section_when_attr_absent()
+    test_shipping_section_from_order_level_field()
+    test_index_replicates_shipping_cs_to_rows()
     test_integrated_only_when_both_sources()
     test_promo_excluded_from_review_summaries()
     test_no_sectionize_all_none()

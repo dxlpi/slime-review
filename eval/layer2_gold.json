@@ -25,7 +25,6 @@
             "texture": null,
             "sound": null,
             "longevity": null,
-            "value": null,
             "overall": {
               "stated_rating": null,
               "model_sentiment": "pos",
@@ -59,11 +58,6 @@
               "evidence": "걀걀거리는게"
             },
             "longevity": null,
-            "value": {
-              "krw": null,
-              "sentiment": "neg",
-              "evidence": "과일18g내외"
-            },
             "overall": {
               "stated_rating": null,
               "model_sentiment": "neg",

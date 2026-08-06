@@ -8,12 +8,14 @@
         r["product_ref"]               # {"market":..., "product":...}
         r["overall"]["model_sentiment"]# 'pos'|'neu'|'neg'
         r["scent"]["perceived"], r["scent"]["sentiment"], ...
-        r["texture"]..., r["value"]..., 등 (없으면 None)
+        r["texture"]..., r["shipping_cs"]..., 등 (없으면 None)
+      shipping_cs 는 원래 후기(주문) 단위 필드(ADR-0005)지만, index.index_post 가 제품별
+      팬아웃 행마다 복제해 넣어 준다 — 여기선 다른 속성과 동일하게 행 단위로 읽는다.
 
 핵심 원칙: 소스를 순진하게 평균내지 않는다.
   - 소스별로 따로 집계하고 '갭'을 시그널로(net·건수). 보정(점수 깎기) 대신 소스별 투명화.
   - '긍정/부정 쏠림' 같은 편향 라벨은 노출하지 않는다(사용자 결정 2026-07-15).
-  - 서포터(홍보성) 후기는 실사용과 분리하되, 소수라도 향/질감/장단점 실내용을 요약해 포함.
+  - 서포터(홍보성) 후기는 실사용과 분리하되, 소수라도 향/질감/배송·CS/장단점 실내용을 요약해 포함.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from typing import Optional, Callable
 SENT_SCORE = {"pos": 1.0, "neu": 0.0, "neg": -1.0}
 
 # 종합 요약에서 다룰 속성 필드(필드별 정서가 있는 것들)
-ATTR_FIELDS = ["scent", "texture", "sound", "longevity", "value", "shipping_cs"]
+ATTR_FIELDS = ["scent", "texture", "sound", "longevity", "shipping_cs"]
 
 
 def _platform(r: dict) -> str:
@@ -101,19 +103,22 @@ import re  # (scent_divergence에서 사용)
 
 
 # ---------------------------------------------------------------- 종합 뷰 빌더
-# 리뷰 요약(소스별/통합 공통) 스키마 — 향/질감은 미언급이면 null(빈칸), 장단점은 모든 측면 배열.
+# 리뷰 요약(소스별/통합 공통) 스키마 — 향/질감/배송·CS 는 미언급이면 null(빈칸), 장단점은 모든 측면 배열.
 # strict structured outputs 용: 전 필드 required + additionalProperties=False.
 SOURCE_REVIEW_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["scent", "texture", "pros", "cons"],
+    "required": ["scent", "texture", "shipping", "pros", "cons"],
     "properties": {
         "scent":   {"type": ["string", "null"],
                     "description": "향 관련 후기 요약(1~2문장). 향 언급이 하나도 없으면 null(지어내기 금지)."},
         "texture": {"type": ["string", "null"],
                     "description": "질감 관련 후기 요약(1~2문장). 질감 언급이 없으면 null."},
+        "shipping": {"type": ["string", "null"],
+                     "description": "배송·CS 관련 후기 요약(1~2문장) — 배송 속도·도착·포장·문자·교환·응대. "
+                                    "언급이 없으면 null. 제품 지속력('빨리 죽음')은 여기가 아니다."},
         "pros":    {"type": "array", "items": {"type": "string"},
-                    "description": "장점(향·질감·배송·가격·지속력·소리 등 모든 측면). 없으면 []."},
+                    "description": "장점(향·질감·배송·CS·지속력·소리 등 모든 측면). 없으면 []."},
         "cons":    {"type": "array", "items": {"type": "string"},
                     "description": "단점(모든 측면). 없으면 []."},
     },
@@ -122,12 +127,16 @@ SOURCE_REVIEW_SCHEMA: dict = {
 # 소스별(인스타 또는 디시) 후기 요약 프롬프트. 이 소스 후기만 근거로.
 SECTION_PROMPT = """\
 너는 슬라임 한 제품(또는 한 마켓의 여러 제품)에 대한 '한 소스(플랫폼)'의 실사용 후기를
-향/질감/장단점으로 요약한다.
+향/질감/배송·CS/장단점으로 요약한다.
 입력 by_attr 의 evidence 에 실제로 나온 내용만 근거로 삼는다. 지어내기 금지.
 규칙:
 - scent: 향(냄새) 언급이 있으면 1~2문장으로 요약. 향 언급이 전혀 없으면 null (억지 서술 금지).
 - texture: 질감(말랑·쫀득·흐름성 등) 언급이 있으면 1~2문장 요약. 없으면 null.
-- pros/cons: 향·질감을 포함한 모든 측면(배송·가격·지속력·소리 등)의 장점/단점을 각각 짧은 항목으로.
+- shipping: 배송·CS(배송 속도·도착·포장·문자·교환·환불·응대) 언급이 있으면 1~2문장 요약. 없으면 null.
+  ⚠️ 배송은 '주문 단위' 사실이라 같은 글의 여러 제품에 같은 내용이 붙어 있을 수 있다 —
+  같은 주문의 배송 얘기를 제품 수만큼 부풀려 세지 마라.
+  ⚠️ '슬라임이 빨리 죽었다' 같은 제품 수명(longevity)은 배송이 아니다 → shipping 에 넣지 마라.
+- pros/cons: 향·질감·배송을 포함한 모든 측면(지속력·소리 등)의 장점/단점을 각각 짧은 항목으로.
   해당 없으면 빈 배열 []. 근거 없는 장단점 창작 금지.
 - 항목에 product 라벨이 있으면(마켓 단위 요약) 제품별로 갈리는 평가는 제품명을 표기해 구분한다
   (예: '[한글과자한줌] 비누향 지적'). 서로 다른 제품의 평가를 하나로 뭉뚱그리지 않는다.
@@ -143,6 +152,8 @@ INTEGRATED_PROMPT = """\
 - scent: 두 소스 향 평가가 수렴하면 그 합의를, 갈리면 어떻게 다른지(sentiment_gap 수치 참고) 명시.
   한쪽만 향 언급이 있으면 그 소스만 있었다고 밝힌다. 둘 다 없으면 null.
 - texture: 위와 동일.
+- shipping: 배송·CS 도 위와 동일 — 수렴하면 합의를, 갈리면 어떻게 다른지. 한쪽만 있으면 그 소스만
+  있었다고 밝힌다. 둘 다 없으면 null. (디시는 배송 지연을, 인스타는 포장을 말하는 식으로 자주 갈린다.)
 - pros/cons: 두 소스 '공통' 장/단점과 '한쪽에서만' 나온 장/단점을 구분해 항목화(소스 표기 권장: 예 '[디시] 배송 지연').
 - 점수를 하나로 섞지 말고 소스별 관점을 유지하라.
 """
@@ -150,12 +161,14 @@ INTEGRATED_PROMPT = """\
 # 서포터(홍보성) 후기 전용 요약 — 실사용과 '분리'하되, 실제 언급된 향/질감/장단점을 담백히 요약.
 SUPPORTER_SECTION_PROMPT = """\
 아래는 이 제품(또는 이 마켓)의 '서포터/무상 제공(협찬)' 인스타 후기다. 실제 언급된
-향/질감/장단점만 요약한다.
+향/질감/배송·CS/장단점만 요약한다.
 지어내기 금지, 미언급은 null/빈배열. 실사용 후기와 합치지 말고 이 버킷만 요약한다.
 규칙:
 - scent: 향 언급이 있으면 1~2문장, 없으면 null.
 - texture: 질감 언급이 있으면 1~2문장, 없으면 null.
-- pros/cons: 향·질감을 포함한 모든 측면의 장점/단점을 항목화. 없으면 빈 배열 [].
+- shipping: 배송·CS 언급이 있으면 1~2문장, 없으면 null. (서포터 발송은 일반 주문과 경로가 달라
+  배송 경험이 실사용 후기와 다를 수 있다 — 그래서 버킷을 섞지 않는다.)
+- pros/cons: 향·질감·배송을 포함한 모든 측면의 장점/단점을 항목화. 없으면 빈 배열 [].
 - 항목에 product 라벨이 있으면(마켓 단위) 제품별로 갈리는 평가는 제품명을 표기한다.
 """
 
@@ -170,7 +183,6 @@ _SALIENT = {
     "texture":     ["feel", "feel_simile", "feel_other", "hand_stick", "hand_residue"],
     "sound":       ["notes"],
     "longevity":   ["notes"],
-    "value":       ["krw"],
     "shipping_cs": ["notes"],
 }
 
@@ -239,8 +251,8 @@ def build_consolidated(product_ref: dict,
                        llm_sectionize: Optional[Callable[[str, dict], dict]] = None) -> dict:
     """제품 하나(또는 product=None 이면 마켓 전체)에 대한 종합 뷰(구조화).
 
-    - llm_sectionize 주입 시 review_summaries(인스타/디시/통합)를 향/질감/장단점으로 산출.
-      · 향/질감은 해당 소스에 언급이 없으면 null(빈칸) — 지어내기 금지.
+    - llm_sectionize 주입 시 review_summaries(인스타/디시/통합)를 향/질감/배송·CS/장단점으로 산출.
+      · 향/질감/배송은 해당 소스에 언급이 없으면 null(빈칸) — 지어내기 금지.
       · 통합은 두 소스 모두 실사용 후기가 있을 때만 생성(reconciliation, 평균 금지). 아니면 None.
       · 요약 입력은 2층(후기)만 — official_spec 은 어떤 요약 프롬프트에도 들어가지 않는다
         (스펙↔후기 완전 분리). 스펙은 뷰의 official_spec 키로만 나간다.
@@ -249,7 +261,7 @@ def build_consolidated(product_ref: dict,
       평가가 뭉개지지 않게 한다.
 
     서포터(review_class='promo') 후기는 headline·review_summaries 에서 제외하되, 별도 promo_view 에
-    '서포터 리뷰'로 향/질감/장단점을 실제 내용 그대로 요약(소수라도 포함). 없으면 promo_view=None.
+    '서포터 리뷰'로 향/질감/배송·CS/장단점을 실제 내용 그대로 요약(소수라도 포함). 없으면 promo_view=None.
     """
     market_mode = not product_ref.get("product")
     genuine = [r for r in reviews if not _is_promo(r)]
@@ -286,8 +298,8 @@ def build_consolidated(product_ref: dict,
                 rs["instagram"], rs["dcinside"], view["sentiment_gap"], llm_sectionize)
 
     if promo:                                           # 서포터(홍보성) 분리 버킷 — 실내용 요약
-        promo_view = {"n_promo": len(promo),
-                      "scent": None, "texture": None, "pros": [], "cons": []}
+        promo_view = {"n_promo": len(promo), "scent": None, "texture": None,
+                      "shipping": None, "pros": [], "cons": []}
         if llm_sectionize:
             promo_view.update(_sectionize_supporter(promo, llm_sectionize,
                                                     tag_products=market_mode))
@@ -306,15 +318,15 @@ if __name__ == "__main__":
          "texture": {"sentiment": "neg"}},
         {"source": {"platform": "dcinside"}, "product_ref": {"market": "빈짱", "product": "연유스무디"},
          "overall": {"model_sentiment": "neu"}, "scent": {"perceived": "비누향", "sentiment": "neu"},
-         "value": {"sentiment": "pos"}},
+         "shipping_cs": {"notes": "배송 3일 지연", "sentiment": "neg"}},
     ]
     # 가짜 sectionize: 실제 LLM 없이 재료가 넘어오는지·빈 섹션 처리만 확인.
     def _fake_sectionize(prompt: str, schema: dict) -> dict:
-        has_scent = '"scent"' in prompt.split("[입력]", 1)[-1]
-        has_texture = '"texture"' in prompt.split("[입력]", 1)[-1]
-        return {"scent": "향 요약(mock)" if has_scent else None,
-                "texture": "질감 요약(mock)" if has_texture else None,
-                "pros": ["가성비(mock)"], "cons": []}
+        tail = prompt.split("[입력]", 1)[-1]
+        return {"scent": "향 요약(mock)" if '"scent"' in tail else None,
+                "texture": "질감 요약(mock)" if '"texture"' in tail else None,
+                "shipping": "배송 요약(mock)" if '"shipping_cs"' in tail else None,
+                "pros": ["말랑함(mock)"], "cons": []}
 
     v = build_consolidated({"market": "빈짱", "product": "연유스무디"},
                            {"official_scent": "연유향", "type": ["지글리"]}, demo,

@@ -112,13 +112,12 @@ model_sentiment 는 텍스트 기반 추정이며 그렇게 라벨한다.
   },
   "sound":      { "mentioned": true, "notes": "그냥저냥", "sentiment": "neu", "evidence": "소리는 그냥저냥" },
   "longevity":  null,
-  "value":      { "krw": 12000, "sentiment": "pos", "evidence": "12000원 가성비 좋은듯" },
-  "shipping_cs": null,
+  "shipping_cs": { "notes": "주문 다음날 도착, 포장 꼼꼼", "sentiment": "pos", "evidence": "다음날 왔고 포장도" },
   "overall": {
     "stated_rating": null,         // 작성자가 명시한 점수만
     "model_sentiment": "pos",      // 모델 추정(라벨)
     "rebuy_intent": "있음",        // 있음/없음/미언급
-    "summary": "향은 호불호, 질감·가성비는 호평"
+    "summary": "향은 호불호, 질감·배송은 호평"
   },
   "flags": { "toxic": false }
 }
@@ -129,7 +128,7 @@ model_sentiment 는 텍스트 기반 추정이며 그렇게 라벨한다.
 ```
 빈짱 연유스무디 후기! 발향은 적당한데 연유향이라더니 약간 비누향 나요ㅋㅋ
 질감은 완전 말랑쫀득에 생크림 같은 느낌? 손에 안 붙고 묻음도 없어요.
-소리는 그냥저냥. 12000원이면 가성비 좋은듯. 재구매 ㅇㅇ
+소리는 그냥저냥. 주문 다음날 왔고 포장도 꼼꼼. 재구매 ㅇㅇ
 ```
 출력: (위 스키마 예시와 동일한 값)
 

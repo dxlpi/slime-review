@@ -16,7 +16,7 @@ DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [A
 | `bias.py` | 편향 태깅(IG) — 홍보성 게이트→LLM 캐스케이드, 판매자 라우팅 `partition` |
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
-| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/장단점 섹션, 미언급=빈칸; 홍보성 분리). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
+| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/배송·CS/장단점 섹션, 미언급=빈칸; 홍보성 분리). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
@@ -46,8 +46,13 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   → `extract.drop_hearsay_reviews` 가 `firsthand_evidence` 없는 항목을 코드로 버린다.
 - **Note:** 추출 호출 입력의 **99.4%가 고정 프롬프트**(실측). 비용 레버는 분류 정확도가 아니라
   호출 단위다 → `extract_collected` 는 스레드 배치(`extract_thread`)로 돈다.
-- **Don't:** 소스 편향을 평균내지 말 것 — 소스별 net + 갭으로 표시. **'긍정/부정 쏠림' 편향 라벨은 노출 안 함**(2026-07-15 결정). 서포터(홍보성)는 분리하되 소수라도 실내용(향/질감/장단점) 요약해 포함.
+- **Don't:** 소스 편향을 평균내지 말 것 — 소스별 net + 갭으로 표시. **'긍정/부정 쏠림' 편향 라벨은 노출 안 함**(2026-07-15 결정). 서포터(홍보성)는 분리하되 소수라도 실내용(향/질감/배송·CS/장단점) 요약해 포함.
 - **Note:** 후기(주문) 단위 vs 제품 단위 분리 — `market`·`shipping_cs`는 최상위, 제품별 평가는 `reviews[]`.
+- **Important:** 그런데 `attributes` JSONB 에 들어가는 건 제품 항목뿐이라, `index_post` 가
+  `shipping_cs` 를 제품별 팬아웃 행마다 **복제**해 넣는다. 이 복제를 빼면 종합뷰의
+  배송·CS 섹션이 예외 없이 조용한 빈칸이 된다(2026-08-05 `value` 축 교체 시 발견).
+- **Note:** 제품 단위 평가 축은 향/질감/소리/지속력 넷 — **`value`(가성비) 축은 제거됨**(2026-08-05,
+  [ADR-0008](../docs/adr/0008-drop-value-add-shipping-section.md)). 가격 얘기는 pros/cons 로만 흐른다.
 
 ## Cross-module dependencies
 - `../app/ui.py` → `pipeline`, `search` (표시 전용, 백엔드 글루는 여기 캡슐화)

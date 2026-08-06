@@ -9,7 +9,7 @@
 |---|---|
 | `test_bias.py` | 편향 태깅 — 게이트 recall/단락/precision 보존/config (18 케이스) |
 | `test_apify_source.py` | Apify 어댑터 오프라인 매핑·provenance·중복접힘·회복력 (9 케이스) |
-| `test_consolidated_sections.py` | 리뷰 요약(향/질감/장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 (5 케이스) |
+| `test_consolidated_sections.py` | 리뷰 요약(향/질감/배송·CS/장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 + **배송·CS 섹션**(주문단위 필드의 행 복제 계약) (9 케이스) |
 | `test_relevance_gate.py` | 관련성 게이트 — topic/domain 축 + **M/Q/E 3축**(KAX-AC4~AC10: chrome-strip·평서형 종결어미·전언 분리·편향 보존·순위/예산) |
 | `test_extract_hearsay.py` | 전언 하드닝(AC15) — 프롬프트 스냅샷 + `firsthand_evidence` 결정적 게이트 + 실호출 통합 |
 | `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원. `--batch-size`(반복 가능) + `gold/thread_gold.json` 기반 귀속 채점(`grade_thread_attribution`) |

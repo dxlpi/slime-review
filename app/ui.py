@@ -65,7 +65,7 @@ def filter_products(products: list[dict], query: str) -> list[dict]:
 
 
 def _render_review_block(title: str, block: dict | None, meta: str | None = None) -> None:
-    """향/질감/장단점 섹션 렌더. 언급 없는 섹션(None/빈)은 통째로 생략 — 빈칸 유지, 패딩 없음."""
+    """향/질감/배송·CS/장단점 섹션 렌더. 언급 없는 섹션(None/빈)은 통째로 생략 — 빈칸 유지, 패딩 없음."""
     if not block:
         return
     st.markdown(f"#### {title}" + (f"  ·  {meta}" if meta else ""))
@@ -73,6 +73,8 @@ def _render_review_block(title: str, block: dict | None, meta: str | None = None
         st.markdown(f"**향** — {block['scent']}")
     if block.get("texture"):
         st.markdown(f"**질감** — {block['texture']}")
+    if block.get("shipping"):
+        st.markdown(f"**배송·CS** — {block['shipping']}")
     pros, cons = block.get("pros") or [], block.get("cons") or []
     if pros or cons:
         st.markdown("**장단점**")

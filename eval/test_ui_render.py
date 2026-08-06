@@ -32,14 +32,18 @@ def _views() -> dict:
             "scent_divergence": {"official": "레몬", "diverged_ratio": 0.4, "top_perceived": [["인공레몬", 2]], "n": 5},
             "praised": {"instagram": [["scent", 3]]}, "criticized": {"dcinside": [["shipping_cs", 2]]},
             "review_summaries": {
-                "instagram": {"scent": "레몬향 진하고 상큼", "texture": "말랑·텐션 좋음", "pros": ["향 지속력", "가성비"], "cons": []},
-                "dcinside": {"scent": "인공적 레몬향 지적", "texture": None, "pros": ["가성비"], "cons": ["배송 지연", "흐름성 강함"]},
+                "instagram": {"scent": "레몬향 진하고 상큼", "texture": "말랑·텐션 좋음",
+                              "shipping": "포장 꼼꼼하다는 언급", "pros": ["향 지속력", "포장"], "cons": []},
+                # 디시는 배송 섹션만 있고 질감은 빈칸 — 소스별로 채워지는 섹션이 다름을 검증
+                "dcinside": {"scent": "인공적 레몬향 지적", "texture": None,
+                             "shipping": "배송 3일 지연 반복 지적", "pros": [], "cons": ["배송 지연", "흐름성 강함"]},
                 "integrated": {"scent": "양쪽 레몬 인지, 인스타 호평/디시 인공향(gap 0.8)", "texture": "인스타만 평가",
+                               "shipping": "인스타는 포장, 디시는 지연 — 갈림",
                                "pros": ["[공통] 향 존재감"], "cons": ["[디시] 배송·흐름성"]},
             },
-            # 서포터(홍보성) 버킷도 향/질감/장단점 섹션 형태로 포함(소수라도 표시).
+            # 서포터(홍보성) 버킷도 향/질감/배송·CS/장단점 섹션 형태로 포함(소수라도 표시).
             "promo_view": {"n_promo": 1, "scent": "레몬마들렌향 은은", "texture": "매트·포닥",
-                           "pros": ["발색·향"], "cons": []},
+                           "shipping": None, "pros": ["발색·향"], "cons": []},
         },
         "single_source": {   # 디시만 → 통합 None, 질감 빈칸, URL 없음
             "official_spec": {"official_scent": None, "base_combo": None, "slime_type": None, "beads": [], "source_permalink": None},
@@ -96,6 +100,9 @@ def test_ui_render_no_exception_and_blocks():
     assert any("➖ 배송 지연" in m for m in mds), "디시 장단점 미렌더"
     assert any("🔀 통합" in m for m in mds), "통합 블록 미렌더"
     assert any("**질감**" in m for m in mds), "full 뷰 질감 섹션 미렌더"
+    assert any("**배송·CS**" in m and "배송 3일 지연 반복 지적" in m for m in mds), "배송·CS 섹션 미렌더"
+    # promo_view.shipping=None · single_source 는 shipping 키 자체 없음 → 빈 섹션은 통째 생략
+    assert sum("**배송·CS**" in m for m in mds) == 3, "빈 배송 섹션이 패딩으로 렌더됨"
     assert any("공식 스펙 출처" in c and "instagram.com/p/ABC" in c for c in caps), "스펙 URL 링크 미렌더"
     assert any("🎁 서포터 리뷰" in m for m in mds), "서포터 리뷰 블록 미렌더"
     assert any("레몬마들렌향 은은" in m for m in mds), "서포터 향 섹션 미렌더"

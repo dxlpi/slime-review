@@ -442,3 +442,35 @@ LLM 이 빈 향/질감을 지어낼 여지가 없다. 소스당 structured outpu
 
 **남은 것**: Render 배포(마지막 하드게이트). 마켓 모드의 실질 범위는 제품 앵커 수집(ADR-0007
 ACTIVE scope=product)에 묶여 있음 — 재판정으로 market scope 가 활성화되면 범위 캡션 완화 가능.
+
+
+## 2026-08-05 — `value`(가성비) 축 제거 + 배송·CS 요약 1급 섹션 (ADR-0008)
+
+**무엇을**(사용자 결정): 2층 제품 평가 축에서 `value` 를 빼고, 배송·CS 를 요약 섹션으로 올린다.
+"배송/CS 축 추가" 요청에 대해 `shipping_cs` 가 **이미 후기(주문) 단위로 존재**함을 먼저 제시하고
+세 갈래(요약 섹션 승격 / 제품 단위로 이동 / shipping·cs 분리)를 물어 **섹션 승격**으로 확정 —
+ADR-0005(후기 단위 vs 제품 단위)는 건드리지 않는다.
+
+**한 일**:
+- `extract.py` — `_PRODUCT_PROPS` 에서 `value` 삭제. `LAYER2_SYSTEM` 은 무변경(프롬프트가 `value` 를
+  언급한 적 없음) → `_DOC_PROPS` 공유 덕에 스레드 배치 스키마도 자동 동기화.
+- `consolidated_view.py` — `SOURCE_REVIEW_SCHEMA` 에 `shipping` 추가(향/질감/배송·CS/장단점 4섹션),
+  소스별·통합·서포터 3개 프롬프트에 규칙 추가(미언급=null, 지속력과 혼동 금지, 주문 단위라
+  제품 수만큼 부풀려 세지 말 것). `ATTR_FIELDS`/`_SALIENT` 에서 `value` 제거.
+- `index.py` — **발견된 결함 수정**: `index_post` 는 `attributes` 에 제품 항목만(`Jsonb(r)`) 넣는데
+  `shipping_cs` 는 doc 최상위라 행에 실린 적이 없었다 → `ATTR_FIELDS['shipping_cs']` 는 그동안
+  죽은 코드였고 `top_points` 의 배송 집계도 상시 0. `relevance_meta` 와 같은 규칙으로 제품별
+  팬아웃 행에 복제. 렌더 조각도 `가격:` → `배송·CS:`.
+- `app/ui.py` — `_render_review_block` 에 `**배송·CS**` 줄(빈 섹션은 통째 생략).
+- 골드·프롬프트 문서에서 `value` 제거, [ADR-0008](docs/adr/0008-drop-value-add-shipping-section.md) 신설.
+
+**테스트**: 오프라인 8종 전량 그린(`test_consolidated_sections` 9케이스 — 섹션 흐름 + 복제 계약 2건
+신설) · 골드 무결성 통과 · 스키마 동등성(단건↔스레드) 확인. 추가로 **실 pgvector + BGE-M3 실경로
+검증**(LLM 0호출, `post_id` 태그로 격리 후 삭제·53행 원상복구): 비교글 2행 팬아웃 전부에 복제,
+배송 미언급 대조군은 키 없음, `_records_for`→요약 프롬프트 유입, `top_points` 에 배송 첫 집계.
+기존 53행 중 `attributes ? 'shipping_cs'` 가 **0건**이라는 실측이 죽은 코드 판정의 근거.
+
+**AI생성 vs 사람수정**: 사람수정 0건. 사용자 결정 1건(섹션 승격 vs 축 이동).
+
+**남은 것**: Render 배포(마지막 하드게이트). 실 LLM 이 `shipping` 섹션을 실제로 채우는지(스키마는
+키 존재만 강제)는 유료 호출이라 미검증 — 라우팅 품질은 전언 하드닝과 같은 부류의 리스크.

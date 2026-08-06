@@ -94,11 +94,6 @@ _PRODUCT_PROPS: dict = {
         "sentiment": {"type": "string", "enum": SENTIMENT},
         "evidence": _nstr(),
     }, description="제품 수명만('빨리 죽음/오래 감'). 배송 속도·도착 여부는 여기 아님 → shipping_cs."),
-    "value": _nullable_obj({
-        "krw": {"type": ["integer", "null"]},
-        "sentiment": {"type": "string", "enum": SENTIMENT},
-        "evidence": _nstr(),
-    }),
     "overall": _obj({
         "stated_rating": {"type": ["number", "null"]},   # 작성자 명시 점수만
         "model_sentiment": {"type": "string", "enum": SENTIMENT},

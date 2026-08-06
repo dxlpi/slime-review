@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .db import connect
-from . import index
+from . import index, source_links
 from .llm_ops import LLM
 from .config import settings
 
@@ -44,10 +44,28 @@ def _where(filters: dict | None) -> tuple[str, list]:
     return ("WHERE " + " AND ".join(clauses)) if clauses else "", params
 
 
+# dense·sparse 가 공유하는 기본 SELECT 컬럼. 위치가 아니라 **이름**으로 묶는다 —
+# 예전엔 `r[6]`(tokens)·`r[:6]` 처럼 위치를 하드코딩해, 중간에 컬럼 하나만 끼워 넣어도
+# 예외 없이 BM25 가 엉뚱한 값을 먹었다. 이름 기반이면 그런 조용한 파손이 불가능해진다.
+_BASE_COLS = ("id", "source", "market", "product", "evidence", "attributes", "source_ref")
+_BASE_SELECT = ", ".join(_BASE_COLS)
+
+
+def _hit(cols: tuple[str, ...], row) -> dict:
+    """행 튜플 → 이름 붙은 dict. 길이가 어긋나면 조용히 잘리지 않고 즉시 터진다.
+
+    `zip` 은 기본적으로 짧은 쪽에 맞춰 **말없이 절단**한다 — SELECT 만 늘리고 cols 를 안 늘리면
+    컬럼이 사라진 채로 검색이 계속 돈다. strict=True(Py3.11+, CI 도 3.11)로 그걸 예외로 바꾼다.
+    """
+    if len(cols) != len(row):
+        raise ValueError(f"SELECT 컬럼 수 불일치: cols={len(cols)} row={len(row)}")
+    return dict(zip(cols, row, strict=True))
+
+
 def _dense(qvec, where: str, wparams: list, k: int, conn) -> list[dict]:
     rows = conn.execute(
         f"""
-        SELECT id, source, market, product, evidence, attributes,
+        SELECT {_BASE_SELECT},
                1 - (embedding <=> %s) AS score
         FROM reviews {where}
         ORDER BY embedding <=> %s
@@ -55,24 +73,25 @@ def _dense(qvec, where: str, wparams: list, k: int, conn) -> list[dict]:
         """,
         [qvec, *wparams, qvec, k],
     ).fetchall()
-    cols = ("id", "source", "market", "product", "evidence", "attributes", "score")
-    return [dict(zip(cols, r)) for r in rows]
+    cols = (*_BASE_COLS, "score")
+    return [_hit(cols, r) for r in rows]
 
 
 def _sparse(query: str, where: str, wparams: list, k: int, conn, cap: int = 500) -> list[dict]:
     rows = conn.execute(
-        f"SELECT id, source, market, product, evidence, attributes, tokens "
-        f"FROM reviews {where} LIMIT %s",
+        f"SELECT {_BASE_SELECT}, tokens FROM reviews {where} LIMIT %s",
         [*wparams, cap],
     ).fetchall()
     if not rows:
         return []
+    cols = (*_BASE_COLS, "tokens")
+    hits = [_hit(cols, r) for r in rows]
     from rank_bm25 import BM25Okapi
-    bm25 = BM25Okapi([r[6] or [] for r in rows])
+    bm25 = BM25Okapi([h["tokens"] or [] for h in hits])
     scores = bm25.get_scores(index._tokenize(query))
-    ranked = sorted(zip(rows, scores), key=lambda x: x[1], reverse=True)[:k]
-    cols = ("id", "source", "market", "product", "evidence", "attributes")
-    return [dict(zip(cols, r[:6]), score=float(s)) for r, s in ranked]
+    ranked = sorted(zip(hits, scores, strict=True), key=lambda x: x[1], reverse=True)[:k]
+    # tokens 는 BM25 입력일 뿐 소비자(융합·인용)에겐 노이즈 → 여기서 떨군다.
+    return [{**{c: h[c] for c in _BASE_COLS}, "score": float(s)} for h, s in ranked]
 
 
 def _rrf(dense: list[dict], sparse: list[dict], top_k: int) -> list[dict]:
@@ -118,8 +137,11 @@ def answer(query: str, *, filters: dict | None = None, top_k: int = 8) -> Answer
     prompt = f"질문: {query}\n\n근거:\n{_format_context(chunks)}\n\n위 근거만으로 답하라."
     text = LLM().complete(prompt, system=_ANSWER_SYSTEM,
                           model=settings.model_judge, label="search.answer")
+    # url: 근거를 원문에서 검증할 수 있게 한다(AI 요약 불신 대응). `.get` 이라 옛 청크 모양이
+    # 섞여 들어와도 예외 없이 '링크 없음'으로 degrade — 틀린 링크보다 링크 없음이 낫다.
     citations = [{"n": i, "source": c["source"], "market": c["market"],
-                  "product": c["product"], "evidence": c["evidence"]}
+                  "product": c["product"], "evidence": c["evidence"],
+                  "url": source_links.permalink(c.get("source_ref"))}
                  for i, c in enumerate(chunks, 1)]
     return Answer(text, citations)
 

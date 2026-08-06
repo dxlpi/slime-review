@@ -18,4 +18,6 @@ kiwipiepy>=0.18           # 한국어 형태소 토큰화(하이브리드 키워
 rank-bm25>=0.2            # BM25
 
 # --- UI (Phase 6) ---
-streamlit>=1.36
+streamlit>=1.58           # `st.iframe`(판매자 IG 임베드) 하한. 구버전엔 이 최상위 API 가 없어
+                          # 새 배포에서 렌더 시점 AttributeError 가 난다 — 배포가 마지막 하드게이트라
+                          # 하한을 실제 검증한 버전으로 올린다(`st.components.v1.iframe` 는 폐기 예정).

@@ -84,8 +84,16 @@ def _render_review_block(title: str, block: dict | None, meta: str | None = None
             st.markdown(f"- ➖ {c}")
 
 
+_EMBED_HEIGHT = 560          # 인스타 임베드 카드 고정 높이(px)
+
+
 def _render_spec(spec: dict) -> None:
-    """1층 공식 스펙 카드 — specs 행 그대로의 결정적 표시. 후기(2층) 요약과 완전 분리."""
+    """1층 공식 스펙 카드 — specs 행 그대로의 결정적 표시. 후기(2층) 요약과 완전 분리.
+
+    판매자 본인 게시물(=1층 공식 스펙)만 미디어를 임베드한다. 유저 후기 미디어는 어떤
+    경로로도 임베드하지 않는다. 임베드 여부 판단은 `source_links.embed_url` 이 하고
+    (정책은 UI 밖), 여기선 그 결과를 그리기만 한다.
+    """
     c1, c2, c3 = st.columns(3)
     c1.metric("공식 향료", spec.get("official_scent") or "—")
     c2.metric("풀조합", spec.get("base_combo") or "—")
@@ -93,8 +101,16 @@ def _render_spec(spec: dict) -> None:
     beads = spec.get("beads") or []
     if beads:
         st.caption("비즈: " + ", ".join(beads))
+    embed = source_links.embed_url(spec)
+    if embed:
+        # 높이는 고정 — iframe 내용 높이를 서버에서 알 수 없다(height='content' 는 동일출처 전용).
+        st.iframe(embed, height=_EMBED_HEIGHT)
+        st.caption(source_links.EMBED_PRIVACY_CAPTION)
     url = spec.get("source_permalink")
     if url:
+        # 임베드가 떠도 텍스트 링크는 **항상** 남긴다 — 삭제·비공개 게시물이면 프레임 안에
+        # 인스타 에러 화면이 뜨고, 브라우저가 서드파티 프레임을 막으면 빈 칸이 되는데
+        # 둘 다 서버에선 감지할 수 없다. 링크가 유일한 폴백이다.
         st.caption(f"공식 스펙 출처: [인스타 게시물]({url})")
 
 

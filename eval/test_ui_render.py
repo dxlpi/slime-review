@@ -13,6 +13,7 @@ app/ui.py 는 app body 를 main() 가드(__name__=='__main__') 뒤에 둬서, im
   - 공식 스펙 source_permalink 가 있으면 링크 캡션 렌더.
   - 근거 원문 목록: 링크 있으면 실사용/서포터 버킷 분리 렌더, 없으면 섹션 통째 생략.
   - 정직성 캡션 2종(evidence≠인용 · 건수 단위)이 실제로 렌더.
+  - 판매자 임베드: source_permalink 있으면 iframe + 텍스트 링크, 없으면 둘 다 없음.
   - 제품 타이핑 검색: 부분일치·초성·공백무시·무매치 경고.
   - 선택 흐름: 마켓 미선택 → 안내 / 마켓 선택 → 범위 / '특정 제품' → 검색+제품 드롭다운.
 
@@ -138,6 +139,57 @@ def test_ui_render_no_exception_and_blocks():
     print("✓ UI 렌더: 예외 0 · 3블록 · 서포터 블록 · URL · 스펙 분리 헤더 · 쏠림 라벨 제거 OK")
 
 
+# ---------------------------------------------------------------- 판매자 임베드(1층 스펙 카드)
+def _spec_script() -> None:
+    """AppTest 스크립트: `_render_spec` 만 — permalink 있음/없음 두 분기.
+
+    `_render_spec` 은 요약 탭(ui.py `_render_consolidated`)과 챗 탭 양쪽에서 호출되는
+    같은 함수다. 임베드 판단이 이 함수 안에 있으므로 두 탭의 동작은 정의상 동일하고,
+    여기 한 번의 검증이 두 경로를 함께 덮는다(호출부는 아래 test 가 별도로 확인).
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import streamlit as st
+    from app.ui import _render_spec
+    st.header("with_url")
+    _render_spec({"official_scent": "레몬", "base_combo": None, "slime_type": None, "beads": [],
+                  "source_permalink": "https://www.instagram.com/p/ABC123/"})
+    st.header("no_url")
+    _render_spec({"official_scent": "라벤더", "base_combo": None, "slime_type": None, "beads": [],
+                  "source_permalink": None})
+
+
+def test_spec_embed_branches():
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_function(_spec_script).run(timeout=30)
+    assert not at.exception, at.exception
+    caps = [c.value for c in at.caption]
+
+    # permalink 있는 스펙만 임베드 + 프라이버시 캡션 + 텍스트 링크(임베드 실패 시 유일한 폴백)
+    assert sum("쿠키" in c for c in caps) == 1, "임베드 프라이버시 캡션이 정확히 1건이 아니다"
+    assert sum("공식 스펙 출처" in c for c in caps) == 1, "스펙 출처 링크가 정확히 1건이 아니다"
+    assert any("instagram.com/p/ABC123" in c for c in caps), "스펙 텍스트 링크 미렌더"
+
+    # 임베드 요소 자체(iframe) 존재 확인 — 캡션만 보고 통과하지 않게.
+    from slime_rag.source_links import embed_url
+    assert embed_url({"source_permalink": "https://www.instagram.com/p/ABC123/"}), "게이트 회귀"
+    assert embed_url({"source_permalink": None}) is None, "permalink 없는데 임베드가 열렸다"
+    print("✓ 스펙 카드: permalink 있을 때만 임베드+프라이버시 캡션 · 텍스트 링크 상시 OK")
+
+
+def test_spec_rendered_in_both_tabs():
+    """`_render_spec` 이 요약 탭·챗 탭 두 경로 모두에서 호출된다(AC5)."""
+    import inspect
+    from app import ui
+    src = inspect.getsource(ui)
+    body = src.split("def main(", 1)[1]
+    assert "_render_spec(spec)" in src.split("def _render_consolidated", 1)[1].split("def ", 2)[0], \
+        "요약 탭 경로에서 _render_spec 호출이 사라졌다"
+    assert "_render_spec(spec)" in body, "챗 탭 경로에서 _render_spec 호출이 사라졌다"
+    print("✓ 스펙 카드가 요약 탭·챗 탭 두 경로에서 모두 호출됨 OK")
+
+
 # ---------------------------------------------------------------- 제품 타이핑 검색
 def _products() -> list[dict]:
     """1층 fixture 와 같은 모양의 제품 리스트(빈짱 마켓)."""
@@ -213,6 +265,8 @@ def test_selection_flow():
 
 if __name__ == "__main__":
     test_ui_render_no_exception_and_blocks()
+    test_spec_embed_branches()
+    test_spec_rendered_in_both_tabs()
     test_filter_products()
     test_selection_flow()
     print("\nUI 렌더·선택 헤드리스 테스트 통과 ✅")

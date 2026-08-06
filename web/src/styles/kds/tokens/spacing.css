@@ -1,0 +1,27 @@
+:root{
+--kds-spacing-50: 2px;   /* the only exception to the 4px cadence */
+--kds-spacing-100: 4px;
+--kds-spacing-200: 8px;
+--kds-spacing-300: 12px;
+--kds-spacing-400: 16px;
+--kds-spacing-500: 20px;
+--kds-spacing-600: 24px;
+--kds-spacing-700: 28px;
+--kds-spacing-800: 32px;
+--kds-spacing-900: 36px;
+--kds-spacing-1000: 40px;
+--kds-spacing-1100: 44px;
+--kds-spacing-1200: 48px;
+--kds-spacing-1300: 52px;
+--kds-spacing-1400: 60px;  /* non-arithmetic jump: +8 */
+--kds-spacing-1500: 72px;  /* non-arithmetic jump: +12 */
+
+/* fixed heights from the component specs */
+--kds-field-h-l: 50px;  /* MO only */
+--kds-field-h-m: 44px;  /* PC only */
+--kds-field-h-s: 38px;
+--kds-badge-h: 22px;
+--kds-icon: 24px;
+--kds-icon-bottomnav: 26px;
+--kds-avatar-xl: 55px;
+}

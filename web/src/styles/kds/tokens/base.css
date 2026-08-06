@@ -1,0 +1,4 @@
+body{font-family:var(--kds-font-sans);letter-spacing:var(--kds-tracking);color:var(--kds-fg);background:var(--kds-bg);-webkit-font-smoothing:antialiased}
+a{color:var(--kds-accent);text-decoration:none}
+a:hover{color:var(--kds-accent-press);text-decoration:underline}
+*{box-sizing:border-box}

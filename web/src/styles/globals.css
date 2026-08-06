@@ -1,0 +1,29 @@
+/* 전역 스타일 진입점 — 여기서만 import 순서를 정한다.
+ *
+ * 순서가 계약이다:
+ *   1. KDS 원본 토큰 (색/여백/타이포/모션) — `kds/` 아래는 손대지 않는다
+ *   2. 슬믈리에 액센트 오버라이드 — KDS 기본 파랑을 민트로 덮는다
+ *
+ * 뒤집으면 액센트가 KDS 기본값에 먹힌다.
+ */
+
+@import "./kds/styles.css";
+@import "./slime-accent.css";
+
+/* body 의 font/color/background 는 KDS `tokens/base.css` 가 이미 건다 — 여기서
+ * 다시 선언하지 않는다(중복 선언은 나중에 어느 쪽이 진짜인지 헷갈리게 만든다). */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+/* 디자인의 `style-hover="background:var(--kds-gray-100)"` 대응.
+ * 인라인 style 로는 :hover 를 못 걸어서 이것만 클래스로 뺐다(정렬 메뉴 항목). */
+.sortMenuItem:hover {
+  background: var(--kds-gray-100);
+}

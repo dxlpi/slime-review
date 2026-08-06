@@ -1,0 +1,6 @@
+:root{
+--kds-ease: cubic-bezier(0.4,0,0.2,1); /* @kind other */
+--kds-duration-fast: 150ms; /* @kind other */
+--kds-duration-base: 240ms; /* @kind other */
+--kds-toast-dwell: 4000ms; /* @kind other */
+}

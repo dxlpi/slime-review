@@ -1,0 +1,29 @@
+/* 슬믈리에 민트 액센트 — KDS **위에 덧씌운** 슬라임 커스텀.
+ *
+ * KDS 기본 액센트는 파랑이다. 아래 값들은 디자인 파일(`Slime Search.dc.html`)의 `:root`
+ * 오버라이드에서 그대로 가져온 것으로, **교보 디자인 시스템의 일부가 아니다**.
+ * 그래서 `kds/tokens/` 안에 섞지 않고 이 파일로 분리한다 — 토큰 폴더는 KDS 원본과
+ * 바이트 단위로 같게 유지해야 나중에 KDS 를 갱신할 때 무엇이 우리 것인지 구분된다.
+ *
+ * ⚠️ 이 파일은 `kds/styles.css` **다음에** import 되어야 한다(나중 선언이 이긴다).
+ */
+
+:root {
+  --kds-accent: #7ed9a5;
+  --kds-accent-press: #5fc38a;
+  --kds-accent-subtle: #e8f8ef;
+  --kds-fg-on-accent: #10352a;
+  --kds-accent-text: #16704a;
+
+  /* 디자인 파일엔 변수가 아니라 `a:hover { color:#0F5236 }` 규칙으로 있었다.
+   * 다섯 개와 같은 계열이므로 변수로 승격해 한자리에 모은다. */
+  --kds-accent-hover: #0f5236;
+}
+
+a {
+  color: var(--kds-accent-text);
+}
+
+a:hover {
+  color: var(--kds-accent-hover);
+}

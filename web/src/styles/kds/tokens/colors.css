@@ -1,0 +1,77 @@
+:root{
+/* ── Brand identity — LOGO ONLY. Never a UI action colour. ───────────── */
+--kds-brand-navy: oklch(0.340 0.126 258);
+--kds-brand-green: oklch(0.670 0.188 141);
+
+/* ── Blue ramp (core = 700, the UI action colour) ───────────────────── */
+--kds-blue-100: oklch(0.949 0.015 282);
+--kds-blue-200: oklch(0.876 0.036 282);
+--kds-blue-300: oklch(0.774 0.066 282);
+--kds-blue-400: oklch(0.669 0.096 281);
+--kds-blue-500: oklch(0.586 0.117 280);
+--kds-blue-600: oklch(0.531 0.134 278);
+--kds-blue-700: oklch(0.494 0.144 277);
+--kds-blue-800: oklch(0.423 0.126 277);
+--kds-blue-900: oklch(0.339 0.096 278);
+
+/* ── Green ramp (core = 600/700, Positive) ──────────────────────────── */
+--kds-green-100: oklch(0.959 0.027 135);
+--kds-green-200: oklch(0.904 0.066 136);
+--kds-green-300: oklch(0.829 0.117 137);
+--kds-green-400: oklch(0.756 0.161 138);
+--kds-green-500: oklch(0.703 0.183 139);
+--kds-green-600: oklch(0.662 0.188 139);
+--kds-green-700: oklch(0.662 0.188 139);
+--kds-green-800: oklch(0.562 0.162 139);
+--kds-green-900: oklch(0.453 0.129 139);
+
+/* ── Red ramp — 500 = Negative, 600/700 = Hottracks sub-brand ───────── */
+--kds-red-100: oklch(0.949 0.021 14);
+--kds-red-200: oklch(0.857 0.062 15);
+--kds-red-300: oklch(0.742 0.123 17);
+--kds-red-400: oklch(0.643 0.185 22);
+--kds-red-500: oklch(0.603 0.232 26);
+--kds-red-600: oklch(0.571 0.216 26);
+--kds-red-700: oklch(0.571 0.216 26);
+--kds-red-800: oklch(0.483 0.188 27);
+--kds-red-900: oklch(0.384 0.147 26);
+
+/* ── Grayscale ──────────────────────────────────────────────────────── */
+--kds-gray-50: oklch(0.988 0 0);
+--kds-gray-100: oklch(0.970 0.003 265);
+--kds-gray-200: oklch(0.940 0.004 271);
+--kds-gray-300: oklch(0.912 0.006 265);
+--kds-gray-400: oklch(0.845 0.009 265);
+--kds-gray-500: oklch(0.737 0.012 264);
+--kds-gray-600: oklch(0.615 0.015 262);
+--kds-gray-700: oklch(0.434 0.014 264);
+--kds-gray-800: oklch(0.313 0.013 267);
+--kds-gray-900: oklch(0.231 0.010 268);
+--kds-white: oklch(1 0 0);
+--kds-black: oklch(0 0 0);
+
+/* ── Semantic roles (light mode only — no dark palette is published) ── */
+--kds-fg: var(--kds-gray-900);
+--kds-fg-secondary: var(--kds-gray-700);
+--kds-fg-tertiary: var(--kds-gray-500);
+--kds-fg-disabled: var(--kds-gray-400);
+--kds-fg-on-accent: var(--kds-white);
+--kds-bg: var(--kds-white);
+--kds-bg-subtle: var(--kds-gray-100);
+--kds-bg-muted: var(--kds-gray-200);
+--kds-border: var(--kds-gray-300);
+--kds-border-strong: var(--kds-gray-400);
+--kds-accent: var(--kds-blue-700);
+--kds-accent-press: var(--kds-blue-800);
+--kds-accent-subtle: var(--kds-blue-100);
+--kds-positive: var(--kds-green-600);
+--kds-negative: var(--kds-red-500);
+--kds-hottracks: var(--kds-red-600);
+
+/* ── Decorative opacity tokens — decorative UI only, never text ─────── */
+--kds-opacity-90: 0.9; /* @kind other */
+--kds-opacity-70: 0.7; /* @kind other */
+--kds-opacity-50: 0.5; /* @kind other */
+--kds-opacity-30: 0.3; /* @kind other */
+--kds-opacity-10: 0.1; /* @kind other */
+}

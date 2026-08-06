@@ -1,0 +1,7 @@
+:root{
+/* Only three shadow tokens exist. All soft, all downward. */
+--kds-shadow-green-100: 0px 4px 8px 0px oklch(0.662 0.188 139 / 0.40);
+--kds-shadow-gray-100: 0px 5px 10px 0px oklch(0 0 0 / 0.10);
+--kds-shadow-gray-200: 0px 20px 40px 0px oklch(0 0 0 / 0.10);
+--kds-hairline: 1px solid var(--kds-border);
+}

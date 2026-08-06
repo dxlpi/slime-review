@@ -65,6 +65,18 @@ python -m slime_rag.search    # hybrid search + grounded answers
 
 - **Responsible collection**: respect robots, delay between requests, cap pages, never redistribute
   source text (snippets only).
+- **Verifiable against the original**: every displayed piece of evidence links back to its source post.
+  Links and the seller-media embed are **references, not copies** — only addresses are stored and the
+  bytes are served by the origin, so nothing is downloaded or re-hosted
+  ([ADR-0009](docs/adr/0009-source-links-and-owner-media.md)). Evidence text is a structured rendering,
+  not a quote — the UI says so next to the link.
+
+> **Deployment note — third-party iframe.** Official-spec cards embed the seller's own Instagram post
+> via `instagram.com/p/<shortcode>/embed`. That is a third-party frame: it sets Instagram cookies in the
+> viewer's browser, and a browser or extension that blocks third-party frames leaves an empty box the
+> server cannot detect. A text link is therefore always kept below the embed, and the card carries a
+> caption saying both things. The endpoint is undocumented (the official oEmbed **API** needs App
+> Review — the same wall as ADR-0003) and may break without notice; when it does, the link remains.
 - **Grounded output**: unmentioned → `null`, per-field evidence snippets, and stated (by the author)
   kept distinct from inferred (by the model).
 - **Bias made visible**: no averaging — per source, plus the gap. Label it rather than correct it.

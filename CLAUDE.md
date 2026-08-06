@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [app](app/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -41,9 +41,18 @@ something to correct for** — never average it; show it per source, plus the ga
   persists to the DB (`reviews.relevance_meta` JSONB — hard gate #3 failure tracing); the extraction
   batch cap stays 12 by measured cache hard-stop (`Settings.max_thread_sources`,
   [extract.py](slime_rag/extract.py) evidence comment).
+- **Source links are shipped** ([ADR-0009](docs/adr/0009-source-links-and-owner-media.md)):
+  `reviews.source_ref` (JSONB identifier, not a baked URL) → `slime_rag/source_links.py` (pure policy,
+  CI-gated) → chat citations + a summary "근거 원문" list. DC comment **anchors do not exist**
+  (verified live 2026-08-06 — comments are AJAX-rendered), so comment links resolve to the thread URL
+  and the collector's `#cmt` is stripped; `comment_no` is preserved as option value only.
+  The seller-media embed is fail-closed and currently renders **nothing**, because every fixture
+  `source_permalink` is null — it switches on the moment tranche 2 URLs land.
 - Still to do: the ADR-0007 re-ruling (above) · expand the entity-linking gold set
   ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
-  toxicity filter criteria.
+  toxicity filter criteria · **two user inputs for the link feature**: the gold record's amos thread
+  URL (`eval/layer2_gold.json` → `source.url`, the only thing between here and a link visible in the
+  deployed demo) and the six fixture product IG permalinks (`data/layer1_fixture.json`).
 
 ## Frequently used commands
 ```bash
@@ -71,5 +80,9 @@ python .github/scripts/validate_context_paths.py               # context path in
   (`consolidated_view.py`), not from the LLM.
 - **The LLM vendor is a dependency of `llm_ops.py` only.** New sources and models go behind the interface.
 - **Responsible collection**: robots, delays, page caps, no redistribution of source text (snippets only).
+  Links and the seller-media embed are **references, not copies** — only addresses are stored, bytes stay
+  on the origin ([ADR-0009](docs/adr/0009-source-links-and-owner-media.md)). Never download or re-host.
+  Embed seller (Layer 1) posts only; never user-review media. A wrong link is worse than no link —
+  if the identifier is missing, render text with no link.
 - Determinism comes from structured outputs (strict), with one retry on parse failure.
   ⚠️ Do not send `temperature` for GPT-5-family models.

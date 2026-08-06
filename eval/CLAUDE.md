@@ -13,9 +13,10 @@
 | `test_relevance_gate.py` | 관련성 게이트 — topic/domain 축 + **M/Q/E 3축**(KAX-AC4~AC10: chrome-strip·평서형 종결어미·전언 분리·편향 보존·순위/예산) |
 | `test_extract_hearsay.py` | 전언 하드닝(AC15) — 프롬프트 스냅샷 + `firsthand_evidence` 결정적 게이트 + 실호출 통합 |
 | `test_extract_thread.py` | 스레드 배치 추출(AC12/AC13) — 호출 수·조각별 귀속·누락 패딩 + 형제 댓글 문맥 복원. `--batch-size`(반복 가능) + `gold/thread_gold.json` 기반 귀속 채점(`grade_thread_attribution`) |
-| `test_index_meta.py` | `index_post` 의 `relevance_meta` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL (무네트워크·무모델) |
+| `test_index_meta.py` | `index_post` 의 `relevance_meta`·`source_ref` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL/팬아웃 복제 (무네트워크·무모델). 파라미터는 **컬럼 이름**으로 찾는다 |
+| `test_source_links.py` | 원문 링크 **정책**(순수) — `permalink` degrade·`#cmt` 제거 · 식별자 조립 · 한 스레드 댓글 distinct · `embed_url` 게이트 · 근거 목록 그룹핑 · 댓글 id 보존 · 캡션 계약 |
 | `gold/thread_gold.json` | 스레드 골드 — 실제 디시 3스레드 51조각, 조각별 `mentioned_product` 라벨(~200자 스니펫 정책) |
-| `test_ui_render.py` | UI 헤드리스(AppTest) — 종합뷰 3블록·URL 링크·빈 섹션 생략 + **제품 타이핑 검색**(부분일치/공백무시/초성)·**선택 흐름**(마켓→범위→제품→무매치), 예외 0 |
+| `test_ui_render.py` | UI 헤드리스(AppTest) — 종합뷰 3블록·URL 링크·빈 섹션 생략 + **근거 원문 목록**(버킷 분리·구성 라벨·정직성 캡션 2종)·**판매자 임베드 양분기** + **제품 타이핑 검색**(부분일치/공백무시/초성)·**선택 흐름**(마켓→범위→제품→무매치), 예외 0 |
 | `layer2_gold.json` | 2층 추출 골드셋(사람 검수, 현재 비교글 1건) |
 
 ## Common patterns (workflow)
@@ -24,6 +25,8 @@ source .venv/bin/activate
 python -m eval.test_bias          # 모든 bias 오프라인 테스트
 python -m eval.test_apify_source  # Apify 어댑터 오프라인 테스트
 python -m eval.test_relevance_gate   # 관련성 3축 게이트 회귀
+python -m eval.test_source_links     # 원문 링크·임베드 정책(CI 게이트)
+python -m eval.test_ui_render        # 렌더 배선(streamlit 필요 — 로컬 게이트)
 python -m eval.test_extract_thread   # 스레드 배치(키 없으면 실호출 케이스만 skip)
 python -m evals.run               # 추출/개체연결 pass-rate 지표 (→ ../evals/CLAUDE.md)
 ```

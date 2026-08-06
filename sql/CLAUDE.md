@@ -11,8 +11,9 @@ dense 벡터(BGE-M3) + BM25(앱단)로 하이브리드. `docker-compose.yml` 이
 
 ## Schema 요약
 - `specs (market, product, scent, base_combo, slime_type, beads[])` · UNIQUE(market, product)
-- `reviews (source, market, product, spec_id→specs, review_class, attributes JSONB, relevance_meta JSONB, embedding vector(1024), tokens[])`
+- `reviews (source, market, product, spec_id→specs, review_class, attributes JSONB, relevance_meta JSONB, source_ref JSONB, embedding vector(1024), tokens[])`
   — `relevance_meta` = 관련성 게이트 판정 전문(M/Q/E·topic_score·target/target_scope/τ·rank_score, ADR-0007). 게이트 미경유 행은 NULL.
+  — `source_ref` = 원문 조각 식별자 `{platform,url,thread_no,comment_no,shortcode}`(ADR-0009). URL 이 아니라 **식별자**를 저장하고 렌더는 `slime_rag/source_links.py` 가 한다. 미보유 행은 NULL.
 - 조인 키: `reviews.spec_id → specs.id`. 메타필터 컬럼: `market`, `slime_type`, `source`, `review_class`.
 
 ## Common patterns (workflow)
@@ -24,6 +25,10 @@ psql postgresql://localhost:55432 -f sql/schema.sql   # 수동 재적용(멱등)
 
 ## Non-obvious (주의 / Gotcha)
 - **Important:** 원문 미재배포 — 본문 전체가 아니라 `evidence` 스니펫 + 임베딩만 저장(저작권).
+  `source_ref` 도 **주소만** 담는다(참조지 복제가 아님, ADR-0009).
+- **Warning:** `source_ref` 는 **백필하지 않는다**. 기존 행은 NULL 로 남고 `index_gold` 가 존재
+  `post_id` 를 스킵하므로 `setup(reset=False)` 로는 안 채워진다 → 데모 DB 는 `setup(reset=True)` 재적재.
+  ⚠️ `setup()` 이 재생성하는 건 fixture+골드뿐이라 **라이브 수집분은 리셋으로 사라진다**(git 에 없음).
 - **Note:** `review_class` 기본 `'genuine'` — 홍보성(`'promo'`)은 별도 버킷으로 집계 분리(평균 금지).
 - **Warning:** `embedding` 은 1024차원 고정(BGE-M3). 임베딩 모델 바꾸면 차원·인덱스 재생성 필요.
 - **Note:** 후기 규모 커지면 HNSW 가 IVFFlat 보다 관리 쉬움(현재 HNSW).

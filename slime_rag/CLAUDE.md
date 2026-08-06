@@ -16,6 +16,7 @@ DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [A
 | `bias.py` | 편향 태깅(IG) — 홍보성 게이트→LLM 캐스케이드, 판매자 라우팅 `partition` |
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
+| `source_links.py` | 원문 링크 정책(순수) — `permalink`/`embed_url`/`evidence_group_key`/`build_source_ref`/`group_evidence_sources`. DB·네트워크·streamlit 무의존 |
 | `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(향/질감/배송·CS/장단점 섹션, 미언급=빈칸; 홍보성 분리). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
@@ -51,6 +52,17 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
 - **Important:** 그런데 `attributes` JSONB 에 들어가는 건 제품 항목뿐이라, `index_post` 가
   `shipping_cs` 를 제품별 팬아웃 행마다 **복제**해 넣는다. 이 복제를 빼면 종합뷰의
   배송·CS 섹션이 예외 없이 조용한 빈칸이 된다(2026-08-05 `value` 축 교체 시 발견).
+- **Important:** `source_ref`(원문 링크 식별자)는 조각 단위 속성이라 팬아웃 행마다 **복제**되지만
+  `relevance_meta` 와 소비 방식이 다르다 — 저건 행 단위 집계 입력이고 이건 식별자라 **읽는 쪽에서
+  중복 제거**(`source_links.evidence_group_key`)가 필요하다. 안 하면 한 조각이 제품 수만큼 링크로 도배된다.
+- **Don't:** `_records_for` 가 rec 에 넣는 값을 요약 프롬프트로 흘리지 말 것. `_source_material` 의
+  `ATTR_FIELDS`/`_SALIENT` **화이트리스트**가 `source_ref`(URL·id)의 LLM 유출을 막는 유일한 장치다 —
+  payload 를 '남는 키 전부 통과'로 넓히면 그 보장이 사라진다.
+- **Warning:** 디시 댓글 **점프 앵커는 없다**(2026-08-06 라이브 확인 — 댓글이 AJAX 렌더라 서버 HTML 에
+  앵커 부재). 댓글 링크는 스레드 URL 로 가고 수집기가 굽는 `#cmt` 는 `permalink()` 가 제거한다.
+  `comment_no` 는 나중에 켤 옵션으로 보존만 한다([ADR-0009](../docs/adr/0009-source-links-and-owner-media.md)).
+- **Note:** `search._dense`/`_sparse` 는 **명명 인덱스**로만 행을 읽는다(`_BASE_COLS`). 예전의
+  `r[6]`/`r[:6]` 위치 하드코딩은 컬럼 하나 삽입만으로 **무예외** BM25 파손을 냈다 — 되돌리지 말 것.
 - **Note:** 제품 단위 평가 축은 향/질감/소리/지속력 넷 — **`value`(가성비) 축은 제거됨**(2026-08-05,
   [ADR-0008](../docs/adr/0008-drop-value-add-shipping-section.md)). 가격 얘기는 pros/cons 로만 흐른다.
 

@@ -511,6 +511,66 @@ def consolidated_for(market: str, product: str, *, with_summary: bool = True) ->
                                  official_spec, records, llm_sectionize=sectionize)
 
 
+# ---------------------------------------------------------------- 요약 생성·저장(미리 만들어 두기)
+def generate_summaries(market: str, product: str) -> dict:
+    """리뷰 요약을 **한 번 생성해 DB 에 저장**한다. 반환: 저장한 payload.
+
+    왜 저장하나(2026-08-06 사용자 결정): 화면이 열릴 때마다 LLM 을 부르면 방문마다 과금된다.
+    발표용 데모라 요약은 미리 만들어 두고 화면은 읽기만 한다 — `stored_summaries()`.
+
+    ⚠️ 유료 호출이다. 근거 후기가 늘어 다시 만들고 싶을 때만 부를 것(멱등 upsert).
+    ⚠️ `market` 은 **DB 마켓 키**다 — 화면 표시명이 아니다(`지나` O / `슬라임지나` X).
+
+    근거 0건이면 저장하지 않고 예외를 낸다. 예전엔 조용히 빈 payload 를 저장했는데, 그러면
+    `stored_summaries` 는 '요약 있음'으로 읽고 화면엔 영영 '아직 생성하지 않았어요'가 뜬다 —
+    원인이 화면 어디에도 안 보인다. 실제로 표시명으로 불러 그 행을 만든 적이 있다(2026-08-06).
+    """
+    from psycopg.types.json import Jsonb
+    view = consolidated_for(market, product, with_summary=True)
+    payload = view.get("review_summaries") or {}
+    n = view.get("n_reviews") or 0
+    if n == 0:
+        # 오타인지 마켓 키가 틀린 건지 여기서 갈린다 — 같은 제품을 가진 실제 키를 함께 보여준다.
+        with connect() as conn:
+            keys = [r[0] for r in conn.execute(
+                "SELECT DISTINCT market FROM reviews WHERE product=%s AND market IS NOT NULL "
+                "ORDER BY market", (product,)).fetchall()]
+        raise ValueError(
+            f"'{market}/{product}' 에 근거 후기가 0건이라 요약을 저장하지 않았다"
+            + (f" — 이 제품의 실제 마켓 키: {keys}" if keys else " — 이 제품 자체가 DB 에 없다")
+            + ". market 은 DB 키이고 화면 표시명이 아니다."
+        )
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO review_summaries (market, product, payload, model, n_reviews, generated_at)
+            VALUES (%s,%s,%s,%s,%s, now())
+            ON CONFLICT (market, product) DO UPDATE SET
+              payload=EXCLUDED.payload, model=EXCLUDED.model,
+              n_reviews=EXCLUDED.n_reviews, generated_at=now()
+            """,
+            (market, product, Jsonb(payload), settings.model_judge, n),
+        )
+        conn.commit()
+    log.info("요약 생성·저장: %s/%s (근거 %d건)", market, product, n)
+    return payload
+
+
+def stored_summaries(market: str, product: str) -> dict | None:
+    """저장된 요약 → `{payload, model, n_reviews, generated_at}`. 없으면 None(=아직 미생성).
+
+    화면은 **이 함수만** 쓴다. 여기서 없다고 생성으로 넘어가면 결국 로드마다 과금된다.
+    """
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT payload, model, n_reviews, generated_at FROM review_summaries "
+            "WHERE market=%s AND product=%s", [market, product]).fetchone()
+    if not row:
+        return None
+    return {"payload": row[0], "model": row[1], "n_reviews": row[2],
+            "generated_at": row[3].isoformat() if row[3] else None}
+
+
 def consolidated_for_market(market: str, *, with_summary: bool = True) -> dict:
     """마켓 단위 종합 뷰 — 이 마켓의 후기 전 행(제품 연결 보류 행 포함) 집계.
 

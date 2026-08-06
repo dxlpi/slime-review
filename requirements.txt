@@ -27,3 +27,9 @@ Pillow>=10.0              # 아바타를 320px 로 **로컬 강제**. 실측(202
 streamlit>=1.58           # `st.iframe`(판매자 IG 임베드) 하한. 구버전엔 이 최상위 API 가 없어
                           # 새 배포에서 렌더 시점 AttributeError 가 난다 — 배포가 마지막 하드게이트라
                           # 하한을 실제 검증한 버전으로 올린다(`st.components.v1.iframe` 는 폐기 예정).
+
+# --- API (Phase 6) ---
+# 프런트엔드는 `web/`(Vite+React, npm)이라 여기 없다(ADR-0012). 파이썬 쪽은 그 화면이
+# 백엔드를 보는 창구인 HTTP API 만 담당한다 — `api/main.py` 는 pipeline 호출 + 직렬화뿐.
+fastapi>=0.115
+uvicorn[standard]>=0.30

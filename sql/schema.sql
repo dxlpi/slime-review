@@ -89,3 +89,17 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS views        INTEGER;     -- 디시
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment_count INTEGER;    -- 디시 댓글 수 / 인스타 댓글 수
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_up     INTEGER;     -- 디시 추천
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_down   INTEGER;     -- 디시 비추천(화면 미표시, 무손실 보관)
+
+-- 리뷰 요약 저장 (2026-08-06 사용자 결정: 미리 생성 → 저장 → 화면은 읽기만).
+-- 페이지 로드마다 LLM 을 부르면 열 때마다 과금된다. 발표용으로 한 번 만들어 두고 재사용한다.
+-- payload = {instagram|dcinside|integrated: {texture,scent,sound,longevity,cs,shipping,pros,cons}}
+--           — 키는 consolidated_view.CRITERIA 가 단일 출처다(스키마·프롬프트·화면표가 공유).
+CREATE TABLE IF NOT EXISTS review_summaries (
+  market       TEXT NOT NULL,
+  product      TEXT NOT NULL,
+  payload      JSONB NOT NULL,
+  model        TEXT,                    -- 재생성 시 어느 모델로 만든 요약인지(관측성)
+  n_reviews    INTEGER,                 -- 생성 시점의 근거 후기 수 — 나중에 늘면 갱신 판단 근거
+  generated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (market, product)
+);

@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .db import connect
-from . import index, source_links
+from . import index, source_links, consolidated_view   # TONE: 요약 말투를 한 곳에서만 정한다
 from .llm_ops import LLM
 from .config import settings
 
@@ -117,8 +117,9 @@ def search(query: str, *, filters: dict | None = None, top_k: int = 8) -> list[d
 # ---------------------------------------------------------------- 근거 답변
 _ANSWER_SYSTEM = """\
 너는 슬라임 후기 검색 결과만 근거로 답한다. 근거에 없는 내용은 말하지 마라(모르면 모른다고).
-소스를 하나로 평균내지 마라: 디시(amos)와 인스타를 소스별로 구분해 보여라.
-각 주장 끝에 근거 번호 [n] 을 단다. 간결한 한국어."""
+출처를 하나로 평균내지 마라: 디시(amos)와 인스타를 출처별로 구분해 보여라.
+각 주장 끝에 근거 번호 [n] 을 단다. 간결한 한국어.
+{tone}""".format(tone=consolidated_view.TONE)
 
 
 def _format_context(chunks: list[dict]) -> str:
@@ -133,7 +134,7 @@ def answer(query: str, *, filters: dict | None = None, top_k: int = 8) -> Answer
     """검색 → 근거만으로 소스 구분 답변(인용 번호 포함)."""
     chunks = search(query, filters=filters, top_k=top_k)
     if not chunks:
-        return Answer("근거가 될 후기를 찾지 못했습니다.", [])
+        return Answer("근거가 될 후기를 찾지 못했어요.", [])
     prompt = f"질문: {query}\n\n근거:\n{_format_context(chunks)}\n\n위 근거만으로 답하라."
     text = LLM().complete(prompt, system=_ANSWER_SYSTEM,
                           model=settings.model_judge, label="search.answer")

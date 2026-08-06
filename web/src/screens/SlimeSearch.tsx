@@ -87,6 +87,31 @@ const pagerBtn = {
  * 문장이라 24px 로는 빽빽하게 읽힌다. 글자 크기는 건드리지 않는다 — 줄간격만. */
 const PROSE_LINE = '28px'
 
+/* '통합 요약' 제목 옆의 반짝임 아이콘(사용자 지시 2026-08-06 · 원본 `~/Downloads/ai icon.png`).
+ * KDS `Icon`(Lucide) 을 쓰지 않는다 — Lucide 는 선 아이콘이고 이건 **면**으로 채운 두 개의
+ * 네갈래 별이라 `sparkles` 로 대체하면 다른 그림이 된다. 원본은 큰 별 파랑 / 작은 별 보라의
+ * 2색이지만 화면 액센트 하나로 통일한다(사용자 지시) — `--kds-accent`(민트)다. KDS 기본
+ * 액센트는 파랑이므로 이 변수는 `slime-accent.css` 가 덮어쓴 값을 탄다.
+ * 뾰족한 꼭짓점은 원본처럼 둥글게 — 같은 색 얇은 stroke 로 join 만 굴린다. */
+function AiSparkle({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="var(--kds-accent)"
+      stroke="var(--kds-accent)"
+      strokeWidth="0.6"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flex: 'none' }}
+    >
+      <path d="M9.98 1.48 Q12.42 7.52 18.46 9.96 Q12.42 12.4 9.98 18.44 Q7.54 12.4 1.5 9.96 Q7.54 7.52 9.98 1.48Z" />
+      <path d="M18.47 14.49 Q19.79 17.15 22.45 18.47 Q19.79 19.79 18.47 22.45 Q17.15 19.79 14.49 18.47 Q17.15 17.15 18.47 14.49Z" />
+    </svg>
+  )
+}
+
 /* 펼치기/접기 버튼 — 아이콘을 라벨 **왼쪽**에 둔다(사용자 지시 2026-08-06).
  * 아이콘은 '지금 상태'가 아니라 **누르면 갈 방향**을 가리킨다: 접힘 → ›, 펼침 → ⌄.
  * 아이콘도 라벨도 회색이다(사용자 지시 2026-08-06) — 액센트는 후기 카드의 '원문 보기'가
@@ -654,11 +679,15 @@ export default function SlimeSearch() {
                 * space-between 행도 필요 없어졌다. */}
               <span
                 style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                   fontSize: 'var(--kds-title-s-size)',
                   lineHeight: 'var(--kds-title-s-line)',
                   fontWeight: 'var(--kds-weight-bold)',
                 }}
               >
+                <AiSparkle />
                 통합 요약
               </span>
               <p

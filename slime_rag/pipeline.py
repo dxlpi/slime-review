@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from functools import lru_cache
 
 from .config import settings, ROOT
 from .db import connect, apply_schema
@@ -30,6 +32,19 @@ SOURCE_PLATFORM = {"amos": "dcinside", "instagram": "instagram"}
 
 
 # ---------------------------------------------------------------- 1층 적재
+@lru_cache(maxsize=None)
+def _tag_exclusions(market_word: str) -> frozenset[str]:
+    """마켓 표시어 → 제품명 후보에서 뺄 자기이름 집합(KB 조회, 프로세스 캐시).
+
+    `linking.load_kb()` 는 호출마다 KB 파일을 다시 파싱한다 — 판매자 게시물 루프 안에서 부르면
+    게시물 수만큼 재파싱된다. 마켓당 한 번만 계산하면 되는 값이라 여기서 캐시한다.
+    """
+    from . import extract                    # 모듈 최상위 import 아님(다른 함수들과 동일 규칙)
+    kb_market = next((m for m in linking.load_kb().markets
+                      if market_word in (m.get("market_word"), m.get("market"))), None)
+    return frozenset(extract.market_tag_exclusions(kb_market) if kb_market else {market_word})
+
+
 def _upsert_spec(cur, market, product, scent, base_combo, stype, beads=None,
                  source_permalink=None) -> None:
     """specs (market,product) upsert — fixture 시드와 판매자 자동추출이 공유하는 단일 경로.
@@ -120,7 +135,10 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
                 market = sp.meta.get("seller_market")
                 # 결정적 게이트: 해시태그가 하나도 없으면 비매품/공지글 → 스킵(사용자 규칙).
                 # LLM 판정에 맡기지 않는다 — 비매품 설명(예: '8mm디폼')을 제품으로 오추출하기 때문.
-                post_tags = set(extract.hashtags_in(sp.text))
+                # 제품명 후보는 **마켓 자기이름·광역어를 뺀** 태그다(2026-08-06 사용자 규칙).
+                # 안 빼면 `#슬라임지나` 같은 마켓 태그가 통과해 마켓마다 유령 제품 행이 생긴다.
+                excl = _tag_exclusions(market)
+                post_tags = set(extract.product_hashtags(sp.text, exclude=excl))
                 if not post_tags:
                     n_skip_nohash += 1
                     continue

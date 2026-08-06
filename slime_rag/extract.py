@@ -272,10 +272,15 @@ LAYER1_SYSTEM = f"""\
   ⚠️ 향료(맛 이름)는 base_combo 에 넣지 말 것 — scent 로 분리한다. 비즈·토핑·규격(6mm·40g·비즈g)도 제외.
   캡션이 '풀조합 / 향료 규격' 처럼 ' / ' 로 나뉘면 ' / ' 앞(풀조합)만 base_combo, 뒤 향료는 scent 로 간다.
 - slime_type: 종류 통제어휘 안에서만 — {", ".join(TYPE_ENUM)}. 목록 밖이면 null.
-  📏 '6mm'·'8mm' 같은 mm 규격은 디폼(폼) 알갱이 지름을 뜻한다 → 기본 slime_type='디폼'.
-  예) '6mm 40g', '8mm 25g', '6mm디폼' → 디폼. (제품명·테마어에 낚이지 말 것: '곰돌디핑'·'꼬끄카롱'은
-  음식 테마지 종류가 아니다. 단 캡션이 다른 종류를 '명시'하면 그걸 우선한다.)
-- beads: 제품에 든 비즈/토핑 구성요소를 캡션 표기 그대로 배열로 — 예) ['지렁이비즈', '퍼즐비즈']. 없으면 [].
+  📏 '6mm'·'8mm'·'7-9미리' 같은 mm 규격은 **알갱이 지름**이지 종류가 아니다 — 디폼도 폼볼도
+  mm 로 표기한다. 예) '7-9미리 폼볼 내장' → 폼볼, '6미리 디폼 내장' → 디폼.
+  **캡션이 쓴 종류어를 그대로 따르고**, mm 만 있고 종류어가 없을 때만 '디폼'으로 기본값을 잡는다.
+  (제품명·테마어에 낚이지 말 것: '곰돌디핑'·'꼬끄카롱'은 음식 테마지 종류가 아니다.)
+- beads: 제품에 **든 것**(비즈·토핑·내장물)을 캡션 표기 그대로 배열로 — 예) ['지렁이비즈', '퍼즐비즈'].
+  ⚠️ **폼볼·디폼 같은 내장 알갱이도 여기 넣는다**(사용자 규칙 2026-08-06). slime_type 과 겹쳐도
+  중복이 아니다: slime_type 은 '이 슬라임이 무슨 종류인가', beads 는 '안에 뭐가 들었나'다.
+  구매자는 뒤쪽을 보고 고른다. 크기 표기가 붙어 있으면 붙은 채로 넣는다 — 예) '7-9미리 폼볼',
+  '8미리 디폼', '6디폼 스팽글'. 없으면 [].
 
 [원칙]
 - 캡션에 '명시'된 것만. 안 나온 필드는 null. 추측·창작 금지(§10).
@@ -292,7 +297,9 @@ def hashtags_in(text: str) -> list[str]:
 
     []이면 해시태그가 하나도 없는 것 = 비매품/공지글 → 스펙으로 저장하지 않는다(결정적 게이트).
     사용자 규칙(memo layer1-product-name-hashtag-rule): '해시태그 없으면 실제 제품 아님'.
-    (광역/마켓 태그 필터는 현재 데이터에서 불필요해 생략 — 비매품 글이 그런 태그를 달기 시작하면 재도입.)
+
+    ⚠️ 여기서는 **거르지 않는다** — 캡션에 있는 태그 전부를 순서대로 준다.
+       제품명 후보는 `product_hashtags()` 를 쓸 것(마켓명·광역어 제외).
     """
     out: list[str] = []
     for tag in _HASHTAG_RE.findall(text or ""):
@@ -301,9 +308,58 @@ def hashtags_in(text: str) -> list[str]:
     return out
 
 
+# 광역 슬라임어 — 어느 마켓 캡션에나 붙을 수 있어 제품명이 될 수 없다.
+GENERIC_TAGS = frozenset({
+    "슬라임", "슬라임샵", "슬라임마켓", "슬라임스타그램", "슬라임추천", "국내슬라임",
+    "slime", "slimeshop", "slimereview", "slimes", "asmr", "슬라임asmr",
+})
+
+
+def _norm_tag(t: str) -> str:
+    """태그 비교용 정규화: 공백·`_`·`.` 제거 + 소문자.
+
+    구분자를 벗기는 이유는 IG 핸들이 `slime_gina_`·`from.murmurslime`·`bom__slime` 처럼
+    구분자를 쓰는데, 캡션 해시태그는 `#SlimeGina` 처럼 붙여 쓰기 때문이다. 안 벗기면
+    같은 마켓 이름인데도 제외 집합에 안 걸려 유령 제품이 다시 생긴다.
+    """
+    return re.sub(r"[\s_.]+", "", t or "").lower()
+
+
+def product_hashtags(text: str, *, exclude: "set[str] | frozenset[str] | None" = None) -> list[str]:
+    """제품명 **후보** 해시태그 — 마켓 자기이름과 광역 슬라임어를 뺀 나머지.
+
+    사용자 규칙(2026-08-06): **제품명은 해시태그 중 '하나'이지 모든 해시태그가 아니다.**
+    실측 계기: @slime_gina_ 는 게시물마다 `#슬라임지나 #제품명` 두 개를 다는데, 마켓 태그까지
+    제품명으로 통과시키면 **마켓마다 자기 이름의 유령 제품 행**이 하나씩 생긴다(스펙은 같은
+    캡션의 진짜 제품과 동일하게 복제된다 — 조용해서 더 나쁘다).
+
+    `exclude` 에는 그 마켓의 상호·핸들·별칭을 넣는다(KB 에서 조립). 광역어는 상시 제외다.
+    비교는 공백 제거 + 소문자로 한다 — `#슬라임 지나`/`#SlimeGina` 같은 표기 흔들림 때문.
+
+    ⚠️ 과잉 제외 금지: '샵·캔디·스토어' 가 들어가도 고유 태그면 제품명이다
+       (예: `#위즈캔디샵` → 제품 '위즈캔디샵'). 여기서 거르는 건 마켓명과 광역어**뿐**이다.
+    """
+    ex = {_norm_tag(e) for e in (exclude or set())} | {_norm_tag(g) for g in GENERIC_TAGS}
+    return [t for t in hashtags_in(text) if _norm_tag(t) not in ex]
+
+
+def market_tag_exclusions(market: dict) -> set[str]:
+    """KB 마켓 레코드 → `product_hashtags(exclude=...)` 에 넣을 자기이름 집합.
+
+    상호(`market`)·표시어(`market_word`)·핸들(`handle`,`handles_alt`)·별칭(`aliases`)을 모은다.
+    초성(`choseong`)은 넣지 않는다 — 제품 태그와 충돌할 만큼 짧고, 해시태그로 잘 쓰이지 않는다.
+    """
+    keys = ("market", "market_word", "handle")
+    out = {market.get(k) for k in keys if market.get(k)}
+    for k in ("handles_alt", "aliases"):
+        out |= {v for v in (market.get(k) or []) if v}
+    return out
+
+
 def extract_spec(text: str, llm: LLM, model: str | None = None) -> dict:
     """
-    판매자 캡션 한 건 → 1층 공식 스펙(dict): {"products": [{product, scent, base_combo, slime_type, evidence}...]}.
+    판매자 캡션 한 건 → 1층 공식 스펙(dict):
+    {"products": [{product, scent, base_combo, slime_type, beads, evidence}...]}.
     market 은 추출하지 않는다 — 판매자 핸들→market_word 매핑(bias.partition)이 이미 알고 있어 주입한다.
     스키마 강제 + 파싱 실패 1회 재시도.
 

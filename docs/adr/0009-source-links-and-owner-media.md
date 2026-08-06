@@ -7,7 +7,7 @@
 - 영향: `sql/schema.sql`(`reviews.source_ref`), `slime_rag/source_links.py`(신규),
   `slime_rag/index.py`, `slime_rag/pipeline.py`, `slime_rag/search.py`,
   `slime_rag/consolidated_view.py`, `slime_rag/layer1.py`,
-  `slime_rag/sources/dcinside.py`, `app/ui.py`
+  `slime_rag/sources/dcinside.py`, UI(제거됨)
 
 ## 맥락
 
@@ -135,3 +135,11 @@ None 을 돌려주므로, permalink 가 전량 null 인 현재 배포본에서�
   id 를 영구히 복구할 수 없다(§2). 사용자가 명시적으로 요구한 'DC 댓글' 항목을 포기하게 된다.
   — 단 §4 의 정직한 인정대로, 앵커가 배송되지 않은 **현재 시점의 화면 동작은 이 안과 같다.**
   갈리는 건 미래의 복구 가능성이다.
+
+> **2026-08-06 주석(ADR-0012)**: 이 ADR 이 언급한 Streamlit UI 파일은 삭제됐다.
+> 결정 자체는 유효하고 백엔드 쪽 근거(`consolidated_view` · `source_links`)는 그대로 산다 —
+> 사라진 건 그 결정을 렌더하던 화면뿐이다.
+
+> **2026-08-06 주석([ADR-0013](0013-processing-vs-publication.md))**: 아래 '무재배포' 전제가 다시 그어졌다.
+> 원문 본문의 **저장·LLM 처리는 이제 허용**이고, 제한은 **표시**에만 걸린다(서버 발췌 + 링크).
+> §1 의 결론(링크·임베드는 복제가 아니라 참조)은 **그대로 유효**하다 — 링크는 애초에 복제가 아니다.

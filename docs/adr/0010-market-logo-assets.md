@@ -5,7 +5,7 @@
   [ADR-0003 IG 1층 fixture](0003-ig-businessdiscovery-fixture.md)(같은 App Review 벽)
 - 영향: `data/slime_market_kb_demo.json`(`markets[].logo`), `data/market_logos/`(신규),
   `slime_rag/source_links.py`, `slime_rag/logos.py`(신규),
-  `slime_rag/sources/apify.py`, `slime_rag/linking.py`, `slime_rag/pipeline.py`, `app/ui.py`
+  `slime_rag/sources/apify.py`, `slime_rag/linking.py`, `slime_rag/pipeline.py`, UI(제거됨)
 
 ## 맥락
 
@@ -104,3 +104,12 @@ ADR-0009 §1 의 "다운로드·재호스팅 배제"가 지키려던 것은 **�
 - **판매자 사전 동의 게이트**: 가장 방어 가능한 자리다. 동의한 핸들만 로고, 나머지는 모노그램.
   기각이 아니라 **보류** — 아웃리치가 데모를 블로킹하기 때문이고, §3 의 철회 경로가 이미
   사후 대응을 싸게 만든다. 배포 후 문의가 오면 이 안으로 승격한다.
+
+> **2026-08-06 주석(ADR-0012)**: 이 ADR 이 언급한 Streamlit UI 파일은 삭제됐다.
+> 결정 자체는 유효하고 백엔드 쪽 근거(`consolidated_view` · `source_links`)는 그대로 산다 —
+> 사라진 건 그 결정을 렌더하던 화면뿐이다.
+
+> **2026-08-06 주석([ADR-0013](0013-processing-vs-publication.md))**: 이 ADR 은 스스로를 '무재배포의
+> 유일한 예외'로 규정했으나, ADR-0013 이후 그 틀이 사라졌다. 로고는 예외가 아니라 **같은 원칙의
+> 한 사례**다 — 저장은 허용, 표시는 링크백 동반. 1개·320px·본인 계정·삭제 시 철회라는 **경계는
+> 그대로 유지**한다(git 에 커밋되는 유일한 수집물이라는 점이 그 경계의 이유다).

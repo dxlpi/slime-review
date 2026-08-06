@@ -19,3 +19,8 @@ venv/
 
 # 관련성 골드셋 원시 시드(디시 스크랩 raw, 저작권 — 스니펫만 evals/gold 에 남김; ADR/계획 §4a)
 data/dcinside_sample_raw.json
+
+# Apify 원문 수집 raw (ADR-0013: 수집물은 DB 에만 — git 에 커밋하지 않는다)
+data/apify_post_*_raw.json
+data/apify_posts_*_raw.json
+data/apify_profile_*_raw.json

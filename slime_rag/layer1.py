@@ -66,14 +66,14 @@ def seed_kb_products(markets: list[dict], fixture: Optional[dict[str, dict]] = N
         prods: list[dict] = []
         for k in keys:
             if k and k in fx:
-                # 제품에 source_permalink 가 없으면 같은 마켓 게시물 permalink 로 폴백(사용자 결정:
-                # 공식 스펙 URL = 게시물 permalink 재사용). fixture 원본은 건드리지 않게 복사본에 주입.
-                posts = fx[k].get("posts") or []
-                fallback = posts[0].get("permalink") if posts else None
-                for p in fx[k].get("products", []):
-                    if not p.get("source_permalink") and fallback:
-                        p = {**p, "source_permalink": fallback}
-                    prods.append(p)
+                # source_permalink 은 fixture 가 준 값을 그대로 쓴다. 옛 결정("공식 스펙 URL =
+                # 그 마켓 첫 게시물 permalink 재사용")은 **철회**했다(ADR-0009): 마켓의 게시물과
+                # 제품은 1:1 이 아니라, 폴백이 발화하는 순간이 곧 오귀속이 생기는 순간이다.
+                # 하필 그 분기는 끝 상태 둘(전량 null / 전량 채움)에선 죽어 있고 입력을 채우는
+                # 중간 구간에서만 살아난다 — 감시할 게 아니라 없앤다.
+                # 결과: specs.source_permalink 은 **있으면 무조건 정확**하고, 아직 안 채운 제품은
+                # 링크가 아예 안 뜬다(틀린 링크 < 링크 없음). 임베드 게이트도 'null 이냐'로 끝난다.
+                prods.extend(fx[k].get("products", []))
         if prods:
             m["products"] = prods
             seeded += len(prods)
@@ -89,7 +89,8 @@ def iter_specs(kb_markets: list[dict]):
     market 은 정규 market_word(빈짱/봄/머머) — reviews.market(linking 결과)과 조인 키 일치.
     slime_type 은 TYPE_ENUM 배열을 콤마결합, 비면 type_other(마켓 고유 베이스어)로 폴백.
     beads 는 비즈/토핑 구성요소 리스트(오픈 어휘), 없으면 [].
-    source_permalink 은 공식 스펙 출처 게시물 URL(seed_kb_products 가 게시물 permalink 로 폴백), 없으면 None.
+    source_permalink 은 그 제품의 공식 스펙 출처 게시물 URL(fixture 값 그대로), 없으면 None —
+    마켓 게시물로 때우는 폴백은 없다(ADR-0009). 있으면 그 제품 게시물이 맞다는 뜻이다.
     """
     for m in kb_markets:
         mw = m.get("market_word") or m.get("market")

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Commit message gate — see CLAUDE.md "Commit messages".
+#   1. English-only prose; Korean allowed ONLY inside a quoted literal
+#      (`backticks` or "double quotes").
+#   2. Conventional-Commits subject, description <= 50 chars.
+# Enable: git config core.hooksPath .githooks   (README "dev setup")
+set -uo pipefail
+
+MSG_FILE="$1"
+
+# Strip the `git commit -v` diff (everything from the scissors line) BEFORE
+# anything else — this repo's source is full of Korean comments, and a verbose
+# diff would otherwise trip the Korean check on every commit.
+msg="$(sed -e '/ >8 /,$d' "$MSG_FILE" | git stripspace --strip-comments)"
+subject="$(printf '%s\n' "$msg" | sed -n '1p')"
+
+# Git-generated / rebase-machinery subjects are not ours to format.
+case "$subject" in
+  fixup!*|squash!*|amend!*|"Merge "*|"Revert "*) exit 0 ;;
+esac
+
+# Quoted literals are exempt from the Korean check.
+# Single quotes are deliberately NOT delimiters: contractions like "don't"
+# pair up wrongly and would swallow the rest of the message.
+strip_literals() {
+  sed -E -e 's/`[^`]*`//g' -e 's/"[^"]*"//g'
+}
+
+# NOTE: `grep -P` is a GNU extension — macOS /usr/bin/grep exits 2 ("invalid
+# option"), which an `if` reads as "no match", silently disabling the gate.
+# perl ships with macOS, Linux, and Git for Windows; \p{Hangul} also covers
+# standalone jamo (ㅋㅋ, ㅠㅠ) that the AC00-D7A3 syllable range misses.
+has_hangul() {
+  if command -v perl >/dev/null 2>&1; then
+    perl -CSD -ne 'if (/\p{Hangul}/) { $found = 1 } END { exit($found ? 0 : 1) }'
+  else
+    grep -q '[가-힣]'
+  fi
+}
+
+if printf '%s\n' "$msg" | strip_literals | has_hangul; then
+  echo "commit-msg: Korean outside a quoted literal." >&2
+  echo "  Wrap Korean terms in backticks: normalize \`슬라임\` variants" >&2
+  exit 1
+fi
+
+if ! printf '%s\n' "$subject" \
+   | grep -qE '^(feat|fix|refactor|perf|test|docs|build|ci|chore|revert)(\(.+\))?: .{1,50}$'; then
+  echo "commit-msg: subject must match '<type>(<scope>): <description>'" >&2
+  echo "  type: feat|fix|refactor|perf|test|docs|build|ci|chore|revert" >&2
+  echo "  description: 1-50 characters (Hangul counts 1 char but renders 2" >&2
+  echo "  columns wide — keep Korean-bearing subjects near 40)" >&2
+  echo "  got: ${subject}" >&2
+  exit 1
+fi

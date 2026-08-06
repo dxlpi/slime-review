@@ -80,6 +80,7 @@ flowchart TD
 | 임베딩 모델 | `index.py` · `search.py` · `schema.sql`(벡터 차원·인덱스 재생성) |
 | 새 소스 | `sources/` 구현체 + `pipeline.collect` 등록만 — 하류 무변경 |
 | LLM 벤더/모델 | `llm_ops.py` 만 |
+| 마켓 로고 자산 | KB `markets[].logo` · `data/market_logos/` · `source_links.logo_asset` · `app/ui.py` |
 
 ## 배포 (마지막 하드게이트)
 Render(관리형 Postgres+pgvector) → `schema.sql` 적용 → `streamlit run app/ui.py` 호스팅.

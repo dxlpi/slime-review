@@ -25,7 +25,8 @@
       "choseong": "ㅂ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/bom__slime.jpg"
     },
     {
       "market": "웨이즈슬라임",
@@ -35,7 +36,8 @@
       "choseong": "ㅇㅇㅈ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/wayz.slime.jpg"
     },
     {
       "market": "진통제슬라임",
@@ -45,7 +47,8 @@
       "choseong": "ㅈㅌㅈ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/slime_painkiller.jpg"
     },
     {
       "market": "베이퍼슬라임",
@@ -55,7 +58,8 @@
       "choseong": "ㅂㅇㅍ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/invaporslimephase.jpg"
     },
     {
       "market": "머머슬라임",
@@ -67,7 +71,8 @@
       "choseong": "ㅁㅁ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/from.murmurslime.jpg"
     },
     {
       "market": "푸딩슬라임",
@@ -77,7 +82,8 @@
       "choseong": "ㅍㄷ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/sweetpuddingslime.jpg"
     },
     {
       "market": "빈짱슬라임",
@@ -87,7 +93,8 @@
       "choseong": "ㅂㅉ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/vinzzang_slime.jpg"
     },
     {
       "market": "모모네슬라임",
@@ -97,7 +104,8 @@
       "choseong": "ㅁㅁㄴ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/momone.slime.jpg"
     },
     {
       "market": "연찌슬라임",
@@ -107,7 +115,8 @@
       "choseong": "ㅇㅉ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/yeonzzi_slime.jpg"
     },
     {
       "market": "캐치슬라임",
@@ -117,7 +126,8 @@
       "choseong": "ㅋㅊ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/catchslime.jpg"
     },
     {
       "market": "예찬슬라임",
@@ -127,7 +137,8 @@
       "choseong": "ㅇㅊ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/yeahchan_slime.jpg"
     },
     {
       "market": "슬라임지나",
@@ -137,7 +148,8 @@
       "choseong": "ㅈㄴ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/slime_gina_.jpg"
     },
     {
       "market": "늪지슬라임",
@@ -147,7 +159,8 @@
       "choseong": "ㄴㅈ",
       "choseong_aliases": [],
       "aliases": [],
-      "products": []
+      "products": [],
+      "logo": "data/market_logos/swampylandslime.jpg"
     }
   ]
 }

@@ -178,6 +178,52 @@ def test_spec_embed_branches():
     print("✓ 스펙 카드: permalink 있을 때만 임베드+프라이버시 캡션 · 텍스트 링크 상시 OK")
 
 
+# ---------------------------------------------------------------- 마켓 로고(ADR-0010)
+def _logo_script() -> None:
+    """AppTest 스크립트: `_render_market_logo` 만 — 이미지/모노그램 두 분기.
+
+    DB·네트워크·실제 파일 없이 돈다. `logo_asset` 결과 dict 를 직접 만들어 넣으므로
+    정책(어느 분기가 뜨나)은 `test_source_links` 가, 배선(그려지나)은 여기가 덮는다.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import streamlit as st
+    from app.ui import _render_market_logo
+    st.header("monogram")
+    _render_market_logo({"kind": "monogram", "char": "머", "color": "#8A63C4",
+                         "handle": "from.murmurslime", "market_word": "머머",
+                         "url": "https://www.instagram.com/from.murmurslime/"})
+    st.header("no_handle")     # KB 에 핸들이 없는 마켓 — 링크 없이도 안 죽어야
+    _render_market_logo({"kind": "monogram", "char": "봄", "color": "#C4577F",
+                         "handle": None, "market_word": "봄", "url": None})
+    st.header("empty")         # 호출부가 빈 값을 넘겨도 예외 0
+    _render_market_logo({})
+
+
+def test_market_logo_render():
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_function(_logo_script).run(timeout=30)
+    assert not at.exception, at.exception
+    md = " ".join(m.value for m in at.markdown)
+
+    assert "머머" in md and "봄" in md, "마켓명이 렌더되지 않았다"
+    # 링크백은 ADR-0010 예외의 **조건**이다 — 모노그램이어도 반드시 뜬다.
+    assert "https://www.instagram.com/from.murmurslime/" in md, "프로필 링크백이 없다"
+    assert "@from.murmurslime" in md, "핸들 라벨 미렌더"
+    assert "#8A63C4" in md, "모노그램 색상이 적용되지 않았다"
+    print("✓ 마켓 로고: 모노그램 분기·링크백 상시·핸들 없음/빈 입력 예외 0 OK")
+
+
+def test_market_logo_wired_into_sidebar():
+    """1층 패널이 실제로 `pipeline.market_logo` 를 호출한다 — 헬퍼만 있고 배선이 없으면
+    테스트는 통과하는데 화면엔 아무것도 안 뜬다. 그 갭을 여기서 막는다."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "app" / "ui.py").read_text(encoding="utf-8")
+    assert "_render_market_logo(pipeline.market_logo(" in src, "사이드바 1층 패널 배선 누락"
+    assert "source_links.LOGO_CAPTION" in src, "로고 출처 캡션이 빠졌다"
+
+
 def test_spec_card_is_single_source_of_truth():
     """스펙 카드가 요약 탭·챗 탭 **양쪽**에서 같은 함수로 그려진다(AC5).
 
@@ -274,6 +320,8 @@ def test_selection_flow():
 if __name__ == "__main__":
     test_ui_render_no_exception_and_blocks()
     test_spec_embed_branches()
+    test_market_logo_render()
+    test_market_logo_wired_into_sidebar()
     test_spec_card_is_single_source_of_truth()
     test_filter_products()
     test_selection_flow()

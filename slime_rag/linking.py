@@ -60,7 +60,10 @@ class KB:
         self.markets = data["markets"]
         self._literal: dict[str, list[dict]] = {}
         self._cho: dict[str, list[dict]] = {}
+        # market_word → 엔트리. 정규 키라 충돌이 없어(마켓당 1개) 리스트가 아니라 단일 값이다.
+        self._by_word: dict[str, dict] = {}
         for m in self.markets:
+            self._by_word.setdefault(_strip(m["market_word"]), m)
             # 마켓별로 키를 집합화 → 한 마켓이 같은 버킷에 중복 등록되지 않게.
             for form in {_strip(f).lower() for f in self._surface_forms(m)}:
                 self._literal.setdefault(form, []).append(m)
@@ -77,6 +80,17 @@ class KB:
         # 명시 초성 + 별칭 초성 + 마켓명에서 환원한 초성
         forms = [m["choseong"], *m["choseong_aliases"], choseong(m["market_word"])]
         return [f for f in forms if f]
+
+    def market_by_word(self, market_word: str | None) -> Optional[dict]:
+        """정규 `market_word` → KB 엔트리. 없으면 None.
+
+        `resolve_market` 과 다르다 — 저건 후기 표면형을 **추론**하는 퍼지 경로(초성·별칭·보류)고,
+        이건 이미 정규화된 키의 **정확 조회**다. DB `specs.market` 이 정규 market_word 라
+        표시 계층(로고 등)은 추론 없이 여기로 들어온다.
+        """
+        if not market_word:
+            return None
+        return self._by_word.get(_strip(market_word))
 
     def resolve_market(self, mentioned: str) -> tuple[list[dict], float, str]:
         """(후보들, 확신도, 근거). 표면형 우선, 없으면 초성."""

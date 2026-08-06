@@ -24,7 +24,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 # 인스타 게시물 경로 → shortcode. /p/(사진·캐러셀) /reel/(릴스) /tv/(IGTV) 셋만 임베드 대상.
@@ -222,3 +224,90 @@ EMBED_PRIVACY_CAPTION = (
     "제3자 프레임이라 열람자 브라우저에 인스타 쿠키가 설정되며, 브라우저·확장 프로그램이 "
     "프레임을 차단하면 빈 칸으로 보일 수 있습니다(아래 링크로 원문 확인)."
 )
+
+
+# ---------------------------------------------------------------- 마켓 로고(식별 표지)
+# ADR-0010: §1(다운로드·재호스팅 배제)의 적용범위는 후기 본문·게시물 미디어다. 마켓 본인
+# 프로필 아바타는 예외 — 리뷰 대상 저작물이 아니라 그 대상을 가리키는 식별 표지라서다.
+# 여기 있는 건 **표시 정책**뿐이다. 수집·다운로드는 `slime_rag.logos`, 렌더는 `app/ui.py`.
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+# 로고 자산의 유일한 허용 디렉터리. 리포 루트 기준 상대경로로만 KB 에 기록된다.
+LOGO_DIR = "data/market_logos"
+
+# 모노그램 팔레트 — 어두운 배경에 흰 글자가 얹혀도 대비가 남는 채도로 고정.
+_MONOGRAM_COLORS = ("#5B7CFA", "#3FA796", "#E0725C", "#8A63C4",
+                    "#D99A2B", "#4A9BD1", "#C4577F", "#5E8C4A")
+
+
+def _logo_rel_path(logo) -> str | None:
+    """KB 의 `logo` 값 → 검증된 리포 상대경로. 경계를 벗어나면 None.
+
+    KB 는 손으로도 편집되는 파일이라 여기 들어오는 값이 항상 우리가 쓴 것이라고 볼 수 없다.
+    절대경로·상위 이탈(`../`)을 막는 건 로고 슬롯이 임의 파일 읽기 통로가 되지 않게 하기
+    위함이다 — 표시 경로에 붙는 값은 전부 이 게이트를 지난다.
+    """
+    if not isinstance(logo, str) or not logo.strip():
+        return None
+    p = Path(logo.strip())
+    if p.is_absolute():
+        return None
+    try:                                        # `..` 를 접어 실제 착지점을 본다
+        resolved = (_REPO_ROOT / p).resolve()
+        resolved.relative_to((_REPO_ROOT / LOGO_DIR).resolve())
+    except (ValueError, OSError):
+        return None                             # LOGO_DIR 바깥 → 거부
+    return p.as_posix()
+
+
+def monogram(market_word: str | None) -> tuple[str, str]:
+    """마켓명 → (글자 1개, 색상). 같은 이름이면 언제나 같은 칩 — 리런마다 색이 바뀌지 않게.
+
+    초성(`linking.choseong`)이 아니라 **글자 그대로** 쓴다. 'ㅁ' 보다 '머' 가 알아보기 쉽고,
+    초성은 이미 KB 에서 충돌이 잦다(ㅁㅁ·ㅇㅇ 등 12그룹).
+    색상은 md5 로 뽑는다 — 내장 `hash()` 는 프로세스마다 시드가 달라 재시작 때 색이 바뀐다.
+    """
+    word = (market_word or "").strip()
+    char = word[0] if word else "?"
+    digest = hashlib.md5(word.encode("utf-8")).hexdigest()
+    return char, _MONOGRAM_COLORS[int(digest[:8], 16) % len(_MONOGRAM_COLORS)]
+
+
+def logo_asset(market_entry: dict | None, *, exists=Path.exists) -> dict:
+    """KB 마켓 엔트리 → 그릴 것. **절대 None 을 돌려주지 않는다.**
+
+    반환:
+      {"kind": "image",    "path": "<절대경로>", "rel": "data/market_logos/x.jpg",
+       "handle", "url", "market_word"}
+      {"kind": "monogram", "char": "머", "color": "#5B7CFA",  "handle", "url", "market_word"}
+
+    `path` 가 **절대경로**인 건 의도다. KB 에는 이식 가능한 상대경로를 저장하지만(`rel`),
+    렌더는 프로세스 CWD 에 의존하면 안 된다 — `streamlit run` 을 리포 밖에서 실행하는
+    순간 상대경로는 조용히 못 찾는 파일이 되고, 화면엔 모노그램이 뜬다(원인은 안 보인 채).
+
+    이미지 분기는 게이트를 **전부** 통과해야 한다(`embed_url` 과 같은 fail-closed):
+    ① `logo` 필드 존재 ② `LOGO_DIR` 하위로 정규화되는 상대경로 ③ 파일이 실제로 존재.
+    하나라도 실패하면 모노그램 — 깨진 이미지 아이콘을 그리느니 칩을 그린다.
+
+    ③이 이 함수의 존재 이유이자 ADR-0010 의 **철회 경로**다. 판매자가 내려달라고 하면
+    파일 하나를 지우는 것으로 끝나고, 코드도 KB 도 건드릴 필요가 없다.
+
+    `exists` 는 주입 가능하다 — 실제 파일 없이 전 분기를 오프라인에서 덮기 위함이고,
+    그 덕에 이 모듈은 여전히 무의존(순수)으로 남는다.
+    """
+    entry = market_entry if isinstance(market_entry, dict) else {}
+    handle = (entry.get("handle") or "").strip() or None
+    word = entry.get("market_word") or entry.get("market")
+    base = {"handle": handle, "market_word": word,
+            "url": f"https://www.instagram.com/{handle}/" if handle else None}
+
+    rel = _logo_rel_path(entry.get("logo"))
+    if rel and exists(_REPO_ROOT / rel):
+        return {"kind": "image", "path": str(_REPO_ROOT / rel), "rel": rel, **base}
+    char, color = monogram(word)
+    return {"kind": "monogram", "char": char, "color": color, **base}
+
+
+# 로고는 우리 저장소에서 나가는 서드파티 자산이다(ADR-0010). 출처를 화면에서 밝힌다 —
+# 링크백은 이 예외의 조건이지 장식이 아니다.
+LOGO_CAPTION = "마켓 공식 인스타 계정 프로필 이미지"

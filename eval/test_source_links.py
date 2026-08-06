@@ -11,6 +11,8 @@ DB·네트워크·LLM·streamlit 미사용(무비용) → CI 게이트 대상. �
   - build_source_ref(): 디시 게시물(URL 파싱) / 디시 댓글(id) / 인스타(shortcode) / 링크불가
   - evidence_group_key(): 한 스레드 댓글들이 전량 distinct
   - embed_url(): 임베드 게이트 전 분기(fail-closed)
+  - logo_asset(): 마켓 로고 게이트(ADR-0010) — 이미지/모노그램 양분기·경로이탈 차단·
+    링크백 보존 · monogram() 결정성(프로세스 간 색상 고정)
   - group_evidence_sources(): 팬아웃 중복 제거 + URL 그룹핑 + 구성 라벨
   - _parse_comments(): 댓글 고유 id 보존
   - 무재배포: 식별자에 원문 텍스트가 안 섞인다
@@ -23,6 +25,8 @@ from __future__ import annotations
 from slime_rag import source_links as sl
 
 _THREAD = "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201513"
+# 모노그램 색상 스냅샷 — 팔레트/해시를 바꾸면 배포된 화면의 칩 색이 전부 바뀐다.
+_EXPECTED_MURMUR_COLOR = "#8A63C4"
 
 
 # ---------------------------------------------------------------- permalink
@@ -116,6 +120,97 @@ def test_embed_url_gate():
     assert sl.embed_url({"source_permalink": "https://www.instagram.com/p/"}) is None, \
         "shortcode 없는 경로가 통과했다"
     print("✓ embed_url: 인스타 게시물만 통과 · 디시/프로필/호스트위장/무 shortcode 차단 OK")
+
+
+# ---------------------------------------------------------------- 마켓 로고(ADR-0010)
+def test_logo_asset_gate():
+    """`exists` 주입으로 파일 없이 전 분기. 실제 파일에 의존하면 로고를 지우는 순간
+    (=ADR-0010 의 철회 경로를 쓰는 순간) 테스트가 깨지므로 주입이 옳다."""
+    entry = {"market": "머머슬라임", "market_word": "머머", "handle": "from.murmurslime",
+             "logo": "data/market_logos/from.murmurslime.jpg"}
+    yes, no = (lambda p: True), (lambda p: False)
+
+    a = sl.logo_asset(entry, exists=yes)
+    assert a["kind"] == "image", "게이트 전부 통과인데 이미지가 아니다"
+    assert a["rel"] == "data/market_logos/from.murmurslime.jpg"
+    # 렌더 경로는 절대여야 한다 — CWD 가 리포 밖이어도 같은 파일을 가리켜야.
+    from pathlib import Path as _P
+    assert _P(a["path"]).is_absolute(), "렌더 경로가 상대경로다(CWD 의존)"
+    assert a["path"].endswith(a["rel"])
+    assert a["url"] == "https://www.instagram.com/from.murmurslime/"
+    assert a["market_word"] == "머머"
+
+    # ③ 파일 부재 → 모노그램. 파일 하나 지우면 즉시 철회되는 경로(ADR-0010 §3).
+    b = sl.logo_asset(entry, exists=no)
+    assert b["kind"] == "monogram" and b["char"] == "머", "파일 없는데 이미지로 그린다"
+    assert b["url"] == a["url"], "모노그램이어도 링크백은 남아야 한다(예외의 조건)"
+
+    # ① logo 필드 없음/빈값 → 모노그램
+    for bad in (None, "", "   "):
+        e = {**entry, "logo": bad}
+        assert sl.logo_asset(e, exists=yes)["kind"] == "monogram", f"logo={bad!r} 통과"
+    assert sl.logo_asset({**entry, "logo": None}, exists=yes)["kind"] == "monogram"
+
+    # ② 경로 이탈·절대경로·타 디렉터리 → 모노그램(임의 파일 읽기 통로 차단)
+    for bad in ("/etc/passwd", "../../etc/passwd", "data/market_logos/../../.env",
+                "data/slime_market_kb_demo.json", ".env"):
+        e = {**entry, "logo": bad}
+        assert sl.logo_asset(e, exists=yes)["kind"] == "monogram", f"경로 이탈 통과: {bad}"
+
+    # 엔트리 자체가 없어도 절대 None 이 아니다 — 깨진 이미지 대신 항상 그릴 것이 있다
+    for empty in (None, {}, "문자열"):
+        z = sl.logo_asset(empty, exists=yes)
+        assert z["kind"] == "monogram" and z["char"] == "?" and z["url"] is None
+    print("✓ logo_asset: 이미지 게이트 3중 fail-closed · 경로이탈 차단 · 링크백 보존 OK")
+
+
+def test_committed_logos_respect_adr_bounds():
+    """저장소에 **실제로 들어있는** 로고가 ADR-0010 의 경계 안인가 (파일 없으면 skip).
+
+    `logos.normalize` 를 신뢰하는 게 아니라 커밋된 산출물을 직접 잰다. 경계를 어긴 자산이
+    이미 커밋된 적이 있어서(2026-08-06: 인스타 CDN 이 URL 의 s320x320 힌트를 무시하고
+    최대 1080px 를 줬다) 프로세스가 아니라 결과물을 게이트한다.
+    """
+    from pathlib import Path
+    from slime_rag.logos import MAX_PX, MAX_BYTES
+    from slime_rag.linking import load_kb
+    d = Path(__file__).resolve().parent.parent / "data" / "market_logos"
+    files = sorted(d.glob("*.jpg")) if d.exists() else []
+    if not files:
+        print("- 커밋된 로고 없음 → skip (전 마켓 모노그램 상태)")
+        return
+    try:
+        from PIL import Image
+    except ImportError:
+        print("- Pillow 미설치 → skip")
+        return
+
+    handles = {m["handle"] for m in load_kb().markets if m.get("handle")}
+    oversized, alien = [], []
+    for f in files:
+        if f.stem not in handles:               # 마켓당 1개·본인 계정만(ADR-0010 경계)
+            alien.append(f.name)
+        with Image.open(f) as im:
+            if max(im.size) > MAX_PX:
+                oversized.append(f"{f.name} {im.size[0]}x{im.size[1]}")
+        assert f.stat().st_size <= MAX_BYTES, f"{f.name} 용량 상한 초과"
+    assert not oversized, "ADR-0010 해상도 경계 초과:\n  " + "\n  ".join(oversized)
+    assert not alien, f"KB 밖 계정의 아바타가 커밋됐다: {alien}"
+    assert len(files) <= len(handles), "마켓 수보다 로고가 많다(마켓당 1개 위반)"
+    print(f"✓ 커밋된 로고 {len(files)}개: 전량 ≤{MAX_PX}px · KB 핸들 · 마켓당 1개 OK")
+
+
+def test_monogram_deterministic():
+    """리런마다 색이 바뀌면 안 된다 — 내장 hash() 는 프로세스마다 시드가 달라 못 쓴다."""
+    assert sl.monogram("머머") == sl.monogram("머머")
+    assert sl.monogram("머머")[0] == "머"
+    assert sl.monogram("")[0] == "?" and sl.monogram(None)[0] == "?"
+    colors = {sl.monogram(w)[1] for w in ("머머", "빈짱", "봄", "웨이즈", "진통제")}
+    assert len(colors) > 1, "모든 마켓이 같은 색 — 해시 분산이 죽었다"
+    assert all(c.startswith("#") and len(c) == 7 for c in colors)
+    # 고정 기대값: 팔레트를 손대면 배포된 화면의 색이 바뀐다는 걸 여기서 알아채게.
+    assert sl.monogram("머머")[1] == _EXPECTED_MURMUR_COLOR, "모노그램 색상이 바뀌었다"
+    print(f"✓ monogram: 결정적 · 분산 {len(colors)}색 · '머머'={sl.monogram('머머')[1]} OK")
 
 
 # ---------------------------------------------------------------- 근거 목록 그룹핑
@@ -234,6 +329,9 @@ if __name__ == "__main__":
     test_build_source_ref()
     test_thread_comments_distinct()
     test_embed_url_gate()
+    test_logo_asset_gate()
+    test_committed_logos_respect_adr_bounds()
+    test_monogram_deterministic()
     test_group_evidence_sources()
     test_parse_comments_keeps_id()
     test_captions_state_both_reasons()

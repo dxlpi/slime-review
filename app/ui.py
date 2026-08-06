@@ -84,6 +84,38 @@ def _render_review_block(title: str, block: dict | None, meta: str | None = None
             st.markdown(f"- ➖ {c}")
 
 
+_LOGO_PX = 44
+
+
+def _render_market_logo(asset: dict) -> None:
+    """마켓 로고 + 핸들 링크. `pipeline.market_logo()` 결과를 **그리기만** 한다.
+
+    분기 판단(파일 존재·경로 검증·모노그램 폴백)은 `source_links.logo_asset` 이 이미
+    끝냈다 — 여기서 다시 판단하면 정책이 두 곳으로 갈라진다(ADR-0009 §2 와 같은 규칙).
+    링크는 로고 종류와 무관하게 **항상** 그린다: 링크백이 ADR-0010 예외의 조건이라서다.
+    """
+    if not asset:
+        return
+    c_logo, c_name = st.columns([1, 4])
+    with c_logo:
+        if asset["kind"] == "image":
+            st.image(asset["path"], width=_LOGO_PX)
+        else:
+            # 로고가 없는 마켓(미수집·비공개·삭제 요청)은 이름 첫 글자 칩으로 degrade.
+            st.markdown(
+                f'<div style="width:{_LOGO_PX}px;height:{_LOGO_PX}px;border-radius:50%;'
+                f'background:{asset["color"]};color:#fff;display:flex;align-items:center;'
+                f'justify-content:center;font-size:{_LOGO_PX // 2}px;font-weight:600;">'
+                f'{asset["char"]}</div>',
+                unsafe_allow_html=True)
+    with c_name:
+        name = asset.get("market_word") or ""
+        if asset.get("url"):
+            st.markdown(f"**{name}**  \n[@{asset['handle']}]({asset['url']})")
+        else:
+            st.markdown(f"**{name}**")
+
+
 _EMBED_HEIGHT = 560          # 인스타 임베드 카드 고정 높이(px)
 
 
@@ -304,6 +336,9 @@ def main() -> None:
     st.divider()
     st.caption(f"색인 현황 · specs {counts['specs']} · reviews {counts['reviews']}")
     if market_sel:
+        # 로고는 판매자 공식 자산이라 1층(공식 스펙) 패널이 개념상 맞는 자리다(ADR-0010).
+        _render_market_logo(pipeline.market_logo(market_sel))
+        st.caption(source_links.LOGO_CAPTION)
         st.subheader(f"1층 스펙 · {market_sel}")
         for p in market_products:
             beads = ", ".join(p.get("beads") or []) or "—"

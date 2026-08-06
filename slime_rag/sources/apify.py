@@ -278,6 +278,39 @@ class InstagramProfileSource(Source):
             },
         )
 
+    # -------- 프로필 레벨 필드(로고) — 게시물 경로와 분리 --------
+    def fetch_profiles(self, usernames: list[str]) -> list[dict]:
+        """핸들 목록 → 프로필 메타 `{username, profile_pic_url, full_name}` 리스트.
+
+        `collect()` 과 **같은 액터 응답의 다른 층**을 읽는다. `_to_review` 는 `latestPosts[]`
+        만 훑어 프로필 레벨 필드를 통째로 버리는데, 로고는 거기 있다. 그래서 새 네트워크
+        호출이 아니라 새 매핑이다 — 유일한 네트워크 경계 `_run()` 을 그대로 재사용하므로
+        토큰 없음/실패 시 `[]` 회복력과 오프라인 테스트 주입점을 함께 상속한다.
+
+        여기서는 저장하지 않는다(순수 매핑). 다운로드·KB 기록은 `slime_rag.logos` 담당 —
+        정책 경계가 ADR-0010 이라 수집기가 재호스팅 결정을 갖고 있으면 안 된다.
+        """
+        usernames = [u.lstrip("@").strip() for u in (usernames or []) if u and u.strip()]
+        items = self._run(usernames)
+        cost = len(usernames) / 1000 * self.COST_PER_1000
+        log.info("Apify 프로필 메타 %d개 요청 → %d 아이템 (예상비용 $%.4f)",
+                 len(usernames), len(items), cost)
+        out, missing = [], []
+        for item in items:
+            handle = item.get("username") or item.get("ownerUsername")
+            if not handle:
+                continue
+            # HD(320px) 우선 — ADR-0010 이 정한 해상도 상한이자 하한이다. 없으면 150px 폴백.
+            pic = item.get("profilePicUrlHD") or item.get("profilePicUrl")
+            if not pic:
+                missing.append(handle)          # 무음 갭 금지 — 세어서 로그로 드러낸다
+                continue
+            out.append({"username": handle, "profile_pic_url": pic,
+                        "full_name": item.get("fullName") or None})
+        if missing:
+            log.warning("프로필 사진 URL 없음 %d건: %s", len(missing), ", ".join(missing))
+        return out
+
     def collect(self, keywords: list[str], limit: int = 100,
                 target: dict | None = None) -> Iterator[RawReview]:
         """keywords = 마켓 핸들(username). '@' 접두 허용. 프로필 최신 게시물을 RawReview 로 방출.

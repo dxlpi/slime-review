@@ -13,10 +13,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from slime_rag.sources import ApifyHashtagSource, collect_all
+from slime_rag.sources import ApifyHashtagSource, InstagramProfileSource, collect_all
 from slime_rag.config import settings
 
 SAMPLE = Path(settings.kb_demo_path).parent / "apify_hashtag_sample.json"
+# 라이브 프로필 스크랩 1회분 스냅샷(@from.murmurslime, 2026-07-15) — 로고 매핑 검증용.
+PROFILE_SAMPLE = Path(settings.kb_demo_path).parent / "apify_profile_murmur_raw.json"
 
 
 def _sample_items() -> list[dict]:
@@ -121,6 +123,53 @@ def test_curated_hashtags_load():
     print(f"✓ 큐레이션 해시태그 로드 OK (by_market {len(tags)}개, global 없음)")
 
 
+def test_fetch_profiles_mapping():
+    """프로필 레벨 매핑(ADR-0010 로고) — 실제 액터 출력 스냅샷으로 무비용 검증.
+
+    `data/apify_profile_murmur_raw.json` 이 존재하는 이유가 정확히 이것이다: 라이브
+    프로필 스크랩 1회분을 떠 뒀기 때문에 유료 호출 없이 필드 모양 회귀를 잡는다.
+    """
+    raw = json.loads(PROFILE_SAMPLE.read_text(encoding="utf-8"))
+    src = InstagramProfileSource(token="dummy")
+    src._run = lambda usernames: raw["items"]        # seam: 실제 actor 호출 대체
+
+    out = src.fetch_profiles(["@from.murmurslime"])  # '@' 접두 허용 확인
+    assert len(out) == 1, f"기대 1건, 실제 {len(out)}"
+    p = out[0]
+    assert p["username"] == "from.murmurslime"
+    assert p["full_name"], "fullName 이 비었다"
+    # HD(320px)가 있으면 반드시 그쪽 — ADR-0010 이 정한 해상도다.
+    assert p["profile_pic_url"] == raw["items"][0]["profilePicUrlHD"], "HD 우선이 깨졌다"
+    assert p["profile_pic_url"].startswith("https://"), "URL 이 아니다"
+
+    # HD 없으면 150px 폴백, 둘 다 없으면 무음 드롭이 아니라 결손으로 빠진다
+    item = dict(raw["items"][0])
+    item.pop("profilePicUrlHD")
+    src._run = lambda usernames: [item]
+    assert src.fetch_profiles(["x"])[0]["profile_pic_url"] == item["profilePicUrl"], "폴백 실패"
+    item2 = {k: v for k, v in item.items() if k != "profilePicUrl"}
+    src._run = lambda usernames: [item2]
+    assert src.fetch_profiles(["x"]) == [], "사진 URL 없는 항목이 통과했다"
+
+    # 토큰 없으면 조용히 [] (기존 회복력 계약 상속 — 새 네트워크 경계를 만들지 않았다는 증거)
+    assert InstagramProfileSource(token=None).fetch_profiles(["x"]) == []
+    print(f"✓ fetch_profiles: HD 우선·폴백·결손 드롭·토큰없음 회복력 OK ({p['username']})")
+
+
+def test_fetch_profiles_ignores_post_media():
+    """게시물 미디어는 로고 경로로 절대 새지 않는다 — ADR-0009 §4 는 무변경이다."""
+    raw = json.loads(PROFILE_SAMPLE.read_text(encoding="utf-8"))
+    src = InstagramProfileSource(token="dummy")
+    src._run = lambda usernames: raw["items"]
+    keys = set().union(*(set(p) for p in src.fetch_profiles(["from.murmurslime"])))
+    assert keys == {"username", "profile_pic_url", "full_name"}, \
+        f"프로필 매핑이 계약 밖 필드를 흘린다: {keys}"
+    # 액터 응답엔 latestPosts[] 와 relatedProfiles[](타 계정 아바타)가 들어 있다 — 둘 다 미유출
+    assert "latestPosts" in raw["items"][0] and "relatedProfiles" in raw["items"][0], \
+        "스냅샷이 바뀌어 이 테스트의 전제가 사라졌다"
+    print("✓ fetch_profiles: 게시물 미디어·타 계정 아바타 미유출 OK")
+
+
 if __name__ == "__main__":
     test_mapping_and_provenance()
     test_dedup()
@@ -131,4 +180,6 @@ if __name__ == "__main__":
     test_token_unset_is_resilient()
     test_to_review_sets_review_class()
     test_curated_hashtags_load()
+    test_fetch_profiles_mapping()
+    test_fetch_profiles_ignores_post_media()
     print("\n모든 오프라인 테스트 통과 ✅")

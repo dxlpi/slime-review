@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
-from slime_rag import pipeline, search
+from slime_rag import pipeline, search, source_links
 from slime_rag.linking import choseong
 
 # 소스 라벨 ↔ DB source 컬럼 값
@@ -153,6 +153,40 @@ def _render_consolidated(view: dict) -> None:
         if promo:                                    # 서포터(홍보성) — 실사용과 분리해 별도 표시
             _render_review_block("🎁 서포터 리뷰 (협찬·무상 제공)", promo,
                                  f"{promo.get('n_promo', 0)}건")
+
+    _render_evidence_sources(view.get("sources") or {})
+
+
+_SOURCE_PLATFORM_LABELS = {"dcinside": "🔵 디시", "instagram": "🟣 인스타"}
+
+
+def _render_source_group(g: dict) -> None:
+    """근거 원문 한 줄 — 플랫폼 · 구성(글/댓글 건수) · 원문 링크."""
+    plat = _SOURCE_PLATFORM_LABELS.get(g.get("platform"), g.get("platform") or "출처미상")
+    st.markdown(f"- {plat} · {g['label']} — [원문 보기]({g['url']})")
+
+
+def _render_evidence_sources(sources: dict) -> None:
+    """근거 원문 링크 목록 — 실사용/서포터 버킷 분리. 링크가 하나도 없으면 통째로 생략.
+
+    서포터(홍보성)에도 링크를 준다 — 단 서포터 블록 안에서만. 대가성 후기라는 사실을
+    감추지 않는 것과 그 원문을 확인하게 해 주는 것은 같은 목표(투명성)에 복무한다.
+    """
+    genuine = sources.get("genuine") or []
+    promo = sources.get("promo") or []
+    if not genuine and not promo:
+        return
+    st.subheader("🔗 근거 원문")
+    st.caption(source_links.EVIDENCE_NOT_QUOTE_CAPTION)
+    st.caption(source_links.EVIDENCE_COUNT_CAPTION)
+    if genuine:
+        st.markdown(f"**실사용 후기 · 원문 {len(genuine)}건**")
+        for g in genuine:
+            _render_source_group(g)
+    if promo:
+        st.markdown(f"**서포터 후기 (협찬·무상 제공) · 원문 {len(promo)}건**")
+        for g in promo:
+            _render_source_group(g)
 
 
 # ---------------------------------------------------------------- 선택 컨트롤
@@ -295,9 +329,12 @@ def main() -> None:
             ans = search.answer(q, filters=filters or None)
         st.markdown(ans.text)
         with st.expander(f"근거 {len(ans.citations)}건"):
+            st.caption(source_links.EVIDENCE_NOT_QUOTE_CAPTION)
             for c in ans.citations:
+                # 링크는 식별자가 있는 행에만 붙는다. 없으면 텍스트만 — 깨진 링크를 만들지 않는다.
+                link = f"  \n[원문 보기]({c['url']})" if c.get("url") else ""
                 st.markdown(f"**[{c['n']}]** `{c['source']}` · {c['market']}/"
-                            f"{c['product']}  \n{c['evidence']}")
+                            f"{c['product']}  \n{c['evidence']}{link}")
 
 
 if __name__ == "__main__":            # streamlit run 시 __name__=='__main__' → 실행.

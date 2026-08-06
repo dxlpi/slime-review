@@ -23,6 +23,8 @@ import json
 from collections import Counter, defaultdict
 from typing import Optional, Callable
 
+from . import source_links
+
 SENT_SCORE = {"pos": 1.0, "neu": 0.0, "neg": -1.0}
 
 # 종합 요약에서 다룰 속성 필드(필드별 정서가 있는 것들)
@@ -283,6 +285,10 @@ def build_consolidated(product_ref: dict,
         # 소스별 향/질감/장단점 요약 + 통합. llm_sectionize 없으면 전부 None.
         "review_summaries": {"instagram": None, "dcinside": None, "integrated": None},
         "promo_view": None,                             # 서포터 있으면 아래에서 채움
+        # 근거 원문 링크 목록 — 실사용/서포터를 버킷째 분리한다(집계를 안 섞듯 링크도 안 섞는다).
+        # 조각 식별자로 중복 제거 + 렌더된 URL 로 그룹핑(source_links). 링크 없는 행은 빠진다.
+        "sources": {"genuine": source_links.group_evidence_sources(genuine),
+                    "promo": source_links.group_evidence_sources(promo)},
     }
 
     if llm_sectionize:

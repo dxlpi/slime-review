@@ -11,6 +11,8 @@ app/ui.py 는 app body 를 main() 가드(__name__=='__main__') 뒤에 둬서, im
   - texture=None 등 미언급 섹션은 렌더 안 됨(빈칸).
   - review_summaries 가 전부 None 이면 '리뷰 요약' 헤더 자체 생략.
   - 공식 스펙 source_permalink 가 있으면 링크 캡션 렌더.
+  - 근거 원문 목록: 링크 있으면 실사용/서포터 버킷 분리 렌더, 없으면 섹션 통째 생략.
+  - 정직성 캡션 2종(evidence≠인용 · 건수 단위)이 실제로 렌더.
   - 제품 타이핑 검색: 부분일치·초성·공백무시·무매치 경고.
   - 선택 흐름: 마켓 미선택 → 안내 / 마켓 선택 → 범위 / '특정 제품' → 검색+제품 드롭다운.
 
@@ -44,6 +46,14 @@ def _views() -> dict:
             # 서포터(홍보성) 버킷도 향/질감/배송·CS/장단점 섹션 형태로 포함(소수라도 표시).
             "promo_view": {"n_promo": 1, "scent": "레몬마들렌향 은은", "texture": "매트·포닥",
                            "shipping": None, "pros": ["발색·향"], "cons": []},
+            # 근거 원문 — 실사용/서포터 분리. 디시 그룹은 앵커가 없어 글+댓글이 한 줄로 묶인다.
+            "sources": {
+                "genuine": [{"url": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201513",
+                             "platform": "dcinside", "n_pieces": 3, "n_posts": 1,
+                             "n_comments": 2, "label": "글 1건 + 댓글 2건"}],
+                "promo": [{"url": "https://www.instagram.com/p/PROMO1/", "platform": "instagram",
+                           "n_pieces": 1, "n_posts": 1, "n_comments": 0, "label": "글 1건"}],
+            },
         },
         "single_source": {   # 디시만 → 통합 None, 질감 빈칸, URL 없음
             "official_spec": {"official_scent": None, "base_combo": None, "slime_type": None, "beads": [], "source_permalink": None},
@@ -106,6 +116,16 @@ def test_ui_render_no_exception_and_blocks():
     assert any("공식 스펙 출처" in c and "instagram.com/p/ABC" in c for c in caps), "스펙 URL 링크 미렌더"
     assert any("🎁 서포터 리뷰" in m for m in mds), "서포터 리뷰 블록 미렌더"
     assert any("레몬마들렌향 은은" in m for m in mds), "서포터 향 섹션 미렌더"
+
+    # --- 근거 원문 목록: 링크 있는 뷰(full)에만, 실사용/서포터 버킷 분리 ---
+    assert sum("🔗 근거 원문" in s for s in subs) == 1, "근거 원문 섹션은 sources 있는 뷰에만 떠야 한다"
+    assert any("글 1건 + 댓글 2건" in m and "no=201513" in m for m in mds), \
+        "디시 근거 그룹(글+댓글 구성 라벨 + 원문 링크) 미렌더"
+    assert any("서포터 후기" in m and "원문 1건" in m for m in mds), "서포터 근거 버킷 미렌더"
+    assert any("실사용 후기" in m and "원문 1건" in m for m in mds), "실사용 근거 버킷 미렌더"
+    # 정직성 캡션 2종 — 링크를 다는 순간 필요해지는 고지라 링크와 같은 화면에 있어야 한다.
+    assert any("원문 인용이 아니라" in c for c in caps), "evidence≠인용 캡션 미렌더"
+    assert any("근거 목록은 원문 조각 수" in c and "댓글" in c for c in caps), "건수 단위 캡션 미렌더"
     # 편향 라벨(긍정/부정 쏠림)은 제거됨 — 어디에도 나오면 안 됨.
     alltext = mds + caps + subs
     assert not any("쏠림" in t for t in alltext), "쏠림 라벨이 아직 렌더됨"

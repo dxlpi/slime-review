@@ -7,7 +7,7 @@
           {"caption": "<마켓 게시물 캡션 원문>", "permalink": "<게시물 URL>", "timestamp": "<ISO8601>", "media_type": "IMAGE|CAROUSEL_ALBUM|VIDEO", "id": "<게시물 id>"}
         ],
         "products": [
-          {"product_name": "str", "official_scent": "str|null", "glue_composition": "str|null", "type": ["TYPE_ENUM"], "type_other": "str|null", "beads": ["str"], "evidence": {"scent": "str", "glue": "str", "type": "str"}, "source_permalink": "str|null"}
+          {"product_name": "str", "official_scent": "str|null", "glue_composition": "str|null", "type": ["TYPE_ENUM"], "type_other": "str|null", "official_texture": "str|null", "beads": ["str"], "evidence": {"scent": "str", "glue": "str", "type": "str"}, "source_permalink": "str|null"}
         ]
       }
     }
@@ -31,6 +31,7 @@
           "glue_composition": "플레인 / 쁠루모 / 플로우 / 글루올",
           "type": ["디폼"],
           "type_other": "로션/매트크리미 베이스 + 6mm디폼 30g·퍼즐비즈 15g 내장",
+          "official_texture": "지난 마켓 비매품 베이스를 수정해 더 얇아졌고 무게감도 얄랑 가벼워졌어요. 초반엔 뭉근 매끈한 로션베이스 느낌이 가득하고, 부풀수록 수정액 같은 매트크리미가 올라와요. 수분감 없이 빽빽한 질감은 아니라 부담이 적은 편이에요.",
           "beads": ["퍼즐비즈"],
           "evidence": {"scent": "레몬마들렌향 ... 레몬비스켓 레몬빵 느낌", "glue": "플레인+쁠루모+플로우+글루올", "type": "디폼이 우다다 매달려있는데 / 6mm30g+퍼즐비즈15g"},
           "source_permalink": null
@@ -68,6 +69,7 @@
           "glue_composition": "엘믹 / 플로우 / 아마존 / 아이올 / 뉴클 / 점토 / 솝",
           "type": [],
           "type_other": "솝퐁말 (단단한 쉐이빙폼 질감)",
+          "official_texture": "봄슬 솝퐁말 중 가장 정석 — 가장 크리미하고 솝 특유의 갈라지는 결이 두드러져요. 초반엔 약간 버글리스러운 탱글한 질감이다가 훅훅 부풀어 기포가 차오르면 통통하고 단단한 쉐이빙폼 같은 질감이 돼요(무게 보통·수분 보통·밀도 보통이상·부풀기 3배).",
           "beads": [],
           "evidence": {"scent": "향은 수선화 향으로 향긋한 꽃", "glue": "엘믹 플로우 아마존 아이올 뉴클 점토 솝", "type": "단단한 쉐이빙폼 / 솝퐁말"},
           "source_permalink": null
@@ -78,6 +80,7 @@
           "glue_composition": "플로우 / 솔 / 택 / 아이 / 엘믹 / 클리어믹스 / 솝소량 / 점토",
           "type": ["젤라또"],
           "type_other": "머드팩 세미 젤라또 퐁말 (눈가루 미포함, 젤라또 같은 질감)",
+          "official_texture": "초반엔 촉촉하고 부드러운 버글리 느낌이다가 기포가 차기 시작하면 표면이 점점 거칠어지면서, 눈가루를 넣지 않았는데도 살짝 젤라또 같은 질감으로 느껴져요. 밀도가 낮아 기포가 오래 유지되는 편은 아니지만 시즐 소리가 매력적이에요(무게 가벼움·수분 보통이상·부풀기 2.5배).",
           "beads": [],
           "evidence": {"scent": "쌉싸름한 리얼 말차라떼 향", "glue": "플로우 솔 택 아이 엘믹 클리어믹스 솝소량 점토", "type": "머드팩 세미 젤라또 퐁말"},
           "source_permalink": null
@@ -88,6 +91,7 @@
           "glue_composition": "플로우 / 아이믹스 / 솔 / 택 / 스쿨 / 클리어믹스 / 점토 / 솝",
           "type": [],
           "type_other": "물먹은 퍼프퐁말 (버글리퐁말 계열, #butterslime)",
+          "official_texture": "초반엔 촉촉한 버글리퐁말로 약간의 질깃함이 느껴지다가 천천히 풀어주면 금세 부풀어 올라요. 점토의 고운 입자감에 겉면이 아주 부드럽고 촉촉해 물을 머금은 통통한 퍼프처럼 느껴지고, 밀도가 높아 최대로 부푼 상태가 오래 유지돼요. 다만 기포 소리는 조금 먹먹한 편이에요(부풀기 3.5배).",
           "beads": [],
           "evidence": {"scent": "향은 고구마쿠키 향으로 ... 고소한 향", "glue": "플로우 아이믹스 솔 택 스쿨 클리어믹스 점토 솝", "type": "물먹은 퍼프퐁말 / #butterslime"},
           "source_permalink": null
@@ -118,6 +122,7 @@
           "glue_composition": "쁠루모 / 아이글루올 / 글루올 / 플레인",
           "type": ["크런치", "디폼"],
           "type_other": "디폼+한글비즈 크런치 (8디폼 60g 내장, 한글비즈 20g 내외, 화이트글루 버전)",
+          "official_texture": "베이스는 꾸덕하고 크리미한 풀들을 조합해 많이 부푸는 편이 아니라 디폼과 한글비즈의 존재감이 아주 잘 느껴져요. 비즈가 얇고 각이 많아 통꾹이할 때 과자를 씹는 듯 바삭바삭해요. 늘이는 플레잉보다 크런치 슬라임처럼 꽉꽉 누르며 만지는 쪽을 추천해요.",
           "beads": ["한글비즈"],
           "evidence": {"scent": "달달한 믹스커피향에 연유향 ... 자판기커피향", "glue": "쁠루모, 아이글루올, 글루올, 플레인", "type": "디폼+비즈 크런치 ... 아주 크런치하게"},
           "source_permalink": null
@@ -128,9 +133,125 @@
           "glue_composition": "아이뉴클리어 / 슬라임글루클리어",
           "type": ["크런치"],
           "type_other": "스팽글크런치 (큰 별모양 스팽글, 야들야들 리뉴얼 베이스)",
+          "official_texture": "기존 스팽글베이스를 좀더 야들야들하게 리뉴얼해 기포를 채워도 많이 부풀지 않고 계속 바삭바삭해요. 큰 별모양 스팽글이라 찔리면 따끔하지만 낙엽 밟는 듯한 빠삭빠삭 소리가 나요.",
           "beads": ["별모양스팽글"],
           "evidence": {"scent": "드링크향 ... 비타오백이나 박카스같은 에너지드링크향", "glue": "아이뉴클리어, 슬라임글루클리어", "type": "스팽글크런치 ... 계속 바삭바삭"},
           "source_permalink": null
+        }
+      ]
+    },
+    "slime_gina_": {
+      "posts": [],
+      "products": [
+        {
+          "product_name": "베리굿바나나",
+          "official_scent": "블루베리바나나",
+          "glue_composition": "엘믹 플로우 아모스 솝 점토",
+          "type": ["촉감류(점토)"],
+          "type_other": null,
+          "official_texture": "기포를 채우기 전에는 버글리스럽다가 계속 채워주면 부드러운 퐁말이 돼요. 솝퐁말 특유의 도잉도잉한 느낌이 있고 바닥 플레잉에서는 쫀득한 느낌도 있어요. 구멍이 크지 않고 오히려 촘촘하고 밀도 높은 촉감류이며, 손붙음은 거의 없으나 건조한 부분엔 조각 묻음이 있을 수 있어요(부풀기 약 2배).",
+          "beads": [],
+          "evidence": "#베리굿바나나 / 향·점토",
+          "source_permalink": "https://www.instagram.com/p/DXbT7_wDoDG/"
+        },
+        {
+          "product_name": "봄날의배달부",
+          "official_scent": "애프리콧프리지아향",
+          "glue_composition": "아이믹스 글루올 컬스 택키",
+          "type": ["디폼"],
+          "type_other": null,
+          "official_texture": "녹진 몽글 크리미한 베이스인데 물막 느낌도 살짝 느껴지는 질감이에요. 디폼 탈출은 2~3개 정도로 약간 있는 편이고 기포가 찰수록 줄어들어요.",
+          "beads": [],
+          "evidence": "#봄날의배달부, 6미리",
+          "source_permalink": "https://www.instagram.com/p/DXa7OoRAXrE/"
+        },
+        {
+          "product_name": "라일락베르사유",
+          "official_scent": "야생복숭아꽃향",
+          "glue_composition": "글루올 아이올 솔리드 플로우",
+          "type": ["폼볼"],
+          "type_other": null,
+          "official_texture": "반투명함이 거의 없는 새하얀 베이스로 도톰하고, 손에 닿는 촉감이 매끈 말랑하다가 기포가 차면서 크리미해져요. 완전 매트하진 않지만 수분감이 적은 편이라 까드득 소리도 잘 나고, 폼볼을 따로 굽지 않았는데도 통꾹이 소리가 잘 나요. 폼볼 탈출은 1~2개로 거의 없어요.",
+          "beads": ["연보라>핑크>하늘 비율로 믹스된 폼볼"],
+          "evidence": "#라일락베르사유\n글루올 아이올",
+          "source_permalink": "https://www.instagram.com/p/DXancbWAfeH/"
+        },
+        {
+          "product_name": "어노잉블루스크린",
+          "official_scent": "캐시미어믹스향",
+          "glue_composition": "엘믹 아이올 플로우 택키 쁠루모",
+          "type": ["디폼"],
+          "type_other": null,
+          "official_texture": "8미리 디폼 베이스답게 밀도 높고 묵직한 편이에요. 기포가 차기 전에는 탱글 뻐등해 공중 플레잉에서 끊길 듯한 느낌이라 늘이는 데 제약이 있고, 기포가 차면서 탱글함이 몽글함으로 바뀌어요. 묵직하고 도톰한 편이라 손목이 아프면 버거울 수 있어요.",
+          "beads": ["8미리 디폼"],
+          "evidence": "#어노잉블루스크린, 8미리 디폼",
+          "source_permalink": "https://www.instagram.com/p/DXZROCxAR0_/"
+        },
+        {
+          "product_name": "냥심당과일시루",
+          "official_scent": "망고+벌쓰데이케이크향",
+          "glue_composition": "아마존 스쿨 컬스 아이 쁠루모 착풀 택키 점토",
+          "type": ["촉감류(점토)"],
+          "type_other": null,
+          "official_texture": "화이트초콜렛생크림케이크 변형 레시피에 아이글루를 추가해 무게감을 살짝 올렸어요. 가볍고 촉촉한 촉감류로 잔기포로 가득 찬 거품 뭉탱이 같은 질감이에요(부풀기 1.7~1.8배). 자바칩 탈출은 꽤 많은 편이라 탈출에 민감하면 신중하게 고려해 주세요.",
+          "beads": ["자바칩"],
+          "evidence": "#냥심당과일시루 / 망고+벌쓰데이케이크향 / 자바칩 내장",
+          "source_permalink": "https://www.instagram.com/p/DXYovWsDsrc/"
+        },
+        {
+          "product_name": "푸딩크런키",
+          "official_scent": "프루티젤리빈",
+          "glue_composition": "아이뉴클 아모스 (크런키 베이스)",
+          "type": ["크런치"],
+          "type_other": null,
+          "official_texture": "코팅이 잘 되어 있는 편이라 유연하게 만져도 손붙음이 크지 않아요. 적당한 농도에서는 야들야들함이 크고 단단한 농도에서는 도톰 쫀쫀함이 크게 느껴져 취향에 맞게 농도를 잡으면 돼요. 스팽글은 한쪽 면이 까슬하지만 자극은 생각보다 적어요.",
+          "beads": ["스팽글"],
+          "evidence": "#푸딩크런키 / 프루티젤리빈향",
+          "source_permalink": "https://www.instagram.com/p/DXYhM0QAaR_/"
+        },
+        {
+          "product_name": "아오리트위스트",
+          "official_scent": "사과요거트향",
+          "glue_composition": "아이믹스+엘믹",
+          "type": ["폼볼"],
+          "type_other": null,
+          "official_texture": "통통 쫀쫀 크리미함이 메인인 질감으로, 겉이 매끈한 편이라 매트한 크리미함이 크지는 않고 통통함에서 오는 크리미함이 있어요. 유연한 농도에서는 조금 더 유들한 질감이지만 판매자는 적당한 농도를 더 추천해요. 폼볼 탈출은 2~3개예요.",
+          "beads": ["빨간색 벨벳폼"],
+          "evidence": "#아오리트위스트, 사과요거트향",
+          "source_permalink": "https://www.instagram.com/p/DXV_b5-ATFU/"
+        },
+        {
+          "product_name": "미니별초코비",
+          "official_scent": "밀크초콜렛향",
+          "glue_composition": "쁠루모 글루올 아모스",
+          "type": ["디폼"],
+          "type_other": null,
+          "official_texture": "매트 꾸덕 크리미한 질감이 주로 느껴지며, 아모스가 소량 믹스되어 쫀쫀하면서 쭉쭉 잘 늘어나요. 재료 양이 많은 편이라 단단한 농도에서는 끊김이 있을 수 있어 적당~약유연한 농도를 추천해요. 별디폼은 자극 없이 자글자글한 건더기 느낌만 줘요.",
+          "beads": ["별디폼"],
+          "evidence": "#미니별초코비\n쁠루모 글",
+          "source_permalink": "https://www.instagram.com/p/DUNW0uMAalN/"
+        },
+        {
+          "product_name": "아몬드바나나브레드",
+          "official_scent": "카라멜바나나케이크",
+          "glue_composition": "아이올 엘믹",
+          "type": ["폼볼"],
+          "type_other": null,
+          "official_texture": "촉촉 존존 크리미한 질감으로 가벼운 글마존 질감처럼 느껴지는 베이스예요. 쫀쫀까지는 아니고 존존한 정도의 쫄깃함이 있어 폼볼과 잘 어울리고, 크리미해지면서도 어느 정도의 광과 수분감이 느껴져요. 폼볼 탈출은 2~3개예요.",
+          "beads": ["7-9미리 폼볼"],
+          "evidence": "#아몬드바나나브레드, 카라멜바나나케이크향",
+          "source_permalink": "https://www.instagram.com/p/DUNRxj-Aaz8/"
+        },
+        {
+          "product_name": "빠코볼",
+          "official_scent": "코코넛과자향",
+          "glue_composition": "아마존 우드 점토",
+          "type": ["폼볼"],
+          "type_other": null,
+          "official_texture": "영양크림처럼 밀도 높고 유분감이 많은 로션베이스로 크리미함도 약간 있어요. 까드득 소리가 나는 제품은 아니지만 베이스가 얇아 도골도골 폼볼이 잘 느껴지고 손붙음이 거의 없어 오래 편하게 플레잉할 수 있어요. 단단하면 우드글루의 뜯김이 발생해 유연하게 만지길 권장해요.",
+          "beads": ["폼볼"],
+          "evidence": "#빠코볼 / 아마존 우드 점토 / 코코넛과자향 / 도골도골 폼볼이 잘 느껴지고",
+          "source_permalink": "https://www.instagram.com/p/ClLkWcFydEf/"
         }
       ]
     }

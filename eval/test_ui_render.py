@@ -178,16 +178,24 @@ def test_spec_embed_branches():
     print("✓ 스펙 카드: permalink 있을 때만 임베드+프라이버시 캡션 · 텍스트 링크 상시 OK")
 
 
-def test_spec_rendered_in_both_tabs():
-    """`_render_spec` 이 요약 탭·챗 탭 두 경로 모두에서 호출된다(AC5)."""
+def test_spec_card_is_single_source_of_truth():
+    """스펙 카드가 요약 탭·챗 탭 **양쪽**에서 같은 함수로 그려진다(AC5).
+
+    두 탭이 각각 스펙을 그리면 한쪽만 임베드가 붙는 드리프트가 생긴다. 그래서 검증
+    대상은 '두 탭에 임베드 코드가 두 벌 있다'가 아니라 **한 벌뿐이다** 이다.
+    챗 탭 경로는 `main()` 안이라 DB 부트스트랩 없이는 실행할 수 없어, 호출부 존재만
+    구조적으로 확인한다(렌더 동작 자체는 위 `test_spec_embed_branches` 가 덮는다).
+    """
     import inspect
     from app import ui
-    src = inspect.getsource(ui)
-    body = src.split("def main(", 1)[1]
-    assert "_render_spec(spec)" in src.split("def _render_consolidated", 1)[1].split("def ", 2)[0], \
-        "요약 탭 경로에서 _render_spec 호출이 사라졌다"
-    assert "_render_spec(spec)" in body, "챗 탭 경로에서 _render_spec 호출이 사라졌다"
-    print("✓ 스펙 카드가 요약 탭·챗 탭 두 경로에서 모두 호출됨 OK")
+
+    calls = [ln.strip() for ln in inspect.getsource(ui).splitlines()
+             if "_render_spec(" in ln and not ln.lstrip().startswith(("def ", "#"))]
+    assert len(calls) == 2, f"_render_spec 호출부 {len(calls)}곳 (기대 2 — 요약 탭·챗 탭): {calls}"
+    # 임베드 로직은 _render_spec 안에만 산다 — 다른 데서 embed_url 을 부르면 드리프트 시작.
+    embed_calls = [ln for ln in inspect.getsource(ui).splitlines() if "embed_url(" in ln]
+    assert len(embed_calls) == 1, f"embed_url 호출이 {len(embed_calls)}곳 — 스펙 카드 밖으로 샜다"
+    print("✓ 스펙 카드: 두 탭이 같은 함수 1벌을 공유 · 임베드 판단도 1곳 OK")
 
 
 # ---------------------------------------------------------------- 제품 타이핑 검색
@@ -266,7 +274,7 @@ def test_selection_flow():
 if __name__ == "__main__":
     test_ui_render_no_exception_and_blocks()
     test_spec_embed_branches()
-    test_spec_rendered_in_both_tabs()
+    test_spec_card_is_single_source_of_truth()
     test_filter_products()
     test_selection_flow()
     print("\nUI 렌더·선택 헤드리스 테스트 통과 ✅")

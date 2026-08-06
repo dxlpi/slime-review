@@ -528,15 +528,16 @@ export default function SlimeSearch() {
           </div>
         </section>
 
-        <section style={{ padding: '48px 0' }}>
+        <section style={{ padding: '48px 0 32px' }}>
           <div
             style={{
               display: 'grid',
-              /* 판매자 게시물은 **화면 가로 중앙까지** 온다(사용자 지시 2026-08-06) — 디자인의
-               * 고정 480px 대신 `50%`. `main` 이 가운데 정렬이고 좌우 padding 이 같으니 이 열의
-               * 오른쪽 끝이 곧 화면 중앙이고, 창 폭이 바뀌어도 그 관계가 유지된다. 비율은
-               * 아래 `aspectRatio: '4/5'` 가 그대로 잡는다 — 넓어진 만큼 세로도 같이 큰다. */
-              gridTemplateColumns: '50% 1fr',
+              /* 판매자 게시물은 한때 **화면 가로 중앙까지**(`50%`) 왔으나 420px 상한으로 줄였다
+               * (사용자 결정 2026-08-06, 앞선 지시를 대체). 4/5 비율이라 폭이 곧 높이다 —
+               * 1440px 화면에서 576×720 이 되어 옆의 제품 정보 카드(~390)보다 330px 이나 길었고,
+               * 그 빈 칸이 그대로 '리뷰 요약' 앞의 여백으로 보였다. 420 이면 525 로 내려와
+               * 남는 세로가 ~135px. 상한이라 좁은 창에서는 `minmax` 가 알아서 줄인다. */
+              gridTemplateColumns: 'minmax(0, 420px) 1fr',
               gap: 24,
               alignItems: 'start',
             }}

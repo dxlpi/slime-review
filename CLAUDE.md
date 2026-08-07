@@ -22,27 +22,12 @@ something to correct for** — never average it; show it per source, plus the ga
 3. **Observability** (logging, metrics, cost, failure tracing — every LLM call goes through `slime_rag/llm_ops.py` alone)
 
 ## Current status & what's left
-- **The frontend is `web/` — Vite + React + TS — and it reads the backend through `api/`.** The
-  Streamlit UI was deleted on 2026-08-06 ([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md)) and
-  the screen was rebuilt by **porting the design HTML verbatim**: `web/src/screens/SlimeSearch.tsx`
-  is `Slime Search.dc.html` with the inline styles carried over unchanged, and `DCLogic` mapped to
-  `useState`. Measured against the original mockup it is **pixel-identical** (0.025% differing pixels
-  at an 8px offset — the mockup never reset the browser's default `body` margin; we do).
-  `web/src/data/api.ts` fetches `/api/page`; `web/src/data/mock.ts` is the **fallback placeholder**
-  (the design's own `자리` strings) shown before the response lands or when it fails — not the data path.
-  · KDS tokens are copied byte-for-byte into `web/src/styles/kds/`; the mint accent is isolated in
-    `web/src/styles/slime-accent.css` (KDS default is blue — never edit the token folder to change it).
-  · Six KDS components are cut from the design bundle into `web/src/components/kds/` — **do not edit
-    them**, see that folder's README for what was changed and the two known token collisions.
-  · The backend was **not touched** by any of this: every display decision already lived behind
-    `pipeline` / `consolidated_view` / `source_links`.
-  **The HTTP API is [`api/main.py`](api/main.py)** (FastAPI, added 2026-08-06 — the deleted UI had
-  called Python functions directly): `/api/page` · `/api/markets` · `/api/markets/{market}/products` ·
-  `/api/logo/{handle}` · `/api/health`. It is **deliberately thin** — SQL, display policy and
-  aggregation all stay in `slime_rag`; this layer calls `pipeline` and serializes. Its response shape
-  mirrors `web/src/data/mock.ts` so the markup never has to change to swap the data in.
-  A page load **never calls the LLM**: `/api/page` reads stored summaries only
-  (`with_summary=False`); generation is a separate `pipeline.generate_summaries` run.
+- **The stack runs end to end: `slime_rag` → [`api/`](api/CLAUDE.md) (FastAPI) → [`web/`](web/CLAUDE.md)
+  (Vite + React + TS).** The Streamlit UI was deleted on 2026-08-06
+  ([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md)) and the screen was rebuilt by porting the
+  design HTML verbatim; `mock.ts` is now only the fallback placeholder. The two module guides carry
+  the rules that bite — pixel parity, the do-not-edit KDS copies, the thin-API rule, and why a page
+  load never calls the LLM. **Read them before touching either module.**
 - Phases 0–5 (collection → extraction → linking → index → search → consolidated view) are **verified
   end-to-end against live data**. Phase 6 was rebuilt from zero on 2026-08-06 and now renders live
   data through `api/` — what a given page shows depends on what has been collected and summarized,
@@ -76,24 +61,16 @@ something to correct for** — never average it; show it per source, plus the ga
   so even once a screen exists it renders nothing until tranche 2 URLs land.
 - **Market logos** ([ADR-0010](docs/adr/0010-market-logo-assets.md)): shipped, CI-gated, and
   `data/market_logos/` is now **populated** (13 markets) — markets without a file degrade to a monogram chip.
-- **Seller texture description is now a first-class Layer 1 field** (2026-08-06): `specs.official_texture`
-  — the seller's own "what it feels like" prose, summarized to 1–2 sentences by `extract_spec`.
-  Layer 1 was dropping it ("주관 감상 무시"), so the spec card's **질감** row showed only the
-  `slime_type` enum (`폼볼`). The rule is now "ignore **buyer** evaluation", not all prose.
-  It renders on the 1층 spec card only and is **barred from every summary prompt** — seller copy is
-  structurally always positive, so leaking it in would stack another layer of Instagram bias
-  (gated by `eval/test_consolidated_sections.py`). All 16 fixture products are seeded from their captions.
-  The card's four rows are now 풀 조합 / 향 / **종류** / 질감 — 종류 is `slime_type`, 질감 is
-  `official_texture` alone with **no fallback** to `slime_type` (that fallback was the original bug),
-  and `beads` is **not rendered** (user decision 2026-08-06: on embedded-grain products the two rows
-  read as the same word). `beads` is untouched in the DB and still ships in `/api/page`.
+- **Seller texture description is a first-class Layer 1 field** (2026-08-06): `specs.official_texture`.
+  Layer 1 ignores **buyer** evaluation, not all prose. The spec card's four rows are
+  풀 조합 / 향 / **종류**(`slime_type`) / **질감**(`official_texture` alone — the fallback to
+  `slime_type` was the original bug), and `beads` is **not rendered** (user decision 2026-08-06: on
+  embedded-grain products the two rows read as the same word) though it stays in the DB and in
+  `/api/page`. Why it must never reach a summary prompt: [slime_rag](slime_rag/CLAUDE.md).
 - **Everything the user reads is `~해요` (Toss-style), and the word is 출처, never 소스** (user
-  decision 2026-08-06). Review summaries take it from one shared constant `consolidated_view.TONE`
-  (four prompts + `search._ANSWER_SYSTEM` pull from it, CI-gated by
-  `eval/test_consolidated_sections.py::test_tone_rule_reaches_every_summary_prompt`); the Layer-1
-  `official_texture` takes it from the extraction prompt instead, so the extraction layer keeps no
-  dependency on the view layer. **Tone changes the ending, never the verdict** — softening a negative
-  review erases source bias, which is the one thing this project exists to show.
+  decision 2026-08-06). One shared constant `consolidated_view.TONE`, CI-gated so it reaches every
+  prompt. **Tone changes the ending, never the verdict** — softening a negative review erases source
+  bias, which is the one thing this project exists to show. Mechanics: [slime_rag](slime_rag/CLAUDE.md).
 - **What survived ADR-0011** now that its screen is gone: the **six criteria**
   (texture/scent/sound/longevity/CS/shipping) live in `consolidated_view.CRITERIA`, one list shared by
   the schema and the three summary prompts — that contract is backend and is still gated by
@@ -132,37 +109,12 @@ python .github/scripts/validate_context_paths.py               # context path in
 
 ## Commit messages
 
-ALWAYS write commit messages in English — subject, body, and trailers.
-
-python .github/scripts/validate_context_claims.py              # context claim integrity (부재 주장 검증)
-Korean is allowed ONLY as a quoted literal, wrapped in backticks:
-- Identifiers, filenames, or paths that are actually Korean in the codebase
-- UI copy / string values being added or changed
-- Domain terms with no established English equivalent (product names,
-  category labels, service-specific jargon)
-
-Everything else — verbs, connectives, explanations, reasoning — stays
-in English. Never write a Korean sentence and never mix Korean grammar
-into English prose.
-
-  GOOD  fix(search): normalize `슬라임` variants before indexing
-  GOOD  feat(ui): change empty-state copy to `검색 결과가 없어요`
-  BAD   fix(search): 슬라임 검색어 정규화
-  BAD   fix(search): normalize 슬라임 검색어 before indexing
-
-On first use in the body, gloss an unfamiliar Korean term once in
-parentheses, then reuse the term as-is:
-  `제논` (the marketplace this feature targets)
-
-If a term has a widely used English equivalent, prefer the English one.
-Do not romanize Korean — use Hangul or English, never `seullaim`. Without
-that ban one concept scatters across `슬라임` / `seullaim` / `slime` and
-`git log --grep` stops finding it.
-
-Enforced by [.githooks/commit-msg](.githooks/commit-msg) (quoted literals are
-stripped before the Korean check; subject must be `<type>(<scope>): <description>`
-with the description ≤50 chars). The romanization ban is convention only — no
-hook can detect it.
+English only — subject, body, trailers. Korean appears **only as a quoted literal in backticks**
+(real identifiers, UI copy, domain terms with no English equivalent). Never romanize: `슬라임` or
+`slime`, never `seullaim` — without that ban one concept scatters and `git log --grep` stops finding it.
+Subject is `<type>(<scope>): <description>`, description ≤50 chars.
+Full rules and examples: **[docs/commit-convention.md](docs/commit-convention.md)** ·
+enforced by [.githooks/commit-msg](.githooks/commit-msg).
 
 ## Absolute rules (non-negotiable)
 - **Unmentioned → null; never invent.** Cite via per-field evidence snippets (~15 characters) to stay

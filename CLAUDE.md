@@ -31,8 +31,15 @@ something to correct for** — never average it; show it per source, plus the ga
 - Phases 0–5 (collection → extraction → linking → index → search → consolidated view) are **verified
   end-to-end against live data**. Phase 6 renders live data through `api/` — what a given page shows
   depends on what has been collected and summarized, not on the wiring.
-- Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
-  blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
+- Layer 1 is **no longer fixture-only** (2026-08-07). `business_discovery` is still App-Review-blocked
+  ([ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md)), but `pipeline.ingest_seller_profiles`
+  scrapes the market's **own feed** via Apify `instagram-profile-scraper` — the same seller→`extract_spec`
+  path `ingest_hashtag` uses, sharing one gate (`_specs_from_seller_post`). Live run: **specs 23→69행,
+  4→10 markets** for $0.0144 Apify + 54 LLM calls. The fixture remains the seed for markets that path
+  can't reach. **Sampling caveat:** the profile actor returns only the **~12 most recent** posts and has
+  no `resultsLimit`, so old products need repeat runs over time — but unlike the hashtag path it is
+  **not rank-biased** (whole feed, not a top-N subset). It collects **seller posts only**; user reviews
+  live on other accounts and stay the hashtag path's job.
 - The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
   independent binary axes **M/Q/E** ([ADR-0006](docs/adr/0006-mqe-three-axis-relevance.md) — the
   source plan `kind-axis-resolution.md` is author-local and not part of this repo).

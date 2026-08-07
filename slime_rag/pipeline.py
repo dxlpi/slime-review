@@ -72,6 +72,56 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, official_textur
     )
 
 
+# 제품성 판정 필드 — **하나라도** 차면 제품으로 인정한다.
+# `official_texture` 가 여기 있는 이유(2026-08-07 사용자 규칙): 어떤 마켓은 **풀조합·향을 아예
+# 안 적는다**(실측: 진통제 향 0/5 · 풀조합 1/5). 대신 종류와 질감 서술은 쓴다. 앞의 셋만 보면
+# 그런 마켓의 제품이 통째로 드롭된다 — 캡션 관행 차이로 제품이 사라지는 건 데이터 문제가 아니라
+# 우리 게이트의 문제다. 미언급 필드는 그냥 null 로 두고 제품 행은 만든다.
+# ⚠️ `beads` 는 넣지 않는다 — 비즈는 구성요소라 그것만 있는 글은 제품 안내가 아니다.
+_PRODUCTHOOD_FIELDS = ("scent", "base_combo", "slime_type", "official_texture")
+
+
+def _specs_from_seller_post(cur, market: str | None, text: str, url: str | None,
+                            llm) -> tuple[int, bool, int]:
+    """판매자 게시물 1건 → specs 행 upsert. 반환 `(만든 행 수, 해시태그없음_스킵, 제품성탈락 수)`.
+
+    해시태그 경로(`ingest_hashtag`)와 프로필 경로(`ingest_seller_profiles`)가 **이 한 벌을
+    공유한다.** 규칙이 두 곳에 있으면 조용히 갈라진다 — 실제로 후기 경로에 같은 게이트가
+    없어서 유령 제품이 생겼다(`.omc/plans/product-attribution-repair.md`).
+
+    게이트 둘 다 **결정적**이고 LLM 판정에 맡기지 않는다:
+      · 제품 해시태그가 하나도 없으면 비매품/공지글 → 통째로 스킵.
+      · 제품명은 반드시 그 캡션의 해시태그여야 한다 — LLM 이 향료·재료어를 지어내도 드롭.
+    """
+    excl = _tag_exclusions(market) if market else frozenset()
+    post_tags = set(extract_mod().product_hashtags(text, exclude=excl))
+    if not post_tags:
+        return 0, True, 0
+    spec = extract_mod().extract_spec(text, llm, settings.model_extract)
+    n = n_thin = 0
+    for p in spec.get("products", []):
+        if not (market and p.get("product")):
+            continue                             # 제품명 없으면 스펙 행 못 만듦
+        if p["product"].strip() not in post_tags:
+            continue                             # 제품명 = 그 캡션의 해시태그여야 한다
+        if not any(p.get(k) for k in _PRODUCTHOOD_FIELDS):
+            # 네 칸 전부 null. 드롭하되 **세어서 드러낸다** — 예전엔 조용한 continue 라
+            # 어떤 마켓의 제품이 통째로 사라져도 카운트 어디에도 안 보였다.
+            n_thin += 1
+            continue
+        _upsert_spec(cur, market, p["product"], p.get("scent"),
+                     p.get("base_combo"), p.get("slime_type"),
+                     p.get("official_texture"), p.get("beads"), url)
+        n += 1
+    return n, False, n_thin
+
+
+def extract_mod():
+    """`extract` 지연 import — 모듈 최상위 import 아님(기존 함수들과 같은 규칙)."""
+    from . import extract
+    return extract
+
+
 def load_specs(conn, kb: dict | None = None) -> int:
     """fixture 로 시드한 KB products → specs 테이블 upsert. 반환: 적재 행 수."""
     if kb is None:
@@ -134,39 +184,17 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     log.info("해시태그 수집 %d건 → 판매자 %d, 유저후기 %d "
              "(게이트통과 %d / genuine단락 %d / 절감 LLM호출 %d)",
              len(raws), len(sellers), len(users), n_suspect, n_saved, n_saved)
-    n_spec = n_skip_nohash = 0
+    n_spec = n_skip_nohash = n_thin = 0
     with connect() as conn:
         with conn.cursor() as cur:
             for sp in sellers:                       # 판매자 캡션 → 1층 공식 스펙
-                market = sp.meta.get("seller_market")
-                # 결정적 게이트: 해시태그가 하나도 없으면 비매품/공지글 → 스킵(사용자 규칙).
-                # LLM 판정에 맡기지 않는다 — 비매품 설명(예: '8mm디폼')을 제품으로 오추출하기 때문.
-                # 제품명 후보는 **마켓 자기이름·광역어를 뺀** 태그다(2026-08-06 사용자 규칙).
-                # 안 빼면 `#슬라임지나` 같은 마켓 태그가 통과해 마켓마다 유령 제품 행이 생긴다.
-                excl = _tag_exclusions(market)
-                post_tags = set(extract.product_hashtags(sp.text, exclude=excl))
-                if not post_tags:
-                    n_skip_nohash += 1
-                    continue
-                spec = extract.extract_spec(sp.text, llm, settings.model_extract)
-                for p in spec.get("products", []):
-                    if not (market and p.get("product")):
-                        continue                     # 제품명 없으면 스펙 행 못 만듦 → 스킵
-                    # 결정적 제품 게이트: 제품명은 반드시 그 캡션의 해시태그여야 한다(사용자 규칙:
-                    # 제품=제품 고유 해시태그). LLM 이 향료·재료어(에그노그 등)를 유령 제품으로
-                    # 지어내도 #태그가 없으면 드롭 → run 간 비결정 유령 제거.
-                    if p["product"].strip() not in post_tags:
-                        continue
-                    if not any(p.get(k) for k in ("scent", "base_combo", "slime_type")):
-                        continue                     # 스펙 필드 전부 null → 비즈·토핑 노이즈, 제품 아님
-                    # beads·official_texture 는 제품성 판정에 넣지 않는다(각각 구성요소·서술일 뿐,
-                    # 스펙 세 칸이 전부 비었는데 질감 얘기만 있는 글은 제품 안내가 아니다)
-                    # → 위 백스톱 통과분에만 부가.
-                    _upsert_spec(cur, market, p["product"], p.get("scent"),
-                                 p.get("base_combo"), p.get("slime_type"),
-                                 p.get("official_texture"), p.get("beads"),
-                                 sp.url)                # 공식 스펙 출처 = 판매자 게시물 URL
-                    n_spec += 1
+                # 게이트 규칙은 `_specs_from_seller_post` 한 곳에 있다 — 프로필 경로
+                # (`ingest_seller_profiles`)와 공유한다.
+                n, skipped, thin = _specs_from_seller_post(
+                    cur, sp.meta.get("seller_market"), sp.text, sp.url, llm)
+                n_spec += n
+                n_skip_nohash += int(skipped)
+                n_thin += thin
         conn.commit()
     if n_skip_nohash:
         log.info("판매자 글 중 제품 해시태그 없음 %d건 스킵(비매품/공지)", n_skip_nohash)
@@ -193,12 +221,74 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     with connect() as conn:
         n_join = join_specs(conn)
     counts = {"collected": len(raws), "seller_specs": n_spec,
-              "seller_no_hashtag": n_skip_nohash,
+              "seller_no_hashtag": n_skip_nohash, "seller_thin_spec": n_thin,
               "promo": n_promo, "genuine": n_genuine, "joined_now": n_join,
               "gate_suspect": n_suspect, "llm_calls_saved": n_saved,
               "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref}
     log.info("ingest_hashtag 완료: %s", counts)
     return counts
+
+
+# ---------------------------------------------------------------- 1층 수집(마켓 본인 피드)
+def ingest_seller_profiles(markets: list[str] | None = None, *,
+                           limit_per_market: int = 12, dry_run: bool = True) -> dict:
+    """마켓 **본인 계정 피드** → 1층 공식 스펙. ADR-0003 이 막힌 자리의 우회 경로다.
+
+    `business_discovery` 는 App Review 벽이지만(ADR-0003) Apify `instagram-profile-scraper`
+    는 공개 게시물을 승인 없이 준다 — 같은 자리를 메우는 스크래핑 대체물이다.
+
+    **해시태그 경로와 달리 표본 편향이 없다.** 저건 태그당 상한(기본 30)에 랭킹된 부분집합이라
+    인기글이 과대표집되지만, 이건 그 계정의 최신 게시물을 액터가 주는 대로(~12개) 받는다.
+    대신 **최신분만** 온다 — 옛 제품은 안 잡히므로 주기적으로 돌려 앞으로 쌓는 용도다.
+
+    ⚠️ 가져오는 건 **판매자 글**이라 1층 전용이다. 유저 후기(2층)는 남의 계정에 있어서 이
+       경로로는 영영 안 들어온다 — 그건 해시태그 경로 몫이고, 표본 편향도 거기 얘기다.
+
+    markets: 대상 market_word 목록. None 이면 **specs 가 아직 없는 마켓 전부**.
+    dry_run=True(기본): 네트워크·LLM·DB 미접촉. 대상과 예상비용만 돌려준다.
+    ⚠️ dry_run=False 는 **유료**다 — Apify 프로필 요금 + 캡션 1건당 `extract_spec` LLM 호출.
+    """
+    from .sources import InstagramProfileSource
+
+    kb = linking.load_kb()
+    by_handle = {m["handle"]: m.get("market_word") for m in kb.markets if m.get("handle")}
+    if markets is None:
+        with connect() as conn:
+            have = {r[0] for r in conn.execute("SELECT DISTINCT market FROM specs").fetchall()}
+        targets = [(w, h) for h, w in by_handle.items() if w not in have]
+    else:
+        want = set(markets)
+        targets = [(w, h) for h, w in by_handle.items() if w in want]
+
+    cost = len(targets) / 1000 * InstagramProfileSource.COST_PER_1000
+    out: dict = {"targets": [w for w, _h in targets], "handles": [h for _w, h in targets],
+                 "apify_cost_usd": round(cost, 4), "dry_run": dry_run}
+    if dry_run or not targets:
+        log.info("ingest_seller_profiles(dry): %d마켓 · 예상 Apify 비용 $%.4f", len(targets), cost)
+        return out
+
+    src = InstagramProfileSource(token=settings.apify_token)
+    raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
+    llm = LLM()
+    n_spec = n_skip = n_nomarket = n_thin = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for sp in raws:
+                market = by_handle.get((sp.meta or {}).get("owner_username"))
+                if not market:                      # 액터가 리다이렉트된 계정을 줄 수 있다
+                    n_nomarket += 1
+                    continue
+                n, skipped, thin = _specs_from_seller_post(cur, market, sp.text, sp.url, llm)
+                n_spec += n
+                n_skip += int(skipped)
+                n_thin += thin
+        conn.commit()
+    out.update({"collected_posts": len(raws), "specs_upserted": n_spec,
+                "skipped_no_hashtag": n_skip, "skipped_unknown_handle": n_nomarket,
+                "skipped_thin_spec": n_thin,
+                "llm": {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}})
+    log.info("ingest_seller_profiles 완료: %s", out)
+    return out
 
 
 # ---------------------------------------------------------------- 2층 색인(디시 실수집)

@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from slime_rag import pipeline, source_links
+from slime_rag.consolidated_view import CRITERION_SCOPE as CRITERION_SCOPE_OF
 
 app = FastAPI(title="Slime Search API", version="0.1.0")
 
@@ -111,33 +112,84 @@ def logo(handle: str):
     return FileResponse(asset["path"], media_type="image/jpeg")
 
 
-def _paragraph(section: dict | None) -> str | None:
-    """6기준 요약 → 카드에 넣을 **문단**. 없으면 None(=아직 미생성).
+def _cell(section: dict | None, key: str) -> dict:
+    """기준 한 칸 → `{verdict, minority}`. 구 스키마(문자열 한 칸)도 그대로 읽는다.
 
-    저장된 요약은 기준별 문장 6개 + pros/cons 구조다. 디자인의 요약 카드는 '4–6문장 문단'을
-    요구하므로 **미언급(null)이 아닌 기준 문장을 순서대로 잇는다** — 새로 쓰지 않는다.
-    문장을 생성하면 근거 없는 문장이 섞이고, 그 순간 6기준 표와 카드가 서로 다른 말을 한다.
+    ADR-0014 이전에 저장된 요약이 DB 에 남아 있다. 재생성은 유료 호출이라 강제하지 않고,
+    읽는 쪽에서 문자열을 verdict 로 승격해 화면이 깨지지 않게 한다(다수/소수 구분은 없다).
     """
-    if not section:
-        return None
+    v = (section or {}).get(key)
+    if isinstance(v, str):
+        return {"verdict": v, "minority": None}
+    if isinstance(v, dict):
+        return {"verdict": v.get("verdict"), "minority": v.get("minority")}
+    return {"verdict": None, "minority": None}
+
+
+def _pick(payload: dict, market_payload: dict, key: str, card: str) -> dict:
+    """기준 한 칸을 **그 기준의 축이 소유한 payload** 에서 꺼낸다(ADR-0015).
+
+    고객 응대·배송은 마켓 단위 행(`product IS NULL`)에 있고, 제품 기준 넷은 제품 행에 있다.
+
+    ⚠️ 폴백: 마켓 행이 아직 없으면 제품 행의 같은 키를 읽는다. ADR-0015 이전에 저장된
+       요약은 여섯 기준이 **전부 제품 축**에 들어 있고, 재생성은 유료라 강제하지 않는다
+       (ADR-0014 의 구 스키마 승격과 같은 정책). 마켓 행이 한 번 생기면 그쪽이 이긴다.
+    """
+    if CRITERION_SCOPE_OF.get(key) == "market":
+        cell = _cell(market_payload.get(card), key)
+        if cell["verdict"]:
+            return cell
+        return _cell(payload.get(card), key)        # 구 payload 폴백(제품 축에 섞여 있던 값)
+    return _cell(payload.get(card), key)
+
+
+def _summary_rows(payload: dict, market_payload: dict, card: str) -> list[dict]:
+    """요약 카드 한 벌 → **축별 줄 목록**. 없으면 [](=아직 미생성이거나 언급 0).
+
+    예전엔 기준 문장 6개를 공백으로 이어 한 문단으로 만들었다. 질감·향·소리·지속력이 한
+    덩어리로 붙어 축 경계가 안 보였고, 읽는 사람이 매 문장 어느 축 얘긴지 되짚어야 했다.
+    이제 축 라벨이 줄마다 붙는다 — 문장을 새로 쓰지 않는 원칙은 그대로다(표와 카드가 다른
+    말을 하면 안 된다).
+
+    verdict 가 빈 기준은 **줄 자체를 뺀다.** 화면의 '언급 없음'은 표가 맡는다.
+
+    ⚠️ 여기에 배지·라벨을 다시 붙이지 말 것(사용자 결정 2026-08-07). 건수(`인스타 27 · 아모스갤 6`)·
+       정서 분포(`갈림 19:5`)·`인스타만` 을 만들어 화면에 띄워 봤고, 전부 걷어냈다 — 다수/소수는
+       이미 `verdict`/`minority` 두 칸이 **문장으로** 말하고 있어서 같은 말이 줄마다 두 번 붙었다.
+       집계(`criterion_stats`)는 그대로 살아 있고, 프롬프트의 다수 판정 재료로 계속 쓰인다.
+
+    ⚠️ 줄에 `scope` 를 함께 싣는다(ADR-0015). 화면이 '이 마켓 전체 기준'이라고 말해 줘야
+       하는 줄이 어느 것인지는 백엔드가 안다 — 프런트가 키 이름으로 다시 판단하면 규칙이
+       두 벌이 된다.
+    """
     from slime_rag.consolidated_view import CRITERIA
-    parts = [section.get(c["key"]) for c in CRITERIA]
-    joined = " ".join(p.strip() for p in parts if p)
-    return joined or None
+    if not payload.get(card) and not market_payload.get(card):
+        return []
+    rows = []
+    for c in CRITERIA:
+        cell = _pick(payload, market_payload, c["key"], card)
+        if not cell["verdict"]:
+            continue
+        rows.append({"key": c["key"], "ko": c["ko"], "en": c["en"],
+                     "scope": c["scope"], **cell})
+    return rows
 
 
-def _by_criterion(payload: dict) -> dict:
-    """{기준키: {ig, dc, all}} — 디자인의 '평가 기준별 요약' 표가 그대로 먹는 모양.
+def _by_criterion(payload: dict, market_payload: dict) -> dict:
+    """{기준키: {ig, dc, all, scope}} — 디자인의 '평가 기준별 요약' 표가 그대로 먹는 모양.
 
     키는 `consolidated_view.CRITERIA` 하나가 정한다(스키마·프롬프트·화면표 공유, ADR-0011).
+    각 칸은 `{verdict, minority}` 다 — 다수 의견과 소수 반론이 구조로 갈린다(ADR-0014).
+    기준마다 `scope` 가 붙는다 — 고객 응대·배송 두 줄은 제품이 아니라 **마켓** 것이다(ADR-0015).
     """
     from slime_rag.consolidated_view import CRITERIA
     out = {}
     for c in CRITERIA:
         k = c["key"]
-        out[k] = {"ig": (payload.get("instagram") or {}).get(k),
-                  "dc": (payload.get("dcinside") or {}).get(k),
-                  "all": (payload.get("integrated") or {}).get(k)}
+        out[k] = {"ig": _pick(payload, market_payload, k, "instagram"),
+                  "dc": _pick(payload, market_payload, k, "dcinside"),
+                  "all": _pick(payload, market_payload, k, "integrated"),
+                  "scope": c["scope"]}
     return out
 
 
@@ -164,7 +216,11 @@ def page(market: str | None = Query(None), product: str | None = Query(None)) ->
         n_reviews = view.get("n_reviews") or 0
         stored = pipeline.stored_summaries(market, product)
 
+    # 주문 축(고객 응대·배송)은 **마켓당 한 벌**이다(ADR-0015) — 제품이 안 정해져도 읽는다.
+    stored_market = pipeline.stored_market_summaries(market) if market else None
+
     payload = (stored or {}).get("payload") or {}
+    market_payload = (stored_market or {}).get("payload") or {}
     reviews = pipeline.list_reviews(market=market, product=product, limit=100)
     ig = [r for r in reviews if r["platform"] == "instagram"]
     dc = [r for r in reviews if r["platform"] == "dcinside"]
@@ -176,14 +232,22 @@ def page(market: str | None = Query(None), product: str | None = Query(None)) ->
         "product": product,
         "spec": spec,
         "embedUrl": source_links.embed_url(spec) if spec else None,
-        "summary": {k: _paragraph(payload.get(k)) for k in ("integrated", "instagram", "dcinside")},
-        "byCriterion": _by_criterion(payload),
+        "summary": {k: _summary_rows(payload, market_payload, k)
+                    for k in ("integrated", "instagram", "dcinside")},
+        "byCriterion": _by_criterion(payload, market_payload),
+        # 장단점은 **제품 축에만** 있다(ADR-0015) — 주문 축 스키마엔 칸 자체가 없다.
+        # 한 화면에 장단점 목록이 둘이면 어느 쪽을 읽어야 하는지 알 수 없다.
         "prosCons": {k: {"pros": (payload.get(k) or {}).get("pros") or [],
                          "cons": (payload.get(k) or {}).get("cons") or []}
                      for k in ("integrated", "instagram", "dcinside")},
         "summaryMeta": {"generatedAt": (stored or {}).get("generated_at"),
                         "model": (stored or {}).get("model"),
                         "nReviews": (stored or {}).get("n_reviews")},
+        # 주문 축은 근거 모집단이 다르다 — 제품 후기 수가 아니라 **접은 주문 조각 수**다.
+        # 같은 '건수'라는 말로 두 값을 섞으면 배송 줄이 제품 후기 수만큼 있는 것처럼 읽힌다.
+        "marketSummaryMeta": {"generatedAt": (stored_market or {}).get("generated_at"),
+                              "model": (stored_market or {}).get("model"),
+                              "nOrders": (stored_market or {}).get("n_reviews")},
         "nReviews": n_reviews,
         "igReviews": ig,
         "dcReviews": dc,

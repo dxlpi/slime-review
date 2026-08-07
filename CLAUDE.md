@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -29,9 +29,8 @@ something to correct for** — never average it; show it per source, plus the ga
   the rules that bite — pixel parity, the do-not-edit KDS copies, the thin-API rule, and why a page
   load never calls the LLM. **Read them before touching either module.**
 - Phases 0–5 (collection → extraction → linking → index → search → consolidated view) are **verified
-  end-to-end against live data**. Phase 6 was rebuilt from zero on 2026-08-06 and now renders live
-  data through `api/` — what a given page shows depends on what has been collected and summarized,
-  not on the wiring.
+  end-to-end against live data**. Phase 6 renders live data through `api/` — what a given page shows
+  depends on what has been collected and summarized, not on the wiring.
 - Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
   blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
 - The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
@@ -71,10 +70,30 @@ something to correct for** — never average it; show it per source, plus the ga
   decision 2026-08-06). One shared constant `consolidated_view.TONE`, CI-gated so it reaches every
   prompt. **Tone changes the ending, never the verdict** — softening a negative review erases source
   bias, which is the one thing this project exists to show. Mechanics: [slime_rag](slime_rag/CLAUDE.md).
+- **Customer service and shipping are market-scoped, not product-scoped**
+  ([ADR-0015](docs/adr/0015-market-scope-order-criteria.md), 2026-08-07). `shipping_cs` was always an
+  *order*-unit field (ADR-0005); it only sat on product rows because `index_post` **copies** it onto
+  every fan-out row. Summarizing it per product attributed one order's complaint to every product
+  that post mentioned. Now `CRITERIA` carries a `scope` and the summary splits in two:
+  `build_consolidated` (product axis — texture/scent/sound/longevity + pros/cons) and
+  `build_order_view` (**market axis, one per market** — CS/shipping, no pros/cons). Fan-out copies are
+  folded by source-fragment id in **code** (`_fold_orders`) — the prompt used to *ask the model* not to
+  over-count, which is exactly the pattern this repo forbids elsewhere. Storage is one table with two
+  row kinds (`review_summaries.product IS NULL` = market axis; the PK became two partial unique
+  indexes). The screen still shows six rows — the two market rows are borrowed and labeled
+  '이 마켓 전체 주문 N건 기준이에요'.
+  ⚠️ Summaries stored before this ADR keep all six criteria on the product row; `api.main._pick`
+  falls back to them until `generate_market_summaries(market)` is run (paid).
 - **What survived ADR-0011** now that its screen is gone: the **six criteria**
   (texture/scent/sound/longevity/CS/shipping) live in `consolidated_view.CRITERIA`, one list shared by
-  the schema and the three summary prompts — that contract is backend and is still gated by
-  `eval/test_consolidated_sections.py`. `search.answer` still exists with no consumer. Sentiment gap,
+  the schema and the summary prompts — that contract is backend and is still gated by
+  `eval/test_consolidated_sections.py`. Each criterion is now **two slots, `{verdict, minority}`**
+  ([ADR-0014](docs/adr/0014-verdict-minority-and-badge-meta.md)) so the majority view and the dissent
+  are separated structurally rather than laid side by side in one sentence; the meta that used to sit
+  in that sentence (gap, counts, "only one source") is simply gone from the screen — `criterion_stats`
+  keeps it as prompt material and provenance only.
+  ⚠️ Summaries stored before 2026-08-07 are the old string shape — the API promotes them to `verdict`
+  so nothing breaks, but they keep the old prose until `pipeline.generate_summaries` is re-run (paid). `search.answer` still exists with no consumer. Sentiment gap,
   scent divergence, the supporter bucket, and the evidence-source list are all still **computed** in
   `consolidated_view.py`; whether the new screen renders them is an open design question, not a build one.
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
@@ -96,7 +115,7 @@ source .venv/bin/activate                 # always from the repo root (DB port 5
 docker compose up -d                      # pgvector + schema init
 python -m slime_rag.pipeline              # end-to-end glue (no UI — this is how you see data now)
 python -m eval.test_bias && python -m eval.test_apify_source && python -m eval.test_relevance_gate   # offline tests
-python -m eval.test_consolidated_sections # 6기준 요약 계약 (CRITERIA 공유)
+python -m eval.test_consolidated_sections # 6기준 요약 계약 (CRITERIA 공유 · 제품/주문 축 분리)
 python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 정책 · 원문 메타 매핑
 python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
 python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates
@@ -105,6 +124,7 @@ uvicorn api.main:app --reload --port 8000 # HTTP API (repo 루트에서 · web/ 
 cd web && npm install && npm run dev      # frontend (http://127.0.0.1:5173 · API 없으면 목 데이터로 폴백)
 cd web && npm run build && npm run lint   # 타입체크·번들·린트
 python .github/scripts/validate_context_paths.py               # context path integrity
+python .github/scripts/validate_context_claims.py              # context claim integrity (부재 주장 검증)
 ```
 
 ## Commit messages
@@ -125,8 +145,16 @@ enforced by [.githooks/commit-msg](.githooks/commit-msg).
   (Known divergence, ruled intentional: the shipped gate also excludes negative-`e_union`
   non-`bias_hold` items from candidacy — D2, [ADR-0007](docs/adr/0007-collected-for-target-policy.md);
   re-ruling it to match this rule verbatim is option 1 there.)
-- **Label source bias; never average.** Scent mismatches and source gaps come from joins/aggregation
-  (`consolidated_view.py`), not from the LLM.
+- **Label source bias; never average.** Scent mismatches, source gaps, and **which side of a
+  criterion is the majority** come from joins/aggregation (`consolidated_view.py`), not from the LLM.
+A summary sentence carries *content only*; counts and gaps are aggregation, and the LLM is not
+  asked to narrate them ([ADR-0014](docs/adr/0014-verdict-minority-and-badge-meta.md)).
+  Measured: the LLM wrote "향 평가는 인스타에서만 나와요" when the count was **23 : 1**.
+  `criterion_stats` feeds the majority/minority split in the prompt and is snapshotted with each
+  summary; it is **not rendered** — badges for it were built and then withdrawn (user, 2026-08-07)
+  because `verdict`/`minority` already say it in prose. If it ever returns, it carries facts,
+  never threshold verdicts ("the gap is large") — that constant was already removed from
+  `sentiment_gap` for being sample-size-blind.
 - **The LLM vendor is a dependency of `llm_ops.py` only.** New sources and models go behind the interface.
 - **Responsible collection**: robots, delays, page caps. Source text is governed by
   **processing vs publication** ([ADR-0013](docs/adr/0013-processing-vs-publication.md)), not by a

@@ -33,7 +33,7 @@ flowchart LR
   IDX[index.py<br/>BGE-M3 임베딩] --> DBr[(reviews)]
   DBs -. spec_id 조인 .-> DBr
   DBr --> SEARCH[search.py<br/>하이브리드 RRF + 메타필터]
-  DBs --> CONS[consolidated_view.py<br/>소스별 정서·갭·향불일치]
+  DBs --> CONS[consolidated_view.py<br/>소스별 정서·갭·향불일치<br/>기준별 건수 criterion_stats]
   DBr --> CONS
   SEARCH --> ANS[근거 답변<br/>search.answer — 소비자 없음]
   CONS --> API
@@ -95,7 +95,11 @@ flowchart TD
 | 새 소스 | `sources/` 구현체 + `pipeline.collect` 등록만 — 하류 무변경 |
 | LLM 벤더/모델 | `llm_ops.py` 만 |
 | 마켓 로고 자산 | KB `markets[].logo` · `data/market_logos/` · `source_links.logo_asset` · 프런트엔드 |
-| `consolidated_view.CRITERIA` | `SOURCE_REVIEW_SCHEMA`(required) · 3개 요약 프롬프트 · 프런트엔드 평가 기준 표 — **한 리스트가 셋을 동시에 움직인다**(ADR-0011) |
+| `consolidated_view.CRITERIA` | `PRODUCT_REVIEW_SCHEMA`/`ORDER_REVIEW_SCHEMA`(required) · 6개 요약 프롬프트 · 프런트엔드 평가 기준 표 — **한 리스트가 셋을 동시에 움직인다**(ADR-0011) |
+| 기준의 `scope`(product/market) | 어느 축이 그 기준을 요약하는가(`build_consolidated` vs `build_order_view`) · `review_summaries` 행 종류(product NULL 여부) · `api._pick` · `web` 의 범위 라벨 — 주문 축을 제품 축에 되돌리면 한 주문의 배송 사실이 제품마다 관측된 것처럼 실린다(ADR-0015) |
+| 기준 칸의 모양(`{verdict, minority}`) | 축별 스키마 2벌 · 여섯 요약 프롬프트 · `api._cell`/`_summary_rows` · `web` 의 `Cell`/`SummaryRow` — 한 칸을 문자열로 되돌리면 다수/소수 구분이 조용히 사라진다(ADR-0014) |
+| `criterion_stats` 출력 | 요약 프롬프트의 `counts` · `review_summaries.payload` 스냅샷 — 숫자는 여기서만 나온다(ADR-0014, 화면 배지는 철회) |
+| 팬아웃 접기 키(`evidence_group_key`) | 근거 목록 그룹핑 · `list_reviews` 중복 제거 · **주문 축 집계·재료**(`_fold_orders`) — 한 조각을 세는 규칙이 갈리면 화면마다 건수가 달라진다(ADR-0015) |
 | `reviews` 에 작성일·반응수 컬럼 추가 | `pipeline.REVIEW_SORTS`(정렬 메뉴) · `list_reviews` · 리뷰 카드 라벨('수집' → '작성') |
 
 ## 배포 (마지막 하드게이트)

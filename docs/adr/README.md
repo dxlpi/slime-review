@@ -17,5 +17,7 @@
 | [0011](0011-six-criteria-summary-and-search-page.md) | 요약 6기준 확장 + 단일 검색 페이지 재편(챗 제거) | Accepted (구현체는 0012 가 폐기) |
 | [0012](0012-remove-streamlit-frontend.md) | Streamlit 프런트엔드 전면 제거 — 화면 재작성 | Accepted (Vite+React 로 재작성됨) |
 | [0013](0013-processing-vs-publication.md) | 무재배포를 처리/공표로 재정의 — 저장·처리 허용, 표시는 발췌+링크 | Accepted (계정명 표시 미결) |
+| [0014](0014-verdict-minority-and-badge-meta.md) | 요약 기준 칸을 다수/소수 두 칸으로 분리, 메타(갭·건수)는 문장에서 제거 | Accepted (배지 표시는 같은 날 철회) |
+| [0015](0015-market-scope-order-criteria.md) | 고객 응대·배송을 제품 축에서 떼어 **마켓 축**으로 — 요약·저장·집계 분리 + 팬아웃 접기 | Accepted |
 
 배경 흐름: [../../ARCHITECTURE.md](../../ARCHITECTURE.md) · 도메인 규칙: [../../MEMORY.md](../../MEMORY.md).

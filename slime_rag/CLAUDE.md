@@ -18,11 +18,11 @@
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
 | `source_links.py` | 원문 링크 정책(순수) — `permalink`/`embed_url`/`evidence_group_key`/`build_source_ref`/`group_evidence_sources` + `logo_asset`(마켓 로고 표시 게이트). DB·네트워크·streamlit 무의존 |
 | `logos.py` | 마켓 IG 프로필 아바타 **1회성 수동 수집** CLI(ADR-0010) — 파이프라인 미배선, 자동갱신 없음 |
-| `consolidated_view.py` | 소스별 정서·갭·향불일치 + 인스타/디시/통합 **리뷰 요약**(**6기준** `CRITERIA` 질감·향·소리·지속력·고객응대·배송 + 장단점, 미언급=빈칸; 홍보성 분리). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
+| `consolidated_view.py` | 소스별 정서·갭·향불일치 + **기준별 건수**(`criterion_stats`) + 인스타/디시/통합 **리뷰 요약**(6기준 `CRITERIA` × **`{verdict, minority}`**, 미언급=빈칸; 홍보성 분리). **축 둘**(ADR-0015): 제품 축 `build_consolidated`(질감·향·소리·지속력 + 장단점) / 주문 축 `build_order_view`(고객응대·배송, **마켓당 한 벌**, 팬아웃 `_fold_orders` 접기). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
-| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) |
+| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `order_view_for` 주문 축 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) + 요약 저장(`generate_summaries` 제품 · `generate_market_summaries` 마켓 · `stored_*`) |
 
 ## Common patterns (workflow)
 ```bash
@@ -76,6 +76,19 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   `r[6]`/`r[:6]` 위치 하드코딩은 컬럼 하나 삽입만으로 **무예외** BM25 파손을 냈다 — 되돌리지 말 것.
 - **Note:** 제품 단위 평가 축은 향/질감/소리/지속력 넷 — **`value`(가성비) 축은 제거됨**(2026-08-05,
   [ADR-0008](../docs/adr/0008-drop-value-add-shipping-section.md)). 가격 얘기는 pros/cons 로만 흐른다.
+- **Important:** 기준마다 **`scope`** 가 있다([ADR-0015](../docs/adr/0015-market-scope-order-criteria.md)).
+  질감·향·소리·지속력은 `product`, 고객 응대·배송은 `market` — **요약을 만드는 함수가 다르다**
+  (`build_consolidated` vs `build_order_view`). 주문 축은 **마켓당 한 벌**이고 제품 페이지가
+  그걸 빌려 쓴다. 되돌려 제품 축에 합치면, 비교글 하나의 배송 불만이 그 글이 언급한 **모든
+  제품의 요약**에 각각 관측된 것처럼 실린다(표시 문제가 아니라 귀속 오류).
+  **Don't:** 한 축의 프롬프트에 다른 축 기준을 설명하지 말 것 — 담을 칸이 없으면 모델이 그
+  내용을 **남은 칸에 밀어 넣는다**(게이트: `test_axis_prompts_never_mention_the_other_axis`).
+- **Important:** 팬아웃 복제분은 `_fold_orders` 가 **조각 식별자**(`source_links.evidence_group_key`)로
+  접는다 — 재료와 집계 **양쪽**에. 예전엔 프롬프트가 '제품 수만큼 부풀려 세지 마라'고 모델에게
+  **부탁**했는데, 이 저장소의 규칙은 그 반대다(규칙은 프롬프트, 강제는 코드).
+  **Don't:** 내용 해시로 접지 말 것 — 서로 다른 주문의 '배송 빨라요'가 한 건이 된다.
+  **과소 집계는 과대 집계보다 알아채기 어렵다**(화면에 이상이 안 보인다). 식별자 없는 행
+  (ADR-0009 이전 색인분)은 **접지 않고 남긴다** — 해결은 재수집뿐.
 - **Important:** 요약 섹션은 **6기준**이다(`CRITERIA` 단일 출처 — 스키마 required·프롬프트·UI 표가
   이 1벌을 공유, [ADR-0011](../docs/adr/0011-six-criteria-summary-and-search-page.md)).
   제품 축 넷은 ADR-0008 그대로고, 주문 축 `shipping_cs` **재료 하나가 `cs`·`shipping` 두 섹션으로
@@ -83,13 +96,32 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   `sound`/`longevity` 는 예전에도 재료가 프롬프트에 실렸는데 담을 필드가 없어 pros/cons 로만 샜다 —
   섹션 추가로 입력 비용은 그대로고 출력만 늘었다.
 - **Important:** 요약 **말투는 `consolidated_view.TONE` 한 곳**에서 정한다 — '~해요'체(화면 카피가
-  전부 해요체라 요약만 '~다'체면 톤이 튄다). 프롬프트가 넷(인스타·디시·통합·서포터)에
+  전부 해요체라 요약만 '~다'체면 톤이 튄다). 프롬프트가 **여섯**(축 2 × 인스타·디시·통합/서포터)에
   `search._ANSWER_SYSTEM` 까지라 한 곳만 고치면 반드시 어긋난다 →
   `eval/test_consolidated_sections.py::test_tone_rule_reaches_every_summary_prompt` 게이트.
   화면에 보이는 말은 '소스'가 아니라 **'출처'**다(디자인 카피 기준).
   1층 `official_texture`(스펙 카드 질감 줄)도 같은 해요체다 — 다만 그건 추출 프롬프트
   (`extract.py`) 소관이라 `TONE` 을 공유하지 않는다(추출층이 표시층에 의존하면 안 된다).
   fixture 16건은 이미 해요체로 적혀 있고, `load_specs` 로 다시 올리면 화면에 반영된다.
+- **Important:** 기준 한 칸은 **`{verdict, minority}` 두 칸**이다([ADR-0014](../docs/adr/0014-verdict-minority-and-badge-meta.md)).
+  다수 의견과 소수 반론을 **구조로** 가른다 — 문자열 한 칸으로 되돌리면 '유분기 많다 vs 잘 안
+  붙는다'처럼 대립 평가가 다시 병렬로 누워 어느 쪽이 다수인지 읽는 사람이 알 수 없게 된다.
+- **Important:** '어느 쪽이 다수인가'는 **`criterion_stats` 가 센다**(향 불일치·소스 갭과 같은 이유).
+  실측: 저장된 요약이 `향 평가는 인스타에서만 나와요` 라고 썼는데 집계는 **인스타 23 · 아모스갤 1**
+  이었다 — LLM 이 소수를 0으로 반올림했다. 이 카운트가 요약 프롬프트의 다수 판정 재료다.
+  **Note:** 이 값은 **화면에 안 나간다**. 배지(`인스타만`·`인스타 27 · 아모스갤 6`·`갈림 19:5`)로
+  띄워 봤다가 걷어냈다(사용자 결정 2026-08-07) — 다수/소수는 이미 `verdict`/`minority` 두 칸이
+  문장으로 말해서 같은 말이 줄마다 두 번 붙었다. 집계는 프롬프트 재료 + `payload` 스냅샷으로 남는다.
+  **Don't:** 되살리더라도 임계값 판정('갭이 큼')은 넣지 말 것 — 표본수 미반영·임의 상수라
+  `sentiment_gap` 에서 이미 걷어낸 것이다.
+- **Don't:** `sentiment_gap` 을 요약 프롬프트에 넣지 말 것. 넣었더니 `다만 출처 갭이 큰 편이라…`
+  가 본문으로 샜다. 통합 프롬프트가 받는 건 기준별 pos/neg **카운트**뿐이고, 그것도 문장에 쓰라는
+  게 아니라 어느 쪽을 `verdict` 에 둘지 고르라는 재료다.
+- **Don't:** 부재 서술('~는 언급이 없어요') 차단을 프롬프트에만 맡기지 말 것 — 전언 구멍과 같은
+  실패다. `_violations` 검출 → **1회 재시도** → `_scrub_section` 이 남은 **문장**을 잘라낸다.
+  절 단위 수술은 하지 않는다(한국어 종결어미를 다시 지어야 해서 없던 말을 만들 위험).
+  **Note:** 스크럽은 과잉 차단도 회귀 대상이다 — '잔여감도 **없다**'는 내용이지 부재 서술이 아니다
+  (`eval/test_consolidated_sections.py::test_clean_summary_survives_scrub`).
 - **Don't:** 말투를 핑계로 부정 평가를 순화하지 말 것. '별로였다' → '아쉬웠대요'로 눅이면
   소스 편향(1급 기능)이 지워진다. 바꾸는 건 종결어미뿐이고 평가의 세기는 원문 그대로다.
 - **Important:** `list_reviews(market=None, product="빠코볼")` — **마켓은 선택**이다. 실측

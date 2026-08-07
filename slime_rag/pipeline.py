@@ -524,10 +524,16 @@ def generate_summaries(market: str, product: str) -> dict:
     근거 0건이면 저장하지 않고 예외를 낸다. 예전엔 조용히 빈 payload 를 저장했는데, 그러면
     `stored_summaries` 는 '요약 있음'으로 읽고 화면엔 영영 '아직 생성하지 않았어요'가 뜬다 —
     원인이 화면 어디에도 안 보인다. 실제로 표시명으로 불러 그 행을 만든 적이 있다(2026-08-06).
+
+    ⚠️ **제품 축만** 만든다(ADR-0015) — 질감·향·소리·지속력 + 장단점. 고객 응대·배송은
+       `generate_market_summaries(market)` 가 마켓당 한 번 따로 만든다.
     """
-    from psycopg.types.json import Jsonb
     view = consolidated_for(market, product, with_summary=True)
-    payload = view.get("review_summaries") or {}
+    # 기준별 건수 스냅샷을 요약과 **같은 행에** 저장한다. 화면은 이제 이 값을 그리지 않지만
+    # (배지 철회, ADR-0014), 요약 문장의 '다수/소수'가 **어느 표본에서 나왔는지**의 기록이다 —
+    # 나중에 후기가 늘면 실시간 집계와 달라지므로, 그때 그 문장의 근거는 여기에만 남는다.
+    payload = {**(view.get("review_summaries") or {}),
+               "criterion_stats": view.get("criterion_stats") or {}}
     n = view.get("n_reviews") or 0
     if n == 0:
         # 오타인지 마켓 키가 틀린 건지 여기서 갈린다 — 같은 제품을 가진 실제 키를 함께 보여준다.
@@ -540,31 +546,87 @@ def generate_summaries(market: str, product: str) -> dict:
             + (f" — 이 제품의 실제 마켓 키: {keys}" if keys else " — 이 제품 자체가 DB 에 없다")
             + ". market 은 DB 키이고 화면 표시명이 아니다."
         )
+    _store_summary(market, product, payload, n)
+    log.info("요약 생성·저장(제품 축): %s/%s (근거 %d건)", market, product, n)
+    return payload
+
+
+# 요약 행은 두 종류다(ADR-0015): product IS NOT NULL = 제품 축, product IS NULL = 주문 축.
+# PK 가 아니라 **부분 유니크 인덱스** 둘이라(NULL 은 PK 에 못 들어간다) upsert 도 갈린다 —
+# ON CONFLICT 의 추론에 인덱스의 WHERE 절을 그대로 붙여야 맞는 인덱스를 고른다.
+_UPSERT_PRODUCT = """
+    INSERT INTO review_summaries (market, product, payload, model, n_reviews, generated_at)
+    VALUES (%s,%s,%s,%s,%s, now())
+    ON CONFLICT (market, product) WHERE product IS NOT NULL DO UPDATE SET
+      payload=EXCLUDED.payload, model=EXCLUDED.model,
+      n_reviews=EXCLUDED.n_reviews, generated_at=now()
+"""
+_UPSERT_MARKET = """
+    INSERT INTO review_summaries (market, product, payload, model, n_reviews, generated_at)
+    VALUES (%s,NULL,%s,%s,%s, now())
+    ON CONFLICT (market) WHERE product IS NULL DO UPDATE SET
+      payload=EXCLUDED.payload, model=EXCLUDED.model,
+      n_reviews=EXCLUDED.n_reviews, generated_at=now()
+"""
+
+
+def _store_summary(market: str, product: str | None, payload: dict, n: int) -> None:
+    """요약 한 행 upsert. `product=None` 이면 마켓 단위(주문 축) 행."""
+    from psycopg.types.json import Jsonb
+    args = ((market, product, Jsonb(payload), settings.model_judge, n) if product
+            else (market, Jsonb(payload), settings.model_judge, n))
     with connect() as conn:
-        conn.execute(
-            """
-            INSERT INTO review_summaries (market, product, payload, model, n_reviews, generated_at)
-            VALUES (%s,%s,%s,%s,%s, now())
-            ON CONFLICT (market, product) DO UPDATE SET
-              payload=EXCLUDED.payload, model=EXCLUDED.model,
-              n_reviews=EXCLUDED.n_reviews, generated_at=now()
-            """,
-            (market, product, Jsonb(payload), settings.model_judge, n),
-        )
+        conn.execute(_UPSERT_PRODUCT if product else _UPSERT_MARKET, args)
         conn.commit()
-    log.info("요약 생성·저장: %s/%s (근거 %d건)", market, product, n)
+
+
+def generate_market_summaries(market: str) -> dict:
+    """마켓 하나의 **주문 축** 요약(고객 응대·배송)을 생성해 저장한다(ADR-0015).
+
+    마켓당 **한 번**이면 된다 — 그 마켓의 모든 제품 페이지가 이 한 벌을 빌려 쓴다.
+    제품마다 만들던 예전 방식은 같은 주문의 배송 사실을 제품 수만큼 되풀이했고, 비용도
+    제품 수만큼 들었다.
+
+    ⚠️ 유료 호출이다(멱등 upsert). ⚠️ `market` 은 DB 마켓 키다 — 화면 표시명이 아니다.
+    근거 0건이면 저장하지 않고 예외를 낸다(제품 축과 같은 이유 — 빈 payload 를 저장하면
+    화면은 '요약 있음'으로 읽고 영영 빈칸이 뜬다).
+    """
+    view = order_view_for(market, with_summary=True)
+    payload = {**(view.get("review_summaries") or {}),
+               "criterion_stats": view.get("criterion_stats") or {}}
+    n = view.get("n_orders") or 0
+    if n == 0:
+        raise ValueError(
+            f"'{market}' 에 주문(배송·응대) 근거가 0건이라 요약을 저장하지 않았다 — "
+            f"마켓 키가 맞는지 확인할 것(DB 키이고 화면 표시명이 아니다). "
+            f"실재 키: {list_markets()}")
+    _store_summary(market, None, payload, n)
+    log.info("요약 생성·저장(주문 축): %s (근거 %d건)", market, n)
     return payload
 
 
 def stored_summaries(market: str, product: str) -> dict | None:
-    """저장된 요약 → `{payload, model, n_reviews, generated_at}`. 없으면 None(=아직 미생성).
+    """저장된 **제품 축** 요약 → `{payload, model, n_reviews, generated_at}`. 없으면 None.
 
     화면은 **이 함수만** 쓴다. 여기서 없다고 생성으로 넘어가면 결국 로드마다 과금된다.
     """
+    return _fetch_summary("product IS NOT NULL AND product=%s", [market, product])
+
+
+def stored_market_summaries(market: str) -> dict | None:
+    """저장된 **주문 축**(고객 응대·배송) 요약. 없으면 None(=아직 미생성).
+
+    없을 때 제품 축 행으로 폴백하는 건 **화면 쪽**(`api.main`) 일이다 — 구 payload 에 섞여
+    있던 cs·shipping 을 읽을지 말지는 표시 정책이고, 저장소는 없는 걸 없다고 답한다.
+    """
+    return _fetch_summary("product IS NULL", [market])
+
+
+def _fetch_summary(cond: str, params: list) -> dict | None:
     with connect() as conn:
         row = conn.execute(
             "SELECT payload, model, n_reviews, generated_at FROM review_summaries "
-            "WHERE market=%s AND product=%s", [market, product]).fetchone()
+            f"WHERE market=%s AND {cond}", params).fetchone()   # cond 는 상수, 사용자 입력 아님
     if not row:
         return None
     return {"payload": row[0], "model": row[1], "n_reviews": row[2],
@@ -587,6 +649,25 @@ def consolidated_for_market(market: str, *, with_summary: bool = True) -> dict:
             prompt, model=settings.model_judge, schema=schema, label="consolidated.section")
     return cv.build_consolidated({"market": market, "product": None},
                                  None, records, llm_sectionize=sectionize)
+
+
+def order_view_for(market: str, *, with_summary: bool = True) -> dict:
+    """마켓 하나의 **주문 경험** 뷰 — 고객 응대·배송(ADR-0015).
+
+    `consolidated_for_market` 과 같은 행을 읽지만 축이 다르다: 저건 제품 평가를 마켓 범위로
+    모아 보는 것이고, 이건 애초에 마켓에만 귀속되는 사실을 마켓당 한 벌 만드는 것이다.
+    팬아웃 복제분은 `build_order_view` 안에서 조각 단위로 접힌다 — 여기서 미리 거를 필요 없다.
+
+    범위 주의(ADR-0007): 수집이 제품 앵커라 이 뷰의 모집단도 '이 마켓에서 추적 중인 제품들의
+    후기'다. 마켓의 모든 주문이 아니다 — UI 라벨도 그 범위로 표기할 것.
+    """
+    with connect() as conn:
+        records = _records_for(conn, market, None)
+    sectionize = None
+    if with_summary and records:
+        sectionize = lambda prompt, schema: LLM().complete(
+            prompt, model=settings.model_judge, schema=schema, label="consolidated.order")
+    return cv.build_order_view(market, records, llm_sectionize=sectionize)
 
 
 # ---------------------------------------------------------------- 데모 실행

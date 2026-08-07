@@ -92,14 +92,30 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_down   INTEGER;     -- 디시
 
 -- 리뷰 요약 저장 (2026-08-06 사용자 결정: 미리 생성 → 저장 → 화면은 읽기만).
 -- 페이지 로드마다 LLM 을 부르면 열 때마다 과금된다. 발표용으로 한 번 만들어 두고 재사용한다.
--- payload = {instagram|dcinside|integrated: {texture,scent,sound,longevity,cs,shipping,pros,cons}}
---           — 키는 consolidated_view.CRITERIA 가 단일 출처다(스키마·프롬프트·화면표가 공유).
+--
+-- **행은 두 종류다**(ADR-0015 — 기준의 귀속 축이 둘이라서):
+--   · product IS NOT NULL — 제품 축 요약.
+--     payload = {instagram|dcinside|integrated: {texture,scent,sound,longevity,pros,cons}}
+--   · product IS NULL     — 그 마켓의 **주문 축** 요약(고객 응대·배송), 마켓당 한 행.
+--     payload = {instagram|dcinside|integrated: {cs,shipping}}
+-- 키는 consolidated_view.CRITERIA 가 단일 출처다(스키마·프롬프트·화면표가 공유).
 CREATE TABLE IF NOT EXISTS review_summaries (
   market       TEXT NOT NULL,
-  product      TEXT NOT NULL,
+  product      TEXT,                    -- NULL = 마켓 단위(주문 축) 요약
   payload      JSONB NOT NULL,
   model        TEXT,                    -- 재생성 시 어느 모델로 만든 요약인지(관측성)
   n_reviews    INTEGER,                 -- 생성 시점의 근거 후기 수 — 나중에 늘면 갱신 판단 근거
-  generated_at TIMESTAMPTZ DEFAULT now(),
-  PRIMARY KEY (market, product)
+  generated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 기존 배포 DB 멱등 마이그레이션(ADR-0015): product 를 nullable 로 풀고 PK 를 부분 유니크
+-- 인덱스 둘로 바꾼다. PRIMARY KEY 는 NULL 을 담을 수 없어서 마켓 단위 행이 들어갈 자리가 없다.
+-- ⚠️ 기존 제품 축 행은 그대로 남는다 — 구 payload 에는 cs·shipping 이 제품 축에 섞여 있지만
+--    재생성이 유료라 강제하지 않는다. `api.main` 이 마켓 행이 없을 때만 그 값으로 폴백한다.
+-- ⚠️ 순서가 중요하다: PK 를 먼저 떼야 NOT NULL 을 풀 수 있다(PK 컬럼은 NOT NULL 고정).
+ALTER TABLE review_summaries DROP CONSTRAINT IF EXISTS review_summaries_pkey;
+ALTER TABLE review_summaries ALTER COLUMN product DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS review_summaries_product_key
+  ON review_summaries (market, product) WHERE product IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS review_summaries_market_key
+  ON review_summaries (market) WHERE product IS NULL;

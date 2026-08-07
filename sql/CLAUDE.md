@@ -36,6 +36,12 @@ psql postgresql://localhost:55432 -f sql/schema.sql   # 수동 재적용(멱등)
 - **Note:** `review_class` 기본 `'genuine'` — 홍보성(`'promo'`)은 별도 버킷으로 집계 분리(평균 금지).
 - **Warning:** `embedding` 은 1024차원 고정(BGE-M3). 임베딩 모델 바꾸면 차원·인덱스 재생성 필요.
 - **Note:** 후기 규모 커지면 HNSW 가 IVFFlat 보다 관리 쉬움(현재 HNSW).
+- **Important:** `review_summaries` 는 **행이 두 종류**다([ADR-0015](../docs/adr/0015-market-scope-order-criteria.md)):
+  `product IS NOT NULL` = 제품 축 요약, `product IS NULL` = 그 마켓의 **주문 축**(고객 응대·배송)
+  요약. PK 는 NULL 을 못 담아 **부분 유니크 인덱스 둘**로 바꿨다 — `ON CONFLICT` 도 인덱스의
+  `WHERE` 절을 그대로 붙여야 맞는 인덱스를 고른다(`pipeline._store_summary`).
+  ⚠️ 마이그레이션 **순서 주의**: PK 를 먼저 떼야 `product` 의 NOT NULL 을 풀 수 있다.
+  **Don't:** `product=''` 센티널로 되돌리지 말 것 — 빈 문자열은 '이름이 빈 제품'과 구별되지 않는다.
 
 ## Cross-module dependencies
 - ← [`../slime_rag/`](../slime_rag/CLAUDE.md): `db.py`(연결), `index.py`(적재), `search.py`(조회)

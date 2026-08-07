@@ -122,11 +122,53 @@ something to correct for** — never average it; show it per source, plus the ga
   so nothing breaks, but they keep the old prose until `pipeline.generate_summaries` is re-run (paid). `search.answer` still exists with no consumer. Sentiment gap,
   scent divergence, the supporter bucket, and the evidence-source list are all still **computed** in
   `consolidated_view.py`; whether the new screen renders them is an open design question, not a build one.
+- **Collection is incremental and summaries refresh only on change** (2026-08-07,
+  plan `.omc/plans/2026-08-07-incremental-collection-and-stale-summaries.md`). Four things landed:
+  · **The dcinside comment key was run-dependent and the constraint above never bound it.** `post_id`
+    ended in the run's `enumerate` position, so one extra collected item shifted every later comment
+    into a *new* row. `pipeline.dc_post_id` now builds it from `comment_no` (the id dcinside itself
+    gives, already stored in `source_ref`) and a migration in [sql/schema.sql](sql/schema.sql) rewrote
+    the 19 existing rows in place (verified: old-format 0 · row count unchanged · URLs intact).
+    A comment with no id is **skipped and counted** (`skipped_no_comment_no`) — never filled from
+    `ordinal`, which would reintroduce the same instability.
+  · **A seen-pieces cut runs before the first paid step** on all three ingest paths
+    (`index.existing_post_ids`). For the hashtag path that means **before `bias.partition`**, not
+    before extraction — the first LLM there is the promo cascade, so cutting at extraction pays the
+    verdict calls anyway. `ingest_seller_profiles` cuts on the post URL (`specs.source_permalink`) and
+    keeps `skip_seen=False` as the forced re-extract path, since a seller may edit a caption.
+    Savings are reported as `llm_calls_saved_by_dedup`, kept **separate** from the promo gate's
+    `llm_calls_saved`; on dcinside it counts *batches* removed (`extract.count_thread_batches`),
+    because that path is one call per thread batch, not per piece.
+  · **A watermark cuts the dcinside list before the detail request** (`min_thread_no`, HTTP savings),
+    set to `max(thread_no) - WATERMARK_MARGIN` **for that collection anchor** — not the gallery-wide
+    max, which would give a first-time product the watermark another product had already pushed up
+    and truncate its whole history invisibly. No rows for the anchor → no watermark → full sweep,
+    reported as `watermark_anchors`. The margin exists because collection is keyword search, so an
+    older thread can match late. **This saves new *posts* only**: new comments hang off old threads,
+    so re-visiting is an explicit `revisit_threads` argument (fetched directly by thread number, since
+    the search list may not return it), never auto-selected. `gate_unprocessed` is surfaced because
+    the relevance budget is spent during collection, i.e. before the seen-pieces cut can help.
+  · An already-indexed **post** stays in its extraction batch as *context* when its thread has new
+    comments (`context_posts`), and is skipped at index time. Dropping it would silently cost the
+    incremental path the sibling-context attribution and market inheritance that batching exists for;
+    the batch runs either way, so this adds input tokens, not calls. Thread identity for this — and
+    for `group_threads` — comes from **`extract.thread_key` alone**: `parent_no` for comments, the
+    URL's `no=` for posts, because a post's meta has no thread number at all. Keying posts off
+    `meta["thread_no"]` makes them `None`, which both misses every intended case and turns the
+    comparison set into a wildcard that drags dead threads into paid batches.
+  · `pipeline.refresh_stale_summaries(dry_run=True)` lists what to regenerate **for free** (measured:
+    0 LLM calls, 4 targets, ~$0.10). Staleness = ungenerated / evidence grew by `min_delta` / model
+    changed / payload predates ADR-0015. Counts come from `consolidated_for(with_summary=False)` and
+    `order_view_for(with_summary=False)`, never from SQL — `n_reviews` is rows but `n_orders` is
+    **folded pieces**, and recounting would inflate the order axis. Targets are enumerated from
+    `specs`, which doubles as the filter that keeps paid summaries off ghost products.
+  Known hole, left deliberately: a piece whose extraction yields `reviews: []` leaves no row, so it is
+  re-extracted every run. The tombstone ledger that would fix it is out of scope at ~19 threads/day.
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
   already returns them, but `pipeline.REVIEW_SORTS` still offers 수집순 only and rows indexed before
-  that commit keep NULLs and **a plain re-run will not fill them** — indexing is now idempotent by
+  that commit keep NULLs and **a plain re-run will not fill them** — indexing is idempotent by
   DB constraint (`UNIQUE(source, post_id, product)` + `ON CONFLICT DO NOTHING`, 2026-08-07), so a
   re-collect skips the row rather than refreshing it; filling those columns needs an explicit backfill ·
   the ADR-0007 re-ruling (above) · expand the entity-linking gold set
@@ -146,6 +188,7 @@ python -m eval.test_bias && python -m eval.test_apify_source && python -m eval.t
 python -m eval.test_consolidated_sections # 6기준 요약 계약 (CRITERIA 공유 · 제품/주문 축 분리)
 python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 정책 · 원문 메타 매핑
 python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인 멱등성 · 1층 수집 누적성
+python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
 python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
 python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates

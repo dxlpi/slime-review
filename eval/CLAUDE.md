@@ -16,6 +16,7 @@
 | `test_index_meta.py` | `index_post` 의 `relevance_meta`·`source_ref` JSONB 영속화 — 전달 시 INSERT 반영/미전달 시 NULL/팬아웃 복제 (무네트워크·무모델). 파라미터는 **컬럼 이름**으로 찾는다 + **멱등성 계약**(`ON CONFLICT DO NOTHING` 절 부착 · 스킵 시 실제 적재 수 반환) |
 | `test_product_repair.py` | 제품명 귀속 복구 — 유령 제거(풀조합·향료·광역태그)와 **진짜 제품 보존**(해시태그면 1층 부재와 무관 유지 · 같은 글의 별개 제품은 개명도 삭제도 안 함)의 균형 + 접기 계약(이중 계상 방지·생존자 선택·보류 미접기). 개발 중 **양방향으로 한 번씩 깨진** 자리라 회귀 게이트로 둔다 (10 케이스) |
 | `test_layer1_collection.py` | 1층 수집 **누적성** 계약 — `_upsert_spec` 전 값 칸 COALESCE 보호(+`beads` 는 cardinality) · `ingest_seller_profiles` 기본 대상이 KB 전체(스펙 보유 마켓 포함) · `only_missing` 은 명시 옵션 · `dry_run` 무접촉. 액터가 최신 ~12글만 주므로 **수집은 누적이지 교체가 아니다** (5 케이스) |
+| `test_incremental_collection.py` | 증분 수집 계약 — **Phase 0** 디시 댓글 `post_id` 가 `comment_no` 기반(런 무관·`ordinal` 폴백 금지·결손은 카운트 노출)·재실행 `indexed_rows==0` / **Phase 1** 기보유 컷이 **첫 유료 단계 앞**(해시태그는 `bias.partition` 앞·디시는 `extract_collected` 앞)·절감은 조각이 아니라 **배치 수**·판매자 컷은 `extract_spec` **앞**이고 `skip_seen=False` 강제 재추출이 산다 / **Phase 2** 워터마크가 **상세 HTTP 앞**에서 컷·미지정 시 하위호환·워터마크는 **앵커 스코프**(이력 없으면 전량 수집)·`revisit_threads` 는 검색 목록 밖 글도 **직접 조회**·기보유 글은 배치 문맥으로만 남고 색인 제외(**무관한 새 글이 죽은 스레드를 끌어오지 않음** 회귀 포함) · 스레드 키는 `extract.thread_key` 한 벌(글=URL·댓글=`parent_no`) — **픽스처가 수집기 meta 를 그대로 흉내낸다**(글엔 `thread_no` 없음) / **Phase 3** `_is_stale` 4조건·naive/결손 타임스탬프 안전·개수는 뷰 계산(축별 정의 보존)·`dry_run` 기본 무생성·생성 후 멱등 (29 케이스) |
 | `test_source_links.py` | 원문 링크 **정책**(순수) — `permalink` degrade·`#cmt` 제거 · 식별자 조립 · 한 스레드 댓글 distinct · `embed_url` 게이트 · 근거 목록 그룹핑 · 댓글 id 보존 · 캡션 계약 + **로고 게이트**(`logo_asset` 3중 fail-closed·경로이탈 차단·링크백 보존·모노그램 결정성) |
 | `gold/thread_gold.json` | 스레드 골드 — 실제 디시 3스레드 51조각, 조각별 `mentioned_product` 라벨(~200자 스니펫 정책) |
 | `test_post_columns.py` | 원문·작성 메타 매핑(ADR-0013) — 라벨 붙은 카운트('조회 428') 파싱 · 연도 없는 날짜 폐기 · 디시 글/댓글 작성자 양경로 · 인스타 owner_username · 글단위 지표는 댓글에서 None. **실수집에서 두 번 조용히 빈 자리**라 회귀 게이트로 둔다 |
@@ -29,6 +30,7 @@ python -m eval.test_apify_source  # Apify 어댑터 오프라인 테스트
 python -m eval.test_relevance_gate   # 관련성 3축 게이트 회귀
 python -m eval.test_source_links     # 원문 링크·임베드 정책(CI 게이트)
 python -m eval.test_layer1_collection  # 1층 수집 누적성(upsert COALESCE · 대상 선정)
+python -m eval.test_incremental_collection  # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair     # 제품명 귀속 복구(유령 제거 vs 진짜 제품 보존)
 python -m eval.test_post_columns     # 원문·작성 메타 매핑(CI 게이트)
 python -m eval.test_extract_thread   # 스레드 배치(키 없으면 실호출 케이스만 skip)

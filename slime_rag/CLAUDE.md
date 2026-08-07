@@ -22,7 +22,7 @@
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
-| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `order_view_for` 주문 축 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) + 요약 저장(`generate_summaries` 제품 · `generate_market_summaries` 마켓 · `stored_*`) |
+| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치, 안정 키 `dc_post_id` · 워터마크 `_max_thread_no`) + 변경분 요약 갱신(`refresh_stale_summaries`/`_is_stale`, 판정 무료) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `order_view_for` 주문 축 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) + 요약 저장(`generate_summaries` 제품 · `generate_market_summaries` 마켓 · `stored_*`) |
 
 ## Common patterns (workflow)
 ```bash
@@ -155,6 +155,62 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   호출부가 조각 식별자를 항상 넘기는 게 전제다.
   **Note:** `index_post` 의 반환값은 이제 **실제 적재 행 수**(충돌 스킵분 제외)다. `len(texts)` 로
   되돌리면 한 행도 안 들어간 재실행이 'N건 색인'이라 보고한다.
+- **Important:** 그 제약이 **디시 댓글에는 안 걸리고 있었다**(2026-08-07 수정). `post_id` 끝자리가
+  그 런의 `enumerate` 위치라, 수집 결과가 한 건만 달라져도 같은 댓글이 **다른 키**로 새 행이 됐다.
+  이제 `pipeline.dc_post_id` 가 `comment_no`(디시가 주는 댓글 고유 id — 이미 `source_ref` 에 저장돼
+  있었다)로 조립하고, `sql/schema.sql` 의 멱등 `UPDATE` 가 기존 19행을 제자리 재작성했다.
+  **Don't:** `ordinal` 로 폴백하지 말 것 — 수집기가 이름을 분리해 둔 이유가 그거다. id 가 없으면
+  색인하지 않고 `skipped_no_comment_no` 로 **센다**(무음 스킵 금지).
+  **Don't:** 마이그레이션 식에서 `#cmt` 대신 `:` 로 자르지 말 것 — `https://` 의 콜론에 먼저 걸려
+  전 행이 `https` 로 파괴된다.
+- **Important:** 기보유 조각 컷은 **첫 유료 단계 앞**에 둔다(`index.existing_post_ids`).
+  해시태그 경로에서 그 자리는 추출이 아니라 **`bias.partition` 앞**이다 — 여기서 먼저 도는 LLM 은
+  홍보성 캐스케이드라, 추출 직전에 자르면 verdict 값을 이미 치른 뒤다.
+  디시는 **배치 추출**이라 `extract_collected` 앞이고, 절감 보고도 조각 수가 아니라
+  `extract.count_thread_batches` 로 잰 **배치 수**다(조각당 1콜이 아니다).
+  판매자 경로(`ingest_seller_profiles`)의 판정 기준은 `specs` 가 아니라 **이미 스펙을 만든 게시물
+  URL**(`source_permalink`)이고, 캡션 수정 반영을 위해 `skip_seen=False` 강제 재추출을 남겨 둔다.
+  **Note:** `_upsert_spec` 이 `source_permalink` 를 COALESCE 로 보존하므로, 제품마다 이미 URL 이
+  차 있는 게시물은 자기 URL 을 못 남겨 매번 다시 추출된다 — 비용만 드는 페일오픈이라 그대로 둔다.
+  **Note:** 절감 카운터는 `llm_calls_saved`(홍보 게이트 단락분)와 `llm_calls_saved_by_dedup` 으로
+  **가른다** — 합치면 어느 절감인지 사후에 못 나눈다.
+  **Note:** 추출 결과가 `reviews: []` 인 조각은 행을 안 남겨 매번 다시 추출된다(구조적 구멍, 의도적).
+- **Important:** 디시 워터마크(`min_thread_no`)는 **상세 요청 앞**에서 자른다 — 뒤에 두면 HTTP 를
+  못 아낀다. 값은 `max(thread_no) - WATERMARK_MARGIN` 이되 **앵커별**이다(`_max_thread_no(conn,
+  anchors)`). **Don't:** `source='amos'` 전체 최댓값으로 되돌리지 말 것 — 수집이 제품 앵커 키워드
+  검색이라(ADR-0007), 전체 최댓값을 쓰면 **처음 수집하는 제품**의 워터마크가 남의 제품이 올려놓은
+  글번호가 되어 그 제품의 과거 글이 통째로 잘린다. 목록이 최신순이라 첫 페이지에서 페이징까지
+  끝나고, 카운트엔 '새 글 없음'과 구분되지 않는 0 만 남는다 — 조용한 유실이다.
+  앵커 이력이 없으면 워터마크가 None 이라 전량 수집으로 떨어지고, 그 판단은
+  `counts["watermark_anchors"]` 로 드러난다. 마진의 근거는 따로다: 옛 글이 다른 키워드로 뒤늦게
+  매칭될 수 있고, 마진 안쪽은 조각 단위 컷이 잡아 **HTTP 만 조금 더 쓰고 LLM 은 안 쓴다**.
+  필터 뒤의 `if not post_urls: break` 는 '검색 결과 없음'이 아니라 **그 키워드 페이징 종료**다
+  (목록이 최신순) — 버그로 보고 고치지 말 것.
+  **Note:** 이건 **새 글만** 아낀다. 새 댓글은 옛 글에 달리므로 재방문은 `revisit_threads` 명시
+  인자이고, 그 글번호들은 **검색 목록을 거치지 않고 직접 조회**한다(예외 처리만 하면 검색에 안
+  잡히는 글엔 영영 못 닿는다).
+  **Note:** 관련성 게이트 예산은 **수집 중에** 쓰이므로 기보유 컷이 아껴 주지 못한다 — 증분 런에서
+  예산이 이미 본 조각에 소진될 수 있어 `counts["gate_unprocessed"]` 로 노출한다(0 보다 크면 `limit`
+  을 올릴 신호).
+- **Important:** 기보유 **글**은 그 스레드에 새 조각이 남아 있으면 배치에 **문맥으로** 남기고
+  색인만 건너뛴다(`counts["context_posts"]`, 색인 스킵 수와 등식을 `assert` 로 강제).
+  배치 추출의 존재 이유 절반이 형제 문맥이다 — 제품명을 생략한 댓글의 귀속(AC13)과
+  `extract_collected` 의 market 상속은 글에서 온 값을 권위로 삼는다. 글을 빼면 **증분 런에서만**
+  조용히 그 성질을 잃는다. 배치는 어차피 돌아서 추가 호출은 없고 늘어나는 건 입력 토큰뿐이다.
+- **Important:** 스레드 판정은 **`extract.thread_key` 한 곳**이다 — 댓글은 `meta["parent_no"]`,
+  **글은 URL 의 `no=`**. `_parse_post` 가 싣는 건 nick·ip·조회·댓글수·추천뿐이라 **글의 meta 엔
+  스레드 번호가 없다**(`source_links.build_source_ref` 가 같은 이유로 같은 규칙을 쓴다).
+  **Don't:** 호출부에서 `meta["thread_no"]` 하나로 통일하지 말 것 — 글 쪽이 늘 `None` 이 되어
+  ①설계한 문맥 유지가 **한 번도 안 걸리고** ②그 `None` 이 비교 집합에 섞이면 죽은 스레드의 글까지
+  전부 매칭돼 **버릴 글에 유료 호출**이 나간다. 양방향으로 조용히 틀리고, 어느 쪽이 나올지는 그 런의
+  무관한 다른 결과에 달린다(2026-08-07 실제 결함 — 테스트 픽스처가 수집기가 안 싣는 키를 넣어
+  통과시켰다. 그래서 `eval` 픽스처는 `_candidates_for` 가 싣는 meta 만 담는다).
+- **Important:** `refresh_stale_summaries` 의 **판정은 무료, 생성만 유료**다(`dry_run=True` 기본).
+  개수는 `consolidated_for(with_summary=False)`·`order_view_for(with_summary=False)` 에서 온다 —
+  **SQL 로 재구현하지 말 것**: `n_reviews` 는 행 수지만 `n_orders` 는 팬아웃을 접은 **조각 수**라
+  `count(*)` 로 세면 '배송 후기 27건'처럼 부풀려진다. 열거는 `specs` 기준이고, 그게 유령 제품에
+  유료 요약을 쓰지 않는 자동 필터다. `ADR_0015_CUTOFF` 는 tz-aware — `timezone.utc` 를 떼면
+  `generated_at` 과의 비교가 `TypeError` 로 죽는다.
 
 ## Cross-module dependencies
 - [`../api/main.py`](../api/main.py) → `pipeline`, `source_links`, `linking` (얇은 직렬화층;

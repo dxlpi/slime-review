@@ -367,13 +367,14 @@ def _records_for(conn, market: str, product: str | None) -> list[dict]:
     return out
 
 
-# 커뮤니티 리뷰 패널 정렬 — **DB 에 있는 컬럼으로만** 만든다.
-# 디자인의 좋아요/조회/추천순은 수집기(RawReview.meta)엔 있지만 `reviews` 테이블에 없다.
-# 없는 축을 메뉴에 띄우면 정렬을 누른 사용자에게 거짓말이 되므로 넣지 않는다 —
-# 컬럼이 생기면 여기 dict 에 한 줄 추가하는 것으로 켜진다.
-# ⚠️ '최근 수집순'은 작성일이 아니라 **수집일**(reviews.created_at) 기준이다. 원문 작성일은
-# 수집기(RawReview.posted_at)엔 있지만 테이블에 없다 — 없는 걸 '최신순'이라 부르면 거짓말이라
-# 이름·화면 라벨 양쪽에 '수집'을 남긴다.
+# 커뮤니티 리뷰 패널 정렬 — **값이 실제로 채워진 축으로만** 만든다.
+# 디자인의 좋아요/조회/추천순은 이제 컬럼이 있고(ADR-0013 `post_columns`) `list_reviews` 도
+# 반환하지만, 그 컬럼이 생기기 전에 색인된 행은 값이 NULL 이다(수집은 post_id 존재 시 스킵).
+# 절반이 NULL 인 축을 '추천순'이라 부르면 정렬을 누른 사용자에게 거짓말이 되므로, 재수집으로
+# 채운 뒤 여기 dict 에 한 줄 추가하는 것으로 켠다.
+# ⚠️ '최근 수집순'은 작성일이 아니라 **수집일**(reviews.created_at) 기준이다. 작성일은
+# `posted_at` 이 따로 갖고 있으니, 정렬을 켤 때 둘을 섞지 말 것 — 없는 걸 '최신순'이라
+# 부르지 않으려고 이름·화면 라벨 양쪽에 '수집'을 남겼다.
 REVIEW_SORTS: dict[str, str] = {
     "최근 수집순": "created_at DESC NULLS LAST, id DESC",
     "긍정 먼저":   "CASE overall_sentiment WHEN 'pos' THEN 0 WHEN 'neu' THEN 1 ELSE 2 END, id DESC",
@@ -415,13 +416,12 @@ def list_reviews(market: str | None = None, product: str | None = None, *,
        근본 해결은 KB `products` 에 제품→마켓을 등록해 개체연결이 마켓을 붙이는 것이다
        (지금 13개 마켓 전부 `products: []`).
 
-    ⚠️ `evidence` 는 **원문이 아니라 근거 스니펫**(~15자)이다.
+    ⚠️ `evidence` 는 **원문이 아니라 근거 스니펫**(~15자)이다. 원문 발췌인 `body` 와 별개 필드다.
 
-    📌 ADR-0013 이후 이 자리는 **원문 본문의 서버 발췌**로 바뀐다 — 아직 아니다.
-       `reviews` 에 본문 컬럼이 없어서(규칙이 스키마에서 버렸다) 재수집·backfill 이 선행이다.
-       바뀔 때 자르는 코드는 **반드시 여기** 있어야 한다: 전문을 반환하고 프런트에서
-       `line-clamp` 로 접으면 전문이 이미 브라우저에 도달한 것이라 발췌가 아니다.
-       공개 전환 시 길이를 줄이는 스위치도 같은 자리에 둔다(ADR-0013 §5).
+    📌 `body` 는 ADR-0013 §3 의 **서버 발췌**다(`source_links.excerpt`). 저장은 전문
+       (`index.post_columns`)이고 자르는 곳은 **여기 하나**다 — 전문을 반환하고 프런트에서
+       `line-clamp` 로 접으면 전문이 이미 브라우저에 도달한 것이라 발췌가 아니다. 자르는 자리를
+       옮기거나 늘리지 말 것. 공개 전환 시 길이를 줄이는 스위치도 같은 자리다(ADR-0013 §5).
 
     ⚠️ `source_ref` 는 조각 단위 속성이라 제품별 팬아웃 행마다 복제돼 있다. 그대로 그리면
     한 조각이 제품 수만큼 카드로 도배되므로 `source_links.evidence_group_key` 로 접는다

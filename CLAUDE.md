@@ -22,24 +22,31 @@ something to correct for** — never average it; show it per source, plus the ga
 3. **Observability** (logging, metrics, cost, failure tracing — every LLM call goes through `slime_rag/llm_ops.py` alone)
 
 ## Current status & what's left
-- **The frontend is `web/` — Vite + React + TS, and it is not wired to the backend yet.** The
+- **The frontend is `web/` — Vite + React + TS — and it reads the backend through `api/`.** The
   Streamlit UI was deleted on 2026-08-06 ([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md)) and
   the screen was rebuilt by **porting the design HTML verbatim**: `web/src/screens/SlimeSearch.tsx`
   is `Slime Search.dc.html` with the inline styles carried over unchanged, and `DCLogic` mapped to
   `useState`. Measured against the original mockup it is **pixel-identical** (0.025% differing pixels
   at an 8px offset — the mockup never reset the browser's default `body` margin; we do).
-  It renders **placeholder data** (`web/src/data/mock.ts`, the design's own `자리` strings).
+  `web/src/data/api.ts` fetches `/api/page`; `web/src/data/mock.ts` is the **fallback placeholder**
+  (the design's own `자리` strings) shown before the response lands or when it fails — not the data path.
   · KDS tokens are copied byte-for-byte into `web/src/styles/kds/`; the mint accent is isolated in
     `web/src/styles/slime-accent.css` (KDS default is blue — never edit the token folder to change it).
   · Six KDS components are cut from the design bundle into `web/src/components/kds/` — **do not edit
     them**, see that folder's README for what was changed and the two known token collisions.
   · The backend was **not touched** by any of this: every display decision already lived behind
     `pipeline` / `consolidated_view` / `source_links`.
-  **Next dependency: an HTTP API.** There is none today — the deleted UI called Python functions
-  directly. Deployment (hard gate #1) needs `web/` + an API service.
+  **The HTTP API is [`api/main.py`](api/main.py)** (FastAPI, added 2026-08-06 — the deleted UI had
+  called Python functions directly): `/api/page` · `/api/markets` · `/api/markets/{market}/products` ·
+  `/api/logo/{handle}` · `/api/health`. It is **deliberately thin** — SQL, display policy and
+  aggregation all stay in `slime_rag`; this layer calls `pipeline` and serializes. Its response shape
+  mirrors `web/src/data/mock.ts` so the markup never has to change to swap the data in.
+  A page load **never calls the LLM**: `/api/page` reads stored summaries only
+  (`with_summary=False`); generation is a separate `pipeline.generate_summaries` run.
 - Phases 0–5 (collection → extraction → linking → index → search → consolidated view) are **verified
-  end-to-end against live data**. Phase 6 was rebuilt from zero on 2026-08-06 and is **layout-complete,
-  data-empty**.
+  end-to-end against live data**. Phase 6 was rebuilt from zero on 2026-08-06 and now renders live
+  data through `api/` — what a given page shows depends on what has been collected and summarized,
+  not on the wiring.
 - Layer 1 runs off a fixture (`data/layer1_fixture.json`, 3 markets / 6 products) because IG App Review
   blocks business_discovery — [ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md).
 - The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
@@ -93,10 +100,12 @@ something to correct for** — never average it; show it per source, plus the ga
   `eval/test_consolidated_sections.py`. `search.answer` still exists with no consumer. Sentiment gap,
   scent divergence, the supporter bucket, and the evidence-source list are all still **computed** in
   `consolidated_view.py`; whether the new screen renders them is an open design question, not a build one.
-- Still to do: **the HTTP API layer** (blocks both real data and deployment) · decide what to do about
-  three fields the design wants but the DB lacks — like/view/vote counts, IG account name, authored date
-  (`reviews` has no such columns; the old UI showed 수집일 instead) · the ADR-0007 re-ruling (above) ·
-  expand the entity-linking gold set
+- Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
+  else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
+  `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
+  already returns them, but `pipeline.REVIEW_SORTS` still offers 수집순 only and rows indexed before
+  that commit keep NULLs until they are re-collected (ingest skips an existing `post_id`) ·
+  the ADR-0007 re-ruling (above) · expand the entity-linking gold set
   ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
   toxicity filter criteria · **two user inputs for the link feature**: the gold record's amos thread
   URL (`eval/layer2_gold.json` → `source.url`, the only thing between here and a link visible in the
@@ -113,7 +122,8 @@ python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 
 python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
 python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates
 python -m evals.run --min 1.0             # evaluation pass-rate gate
-cd web && npm install && npm run dev      # frontend (http://127.0.0.1:5173, 목 데이터)
+uvicorn api.main:app --reload --port 8000 # HTTP API (repo 루트에서 · web/ 이 읽는 유일한 창구)
+cd web && npm install && npm run dev      # frontend (http://127.0.0.1:5173 · API 없으면 목 데이터로 폴백)
 cd web && npm run build && npm run lint   # 타입체크·번들·린트
 python .github/scripts/validate_context_paths.py               # context path integrity
 ```

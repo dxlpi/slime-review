@@ -2,8 +2,8 @@
 
 ## Purpose (이 모듈이 소유하는 것)
 슬라임 리뷰 RAG의 엔진. 소스 수집 → 관련성 → 추출(1·2층) → 개체연결 → 색인 →
-하이브리드 검색 → 근거 답변 → 종합뷰·편향집계까지 전 파이프라인. UI(`../app`)와
-DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [ARCHITECTURE.md](../ARCHITECTURE.md) 참조.
+하이브리드 검색 → 근거 답변 → 종합뷰·편향집계까지 전 파이프라인. HTTP 층(`../api`)·
+화면(`../web`)과 DB 스키마(`../sql`)는 이 패키지를 소비만 한다. 전체 흐름은 [ARCHITECTURE.md](../ARCHITECTURE.md) 참조.
 
 ## Key files
 | 파일 | 역할 |
@@ -100,16 +100,20 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
 - **Warning:** `platform` 에 모르는 값을 주면 **예외**다. 예전엔 조용히 필터가 꺼져 '아모스갤만'
   요청에 인스타가 섞여 나왔다 — 소스 미평균(1급 규칙)이 조용히 깨지는 경로였다. 받는 값은
   `SOURCE_PLATFORM` 의 값(`dcinside`/`instagram`)이지 화면 라벨('아모스갤')이 아니다.
-- **Note:** `list_reviews` 는 **아직 근거 스니펫만** 조회한다(`evidence`). ADR-0013 §3 은 원문
-  본문의 **서버 발췌**를 내보내라고 정했지만, `reviews` 에 본문 컬럼이 없어 재수집·backfill 이
-  선행이다. 구현할 때 자르는 코드는 **반드시 여기** 둔다 — 전문을 반환하고 프런트에서
-  `line-clamp` 로 접는 건 발췌가 아니다. 공개 전환 스위치도 같은 자리(ADR-0013 §5).
-  정렬(`REVIEW_SORTS`)도 **DB 에 실재하는 컬럼으로만** 만든다: 좋아요/조회/추천 수는 수집기
-  (`RawReview.meta`)엔 있지만 테이블에 없어서 메뉴에 넣지 않았다. '최근 수집순'의 '수집'도
-  같은 이유다 — `created_at` 은 작성일이 아니라 색인 시각이다.
+- **Important:** `list_reviews` 는 원문 본문의 **서버 발췌**(`source_links.excerpt`)를 내보낸다
+  (ADR-0013 §3, 컬럼은 `e930471`). 저장은 전문(`index.post_columns`), 자르는 건 **여기 한 곳**이다 —
+  전문을 반환하고 프런트에서 `line-clamp` 로 접는 건 발췌가 아니다(전문이 이미 브라우저에 도달).
+  공개 전환 시 길이를 줄이는 스위치도 같은 자리(ADR-0013 §5). `evidence`(~15자 근거 스니펫)는
+  발췌와 **별개 필드**로 함께 나간다.
+- **Note:** 정렬(`REVIEW_SORTS`)은 **DB 에 실재하는 컬럼으로만** 만든다. 좋아요/조회/추천 컬럼은
+  이제 존재하고 `list_reviews` 도 반환하지만 **정렬 메뉴는 아직 수집순·감성순뿐**이다 — 그 커밋
+  이전에 색인된 행은 값이 NULL 이라(수집은 `post_id` 존재 시 스킵) 재수집 전에 메뉴를 켜면 정렬이
+  거짓말이 된다. 켜는 건 이 dict 에 한 줄 추가. '최근 수집순'의 '수집'도 같은 정직함이다 —
+  `created_at` 은 작성일이 아니라 색인 시각이고, 작성일은 `posted_at` 이 따로 갖는다.
 
 ## Cross-module dependencies
-- 프런트엔드(재작성 예정) → `pipeline`, `search` (표시 전용, 백엔드 글루는 여기 캡슐화)
+- [`../api/main.py`](../api/main.py) → `pipeline`, `source_links`, `linking` (얇은 직렬화층;
+  화면 `../web` 은 HTTP 로만 닿는다 — DB 접근은 이 패키지가 전부 캡슐화)
 - `../sql/schema.sql` ← `db.py`/`index.py` 가 specs↔reviews 조인·메타필터 컬럼 사용
 - `../eval/` → `bias`, `sources`, `linking` 오프라인 테스트
 - 도메인 규칙·결정 근거: [../MEMORY.md](../MEMORY.md), [../docs/adr/](../docs/adr/)

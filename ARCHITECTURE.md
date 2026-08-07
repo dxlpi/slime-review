@@ -6,8 +6,9 @@
 
 모듈별 상세는 각 `CLAUDE.md`: [slime_rag](slime_rag/CLAUDE.md) ·
 [eval](eval/CLAUDE.md) · [evals](evals/CLAUDE.md) · [sql](sql/CLAUDE.md).
-프런트엔드는 `web/`(Vite + React + TS) — 디자인 HTML 을 그대로 옮긴 화면이고 **아직 목 데이터**다
-([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md)).
+프런트엔드는 `web/`(Vite + React + TS) — 디자인 HTML 을 그대로 옮긴 화면이고
+([ADR-0012](docs/adr/0012-remove-streamlit-frontend.md)), `api/`(FastAPI)를 통해 백엔드를 읽는다.
+`web/src/data/mock.ts` 는 응답 전·실패 시의 **폴백 자리표시자**다.
 도메인 결정 근거는 [MEMORY.md](MEMORY.md) · [docs/adr/](docs/adr/).
 
 ## 데이터 흐름 (파이프라인)
@@ -35,19 +36,25 @@ flowchart LR
   DBs --> CONS[consolidated_view.py<br/>소스별 정서·갭·향불일치]
   DBr --> CONS
   SEARCH --> ANS[근거 답변<br/>search.answer — 소비자 없음]
-  CONS -.->|API 미연결| UI[web/ · Vite+React<br/>SlimeSearch.tsx · 목 데이터]
+  CONS --> API
   DBr --> LR[pipeline.list_reviews<br/>커뮤니티 리뷰 패널]
-  LR --> UI
+  LR --> API[api/main.py<br/>FastAPI · 얇은 직렬화층]
+  API -->|HTTP| UI[web/ · Vite+React<br/>SlimeSearch.tsx]
 ```
 
-> `UI` 로 가는 화살표는 **아직 점선이다**. HTTP API 가 없어서 `web/` 은 [목 데이터](web/src/data/mock.ts)를 읽는다.
-> `pipeline` 의 `list_*` / `consolidated_for` / `answer` 가 표시 계층의 계약이고,
-> API 층은 그 셋을 그대로 노출하면 된다.
+> 표시 계층의 계약은 `pipeline` 의 `list_*` / `consolidated_for` / `stored_summaries` 다.
+> `api/main.py` 는 그걸 **그대로 노출만** 한다 — SQL·표시 정책·집계가 여기로 새면 백엔드가 두 벌이 된다.
+> 응답 shape 은 [`web/src/data/mock.ts`](web/src/data/mock.ts) 와 같은 모양이라 목 데이터와 실데이터를
+> 마크업 수정 없이 갈아끼울 수 있다(디자인 원본과 픽셀 대조 유지). `search.answer` 는 아직 소비자가 없다.
 
 ## 모듈 의존성 (누가 누구를 import 하나)
 
 ```mermaid
 flowchart TD
+  web[web/ · SlimeSearch.tsx] -->|fetch| api[api/main.py]
+  api --> pipeline
+  api --> source_links
+  api --> linking
   pipeline --> sources
   pipeline --> bias
   pipeline --> extract
@@ -92,6 +99,8 @@ flowchart TD
 | `reviews` 에 작성일·반응수 컬럼 추가 | `pipeline.REVIEW_SORTS`(정렬 메뉴) · `list_reviews` · 리뷰 카드 라벨('수집' → '작성') |
 
 ## 배포 (마지막 하드게이트)
-Render(관리형 Postgres+pgvector) → `schema.sql` 적용 → 정적 사이트(`web/`) + API 웹서비스 2개.
-화면은 다시 있으나 **API 층이 없어** 아직 실데이터를 못 띄운다 — 그게 이 게이트의 선행 조건이다.
-로컬은 `.venv` + `docker compose up -d`(포트 55432).
+Render(관리형 Postgres+pgvector) → `schema.sql` 적용 → 정적 사이트(`web/`) + API 웹서비스(`api/`) 2개.
+화면·API·파이프라인은 **로컬에서 이미 연결돼 돈다** — 남은 건 배포 자체다.
+로컬은 `.venv` + `docker compose up -d`(포트 55432) + `uvicorn api.main:app --port 8000`.
+배포 시 `api/main.py` 의 CORS 허용 오리진(지금 Vite 개발서버 `5173` 만)과 `web/` 의
+`VITE_API_BASE` 를 실제 오리진으로 바꾼다.

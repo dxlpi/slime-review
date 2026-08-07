@@ -8,7 +8,7 @@ SQL·표시 정책·집계는 전부 [`../slime_rag`](../slime_rag/CLAUDE.md) �
 ## Key files
 | 파일 | 역할 |
 |---|---|
-| `main.py` | 전부. FastAPI 앱 + 5개 엔드포인트 + 화면 형태 어댑터(`_summary_rows` · `_by_criterion` · `_cell` · `_logo`) |
+| `main.py` | 전부. FastAPI 앱 + 5개 엔드포인트 + 화면 형태 어댑터(`_paragraph` · `_by_criterion` · `_logo`) |
 
 | 엔드포인트 | 반환 |
 |---|---|
@@ -46,13 +46,6 @@ curl -s 'http://127.0.0.1:8000/api/page?product=빠코볼' | python -m json.tool
 - **Note:** 로고는 파일 경로를 그대로 주지 않는다(서버 로컬 경로) — `/api/logo/{handle}` 로 서빙하고
   파일이 없으면 모노그램으로 degrade 한다(ADR-0010 의 '삭제=철회' 성질).
 - **Warning:** CORS 는 지금 Vite 개발서버(`5173`)만 허용한다. 배포 시 실제 오리진으로 교체.
-- **Don't:** 기준 줄에 배지·라벨을 붙이지 말 것(사용자 결정 2026-08-07). 건수(`인스타 27 · 아모스갤 6`)·
-  정서 분포(`갈림 19:5`)·`인스타만` 을 만들어 띄워 봤고 전부 걷어냈다 — 다수/소수는 이미
-  `verdict`/`minority` 두 칸이 **문장으로** 말해서 같은 말이 줄마다 두 번 붙었다
-  ([ADR-0014](../docs/adr/0014-verdict-minority-and-badge-meta.md)). 집계 자체는 `criterion_stats` 에
-  살아 있고 **요약 프롬프트의 다수 판정 재료**로 계속 쓰인다 — 지우는 건 표시뿐이다.
-- **Important:** `_cell` 은 구 스키마(문자열 한 칸) 요약도 읽어 `verdict` 로 승격한다. 재생성이
-  유료라 강제하지 않기 때문이다 — 지우면 옛 행이 있는 페이지가 통째로 빈칸이 된다.
 
 ## Cross-module dependencies
 - `../slime_rag` → `pipeline`(데이터 접근 전부) · `source_links`(링크·임베드·로고) · `linking`(마켓 해석)

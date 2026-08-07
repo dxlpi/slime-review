@@ -7,7 +7,12 @@
 
 설계 메모:
 - 1층(specs)은 KB market_word 를 키로 적재 → linking 이 정규화한 reviews.market 과 바로 조인.
-- 멱등: specs 는 UNIQUE(market,product) upsert, reviews 는 post_id 존재 시 색인 스킵.
+- 멱등: 양쪽 다 **DB 제약**이 강제한다 — specs 는 UNIQUE(market,product) upsert,
+  reviews 는 UNIQUE(source,post_id,product) + ON CONFLICT DO NOTHING(`index.index_post`).
+  ⚠️ 2026-08-07 이전 이 줄은 'reviews 는 post_id 존재 시 색인 스킵'이라고 적혀 있었지만
+  그 스킵은 `index_gold` 에만 있었고 실제 수집 경로(`ingest_hashtag`·`ingest_dcinside`)는
+  맨 INSERT 였다. 결과: 배치를 두 번 돌려 인스타 80행 중 28행이 중복(같은 글이 런마다
+  다른 감성으로 추출돼 독립 후기처럼 집계에 들어감). 주석이 지키던 규칙을 제약으로 옮긴 이유다.
 - 소스→플랫폼 매핑(amos→dcinside)은 여기 한 곳에서. 종합뷰는 플랫폼 라벨로 편향을 본다.
 - 표시 계층은 이 모듈의 list_*/consolidated_for/answer 만 호출(DB SQL 캡슐화).
 """
@@ -53,8 +58,17 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, official_textur
     종류어('폼볼')는 분류지 질감 설명이 아니라서, 이게 없으면 화면의 '질감' 줄이 분류코드만 보여준다.
     beads: 비즈/토핑 구성요소 리스트(오픈 어휘). None/빈 → []. 제품행에 붙는 부가 메타이며,
     비즈 단독으로는 제품이 되지 않는다(호출부 백스톱이 scent/base_combo/slime_type 로 제품성 판정).
-    source_permalink: 공식 스펙 출처 인스타 게시물 URL(없으면 None). COALESCE 로 기존 값 보존 —
-    나중 upsert 가 URL 을 안 넘겨도(None) 이미 저장된 URL 을 지우지 않는다.
+    source_permalink: 공식 스펙 출처 인스타 게시물 URL(없으면 None).
+
+    **모든 칸이 COALESCE 다 — 재수집이 기존 값을 지우지 않는다**(2026-08-07).
+    예전엔 `source_permalink`·`official_texture` 만 보존하고 `scent`·`base_combo`·`slime_type`·
+    `beads` 는 무조건 덮어썼다. 그러면 같은 제품이 향을 안 적은 다른 글에서 다시 잡힐 때
+    이미 있던 향이 null 로 날아간다 — 프로필 경로는 **최신 ~12글만** 주므로 같은 제품이
+    여러 글에 걸쳐 잡히는 게 정상이고, 그래서 이건 이론적 위험이 아니라 예정된 사고였다.
+    수집은 **누적**이지 최신 글로의 교체가 아니다.
+    ⚠️ 되돌리지 말 것. 값을 실제로 **고쳐야** 할 때(판매자가 향을 바꿨다 등)는 이 경로가 아니라
+      무엇을 덮는지 명시하는 별도 갱신으로 한다 — `index_post` 의 `DO NOTHING` 과 같은 원칙이다.
+    `beads` 는 배열이라 NULL 이 아니라 **빈 배열**이 '미언급'이므로 `cardinality` 로 가른다.
     """
     cur.execute(
         """
@@ -62,8 +76,11 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, official_textur
                            official_texture, beads, source_permalink)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (market, product) DO UPDATE SET
-          scent=EXCLUDED.scent, base_combo=EXCLUDED.base_combo,
-          slime_type=EXCLUDED.slime_type, beads=EXCLUDED.beads,
+          scent=COALESCE(EXCLUDED.scent, specs.scent),
+          base_combo=COALESCE(EXCLUDED.base_combo, specs.base_combo),
+          slime_type=COALESCE(EXCLUDED.slime_type, specs.slime_type),
+          beads=CASE WHEN cardinality(EXCLUDED.beads) > 0
+                     THEN EXCLUDED.beads ELSE specs.beads END,
           official_texture=COALESCE(EXCLUDED.official_texture, specs.official_texture),
           source_permalink=COALESCE(EXCLUDED.source_permalink, specs.source_permalink)
         """,
@@ -201,9 +218,26 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
 
     n_genuine = n_promo = 0
     n_ref = n_noref = 0                              # 관측성: 원문 링크 식별자 유/무 행수
+    # 후기 분기의 제품 게이트 재료. 판매자 분기가 먼저 돌아 specs 를 채운 **뒤에** 읽는다 —
+    # 같은 런에서 방금 수집한 1층 제품도 타이브레이커로 쓸 수 있다.
+    known: dict[str, set] = {}
+    with connect() as conn:
+        for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
+            known.setdefault(mk, set()).add(pr)
+    all_excl = frozenset().union(*(extract.market_tag_exclusions(m) for m in kb.markets)) \
+        if kb.markets else frozenset()
+
     for u in users:                                  # 실사용/홍보성 → 2층 색인
         rc = u.meta.get("review_class", "genuine")
         doc = extract.extract_review(u.text, llm, settings.model_extract)
+        # 유령 제품 차단 — 캡션의 **스펙 줄**(풀조합/향료)이 제품명으로 올라오는 걸 막는다.
+        # 판매자 분기엔 원래 있던 게이트가 후기 분기엔 없어서 인스타 80행 중 46행이 오염됐다.
+        # 규칙은 프롬프트가 아니라 코드로 강제한다(전언 차단·판매자 게이트와 같은 수법).
+        mkt = _market_from_caption(kb, u.text)
+        doc = extract.repair_product_names(
+            doc, u.text,
+            exclude=_tag_exclusions(mkt) if mkt else all_excl,
+            known_products=known.get(mkt, ()))
         ref = source_links.build_source_ref("instagram", u.url, u.meta)
         rows = index.index_post(doc, source="instagram",
                                 post_id=u.meta.get("shortcode"), review_class=rc,
@@ -231,6 +265,7 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
 
 # ---------------------------------------------------------------- 1층 수집(마켓 본인 피드)
 def ingest_seller_profiles(markets: list[str] | None = None, *,
+                           only_missing: bool = False,
                            limit_per_market: int = 12, dry_run: bool = True) -> dict:
     """마켓 **본인 계정 피드** → 1층 공식 스펙. ADR-0003 이 막힌 자리의 우회 경로다.
 
@@ -244,7 +279,12 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
     ⚠️ 가져오는 건 **판매자 글**이라 1층 전용이다. 유저 후기(2층)는 남의 계정에 있어서 이
        경로로는 영영 안 들어온다 — 그건 해시태그 경로 몫이고, 표본 편향도 거기 얘기다.
 
-    markets: 대상 market_word 목록. None 이면 **specs 가 아직 없는 마켓 전부**.
+    markets: 대상 market_word 목록. None 이면 **KB 의 핸들 있는 마켓 전부**.
+    only_missing=True: 그중 `specs` 가 아직 하나도 없는 마켓만. 첫 훑기용 싼 경로다.
+    ⚠️ `only_missing` 이 **기본값이었던 게 버그였다**(~2026-08-07). 이 함수의 존재 이유가
+      '액터가 최신 ~12글만 주니 주기적으로 돌려 앞으로 쌓는 것'인데, 기본 대상이
+      '스펙 0개인 마켓'이면 두 번째 실행부터 대상이 **빈 목록**이 된다 — 누적하라고 만든
+      경로가 누적을 못 했다. 이제 기본은 전체이고, 옛 동작은 명시 옵션으로만 쓴다.
     dry_run=True(기본): 네트워크·LLM·DB 미접촉. 대상과 예상비용만 돌려준다.
     ⚠️ dry_run=False 는 **유료**다 — Apify 프로필 요금 + 캡션 1건당 `extract_spec` LLM 호출.
     """
@@ -252,13 +292,18 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
 
     kb = linking.load_kb()
     by_handle = {m["handle"]: m.get("market_word") for m in kb.markets if m.get("handle")}
-    if markets is None:
-        with connect() as conn:
-            have = {r[0] for r in conn.execute("SELECT DISTINCT market FROM specs").fetchall()}
-        targets = [(w, h) for h, w in by_handle.items() if w not in have]
-    else:
+    if markets is not None:
         want = set(markets)
         targets = [(w, h) for h, w in by_handle.items() if w in want]
+        if unknown := want - {w for w, _h in targets}:
+            # 무음 갭 금지: 오타·미등록 마켓을 조용히 건너뛰면 '수집했는데 왜 없지'가 된다.
+            log.warning("KB 에 핸들이 없어 건너뛴 마켓 %d개: %s", len(unknown), ", ".join(sorted(unknown)))
+    else:
+        targets = [(w, h) for h, w in by_handle.items()]
+        if only_missing:
+            with connect() as conn:
+                have = {r[0] for r in conn.execute("SELECT DISTINCT market FROM specs").fetchall()}
+            targets = [(w, h) for w, h in targets if w not in have]
 
     cost = len(targets) / 1000 * InstagramProfileSource.COST_PER_1000
     out: dict = {"targets": [w for w, _h in targets], "handles": [h for _w, h in targets],
@@ -292,6 +337,30 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
 
 
 # ---------------------------------------------------------------- 2층 색인(디시 실수집)
+def dc_post_id(raw) -> str | None:
+    """디시 조각 → `reviews.post_id`. 못 만들면 None(호출부가 색인을 건너뛴다).
+
+    **런에 의존하지 않는 값만 쓴다.** 예전엔 댓글 id 자리에 그 런의 `enumerate` 위치(`i`)를
+    넣었다 — 수집 결과가 한 건만 달라져도 이후 모든 댓글의 `i` 가 밀려서 **같은 댓글이 다른
+    `post_id`** 로 들어갔다. 그러면 `UNIQUE(source, post_id, product)` 가 댓글에 대해 아무것도
+    막지 못한다(글·인스타는 URL·shortcode 라 정상이었다). 기보유 조각을 건너뛰는 컷을
+    그 위에 얹으면 **조용히 아무것도 안 걸러지므로**, 이 함수가 Phase 1 컷의 선행 조건이다.
+
+    안정 키는 이미 수집돼 있었다 — `comment_no` 는 디시가 주는 댓글 고유 id다
+    (`sources/dcinside.py` `_parse_comments`, 2026-08-06 라이브 확인). `post_id` 만 그걸 안 썼다.
+
+    ⚠️ `ordinal` 폴백을 쓰지 말 것. 수집기가 그 값을 **일부러 다른 이름으로** 싣는다
+      ("id 를 못 잡았을 때만 채우는 스레드 내 순번 폴백 — 이름을 분리해 앵커 조립에 절대
+      안 쓰이게 한다"). 여기서 그걸 쓰면 방금 없앤 런 의존성이 그대로 재발한다.
+    ⚠️ 반환 형식은 마이그레이션 SQL(`sql/schema.sql`)이 만드는 값과 **같아야** 한다:
+      `raw.url`(= `…&no=<스레드>#cmt`) + `':'` + `comment_no`.
+    """
+    if raw.meta.get("type") == "post":
+        return raw.url
+    cno = raw.meta.get("comment_no")
+    return f"{raw.url}:{cno}" if cno else None
+
+
 def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | None = None,
                     limit: int = 30, comment_pages: int = 1, dry_run: bool = False) -> dict:
     """
@@ -321,16 +390,21 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
 
     llm = LLM()
     pairs = extract.extract_collected(raws, llm, settings.model_extract)
-    n_rows = n_ref = n_noref = 0                      # 관측성: 원문 링크 식별자 유/무 행수
+    n_rows = n_ref = n_noref = n_no_cno = 0           # 관측성: 원문 링크 식별자 유/무 행수
     with connect() as conn:
-        for i, (raw, doc) in enumerate(pairs):
+        for raw, doc in pairs:
             # post_id 는 조각별로 달라야 한다 — 스레드 배치라도 귀속은 조각 단위(AC12).
             # 댓글 URL 은 스레드 안에서 전부 `…#cmt` 로 같으므로(수집기가 앵커를 안 붙인다)
-            # 순번을 넣지 않으면 같은 스레드 댓글들이 한 post_id 로 뭉개진다.
-            post_id = raw.url if raw.meta.get("type") == "post" else \
-                f"{raw.url}:{raw.meta.get('parent_no')}:{i}"
-            # 링크용 식별자는 post_id 와 별개다 — post_id 가 담는 건 댓글 id 가 아니라 런 전체의
-            # enumerate 위치라 원문 주소로 되돌릴 수 없다(그래서 별도 컬럼, ADR-0009).
+            # 댓글 고유 id 를 붙여야 같은 스레드 댓글들이 한 post_id 로 뭉개지지 않는다.
+            post_id = dc_post_id(raw)
+            if post_id is None:
+                # 무음 스킵 금지 — 유실량이 보여야 판단할 수 있다(계획 R2). id 없는 댓글을
+                # 순번으로 때우면 런마다 키가 흔들려 멱등성이 통째로 무효가 된다.
+                log.warning("댓글 id 없음 → 색인 스킵(스레드 %s)", raw.meta.get("thread_no"))
+                n_no_cno += 1
+                continue
+            # 링크용 식별자는 post_id 와 별개다 — 이건 표시용 주소 조립 규칙이고(ADR-0009)
+            # post_id 는 색인 유일성 키다. 같은 재료로 만들지만 소비처가 다르다.
             ref = source_links.build_source_ref("dcinside", raw.url, raw.meta)
             rows = index.index_post(doc, source="amos", post_id=post_id, conn=conn,
                                     relevance_meta=raw.meta.get("relevance"), source_ref=ref,
@@ -344,6 +418,7 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     counts["indexed_rows"] = n_rows
     counts["rows_with_source_ref"] = n_ref
     counts["rows_without_source_ref"] = n_noref
+    counts["skipped_no_comment_no"] = n_no_cno
     counts["llm"] = {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}
     log.info("ingest_dcinside 완료: %s", counts)
     return counts
@@ -368,6 +443,133 @@ def index_gold(conn) -> int:
         n += index.index_post(rec["expected"], source="amos", post_id=pid, conn=conn,
                               source_ref=ref)
     return n
+
+
+# ---------------------------------------------------------------- 제품명 귀속 복구(백필)
+def _market_from_caption(kb, text: str) -> str | None:
+    """캡션의 해시태그로 마켓을 푼다 — 행의 `market` 이 비었을 때만 쓰는 폴백(AC7-1).
+
+    유일하게 확정될 때만 돌려준다. 후보가 둘 이상이면 None — 모르는 채로 두는 게
+    엉뚱한 마켓의 제품 목록을 타이브레이커로 쓰는 것보다 낫다.
+    """
+    from . import extract
+
+    hits = set()
+    for tag in extract.hashtags_in(text or ""):
+        cands, conf, _why = kb.resolve_market(tag)
+        if len(cands) == 1 and conf >= 0.85:
+            hits.add(cands[0].get("market_word") or cands[0].get("market"))
+    return hits.pop() if len(hits) == 1 else None
+
+
+def repair_product_attribution(*, dry_run: bool = True) -> dict:
+    """기존 인스타 행의 `product` 를 캡션 해시태그 기준으로 복구한다(`extract.resolve_product_name`).
+
+    **LLM 을 부르지 않는다**(AC10). 원문 캡션이 `body` 에 이미 있어 다시 읽으면 되고,
+    재임베딩도 로컬 BGE-M3 라 API 비용이 0이다 — 재수집이 필요한 작업이 아니다.
+
+    ⚠️ `render_review` 가 제품명을 텍스트에 굽기 때문에 `product` 만 바꾸면 `evidence`·`tokens`·
+      `embedding` 이 옛 이름을 가리킨 채 남는다(검색이 유령 이름으로 계속 맞는다). 셋을 함께 다시 만든다.
+    ⚠️ 접기 키는 `UNIQUE(source, post_id, product)` 와 **정확히 같아야** 한다. 마켓을 키에 넣으면
+      제약이 안 보는 축으로 접게 되어 갱신이 제약 위반으로 죽는다.
+    보류(None)는 접지 않는다 — Postgres 가 NULL 을 서로 다른 값으로 보므로 제약에도 안 걸린다.
+    """
+    from . import extract
+
+    kb = linking.load_kb()
+    all_excl = frozenset().union(*(extract.market_tag_exclusions(m) for m in kb.markets)) \
+        if kb.markets else frozenset()
+    with connect() as conn:
+        known: dict[str, set] = {}
+        for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
+            known.setdefault(mk, set()).add(pr)
+        rows = conn.execute(
+            "SELECT id, post_id, market, product, body, attributes FROM reviews "
+            "WHERE source='instagram' AND body IS NOT NULL ORDER BY id").fetchall()
+
+    # 1) 조각(post)마다 ①로 확정되는 이름을 먼저 모은다 — 그 조각이 **이미 갖고 있는 제품**은
+    #    다른 이름의 흡수 대상이 될 수 없다(`taken`). 행 단위로만 보면 이 맥락이 안 보인다.
+    ctx = {}                                   # post_id → (exclude, known, taken)
+    for rid, post_id, market, product, body, attrs in rows:
+        if post_id in ctx:
+            continue
+        mkt = market or _market_from_caption(kb, body)
+        excl = _tag_exclusions(mkt) if mkt else all_excl   # 마켓 미상이면 전 마켓 태그를 뺀다(페일세이프)
+        ctx[post_id] = (excl, known.get(mkt, ()), [])
+    for _rid, post_id, _mk, product, body, _at in rows:
+        excl, kn, taken = ctx[post_id]
+        if extract.resolve_product_name(product, body, exclude=excl, known_products=kn)[1] == "keep":
+            taken.append(product)
+
+    # 2) 행마다 목표 제품명 판정
+    plan: list[dict] = []
+    for rid, post_id, market, product, body, attrs in rows:
+        excl, kn, taken = ctx[post_id]
+        target, why = extract.resolve_product_name(
+            product, body, exclude=excl, known_products=kn, taken=taken)
+        plan.append({"id": rid, "post_id": post_id, "market": market, "from": product,
+                     "to": target, "why": why, "score": extract._filled_score(attrs or {})})
+
+    # 3) 제약과 같은 키로 접기 — 같은 조각의 같은 제품은 한 행(AC3, 이중 계상 방지)
+    groups: dict[tuple, list[dict]] = {}
+    for p in plan:
+        if p["to"] is None:
+            continue                                       # 보류분은 접지 않는다
+        groups.setdefault((p["post_id"], p["to"]), []).append(p)
+    drops: list[dict] = []
+    for _key, members in groups.items():
+        if len(members) < 2:
+            continue
+        members.sort(key=lambda m: (-m["score"], m["id"]))  # 많이 찬 쪽을 남긴다
+        drops.extend(members[1:])
+    drop_ids = {d["id"] for d in drops}
+    # 쓰기가 필요한 행 = 이름이 바뀌는 행 + 보류로 비우는 행. 둘 다 UPDATE 지만 성격이 달라
+    # 보고는 나눈다 — 보류는 '고쳤다'가 아니라 '모른다고 표시했다'이다.
+    writes = [p for p in plan if p["id"] not in drop_ids and p["to"] != p["from"]]
+    renames = [p for p in writes if p["to"] is not None]
+    holds = [p for p in writes if p["to"] is None]
+
+    def _brief(p, keys):
+        return {k: p[k] for k in keys}
+
+    out = {"dry_run": dry_run, "scanned": len(plan), "writes": len(writes),
+           "renames": len(renames), "folds": len(drops), "holds": len(holds),
+           "unchanged": sum(1 for p in plan if p["to"] == p["from"]),
+           "by_reason": {w: sum(1 for p in plan if p["why"] == w) for w in
+                         sorted({p["why"] for p in plan})},
+           "rename_list": [_brief(r, ("id", "post_id", "market", "from", "to", "why"))
+                           for r in renames],
+           "hold_list": [_brief(h, ("id", "post_id", "market", "from", "why")) for h in holds],
+           "fold_list": [_brief(d, ("id", "post_id", "from", "to")) for d in drops]}
+    if dry_run:
+        log.info("repair_product_attribution(dry): %s", {k: out[k] for k in
+                 ("scanned", "renames", "folds", "holds", "unchanged")})
+        return out
+
+    # 4) 적용 — 접기 삭제가 **먼저**다. 나중에 하면 이름 변경이 제약 위반으로 죽는다.
+    changed = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            if drop_ids:
+                cur.execute("DELETE FROM reviews WHERE id = ANY(%s)", (list(drop_ids),))
+            for r in writes:
+                row = cur.execute("SELECT market, attributes FROM reviews WHERE id=%s",
+                                  (r["id"],)).fetchone()
+                if row is None:
+                    continue
+                mkt, attrs = row
+                text = index.render_review(mkt, r["to"], attrs or {})
+                vec = index.embed([text])[0]
+                cur.execute(
+                    "UPDATE reviews SET product=%s, evidence=%s, tokens=%s, embedding=%s "
+                    "WHERE id=%s",
+                    (r["to"], text, index._tokenize(text), vec, r["id"]))
+                changed += 1
+        conn.commit()
+    out.update({"deleted": len(drop_ids), "updated": changed})
+    log.info("repair_product_attribution 완료: %s", {k: out[k] for k in
+             ("scanned", "updated", "deleted", "holds")})
+    return out
 
 
 # ---------------------------------------------------------------- 셋업(전체)
@@ -459,9 +661,13 @@ def _records_for(conn, market: str, product: str | None) -> list[dict]:
 
 # 커뮤니티 리뷰 패널 정렬 — **값이 실제로 채워진 축으로만** 만든다.
 # 디자인의 좋아요/조회/추천순은 이제 컬럼이 있고(ADR-0013 `post_columns`) `list_reviews` 도
-# 반환하지만, 그 컬럼이 생기기 전에 색인된 행은 값이 NULL 이다(수집은 post_id 존재 시 스킵).
-# 절반이 NULL 인 축을 '추천순'이라 부르면 정렬을 누른 사용자에게 거짓말이 되므로, 재수집으로
+# 반환하지만, 그 컬럼이 생기기 전에 색인된 행은 값이 NULL 이다.
+# 절반이 NULL 인 축을 '추천순'이라 부르면 정렬을 누른 사용자에게 거짓말이 되므로, 값을
 # 채운 뒤 여기 dict 에 한 줄 추가하는 것으로 켠다.
+# ⚠️ **그냥 재수집해서는 안 채워진다**(2026-08-07 정정). 예전 주석은 '수집은 post_id 존재 시
+# 스킵'이라 적어 재수집이 막히는 것처럼 읽혔지만 실제로는 맨 INSERT 라 **중복만 쌓였고**,
+# 지금은 `UNIQUE(source,post_id,product)` + `ON CONFLICT DO NOTHING` 이라 **정말 스킵된다**.
+# 어느 쪽이든 기존 행의 NULL 은 그대로다 — 무엇을 덮는지 명시하는 별도 백필이 필요하다.
 # ⚠️ '최근 수집순'은 작성일이 아니라 **수집일**(reviews.created_at) 기준이다. 작성일은
 # `posted_at` 이 따로 갖고 있으니, 정렬을 켤 때 둘을 섞지 말 것 — 없는 걸 '최신순'이라
 # 부르지 않으려고 이름·화면 라벨 양쪽에 '수집'을 남겼다.

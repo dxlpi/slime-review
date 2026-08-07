@@ -324,9 +324,19 @@ def hashtags_in(text: str) -> list[str]:
 
 
 # 광역 슬라임어 — 어느 마켓 캡션에나 붙을 수 있어 제품명이 될 수 없다.
+# 광역 태그 — 어떤 마켓의 제품명도 될 수 없는 커뮤니티/분류 태그. 제품명 후보에서 상시 뺀다.
+# ⚠️ 여기 없는 광역 태그는 **제품이 된다.** 실측(2026-08-07): `슬라임리뷰` 가 한글판이 없어
+#   `빅말차쿠키디 → 슬라임리뷰` 로 복구될 뻔했다 — 영어 `slimereview` 만 있었다.
+# ⚠️ 넣는 기준은 '실제 코퍼스에서 관측됐고 제품명일 수 없는 **완전일치** 태그'다. 부분일치
+#   규칙으로 넓히지 말 것 — `#위즈캔디샵` 같은 고유 제품명이 '샵' 때문에 사라진다.
+# ⚠️ 개인 태그(`#두통픽`·`#소망픽`·`#꼼픽`)는 여기 못 넣는다 — 마켓/사용자마다 달라 열거가
+#   불가능하다. 그건 마켓별 제품 목록(KB `products`)으로만 갈린다.
 GENERIC_TAGS = frozenset({
     "슬라임", "슬라임샵", "슬라임마켓", "슬라임스타그램", "슬라임추천", "국내슬라임",
     "slime", "slimeshop", "slimereview", "slimes", "asmr", "슬라임asmr",
+    # 2026-08-07 코퍼스 실측 추가 — 인스타 34개 글의 고유 태그 42종에서 관측된 광역어
+    "슬라임후기", "슬라임리뷰", "슬라임영상", "슬라임계정", "슬계맞팔",
+    "폼볼슬라임", "slimeasmr", "slimevideo", "floamslime", "satisfying",
 })
 
 
@@ -426,6 +436,131 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
         kept.append(r)
     doc["reviews"] = kept
     return doc
+
+
+_ATTR_SLOTS = ("scent", "texture", "sound", "longevity")
+
+
+def _filled_score(item: dict) -> int:
+    """항목이 실제로 담고 있는 평가의 양 — 접을 때 어느 쪽을 남길지 정하는 데만 쓴다."""
+    n = sum(1 for k in _ATTR_SLOTS if item.get(k))
+    ov = item.get("overall") or {}
+    return n * 2 + sum(1 for k in ("summary", "stated_rating") if ov.get(k))
+
+
+def _fold_by_product(items: list[dict]) -> list[dict]:
+    """같은 제품으로 접힌 항목을 하나로 병합 — **이중 계상 방지**.
+
+    복구만 하고 안 접으면 유령 2행이 진짜 제품 2행이 될 뿐이다(AC3). 실측: `DLNVdrIzQdm` 은
+    한 캡션에서 `아마존 우드 점토`(풀조합)와 `코코넛과자`(향)를 각각 제품으로 내보냈는데,
+    둘 다 `빠코볼` 로 복구되면 한 사람의 한 의견이 빠코볼 후기 **2건**이 된다.
+    ⚠️ 보류(None)는 접지 않는다 — 서로 다른 제품일 수 있고, 합치면 다른 의견이 한 건이 된다.
+    """
+    out: list[dict] = []
+    seen: dict[str, int] = {}                    # 정규화 제품명 → out 인덱스
+    for it in items:
+        name = it.get("mentioned_product")
+        if not name:
+            out.append(it)                       # 보류분은 그대로 둔다
+            continue
+        key = _norm_tag(name)
+        if key not in seen:
+            seen[key] = len(out)
+            out.append(it)
+        elif _filled_score(it) > _filled_score(out[seen[key]]):
+            out[seen[key]] = it                  # 더 많이 찬 쪽을 남긴다
+    return out
+
+
+def repair_product_names(doc: dict, text: str, *, exclude=None,
+                         known_products=None) -> dict:
+    """추출된 `mentioned_product` 를 **캡션 해시태그**로 검증·복구한다(순수·무LLM).
+
+    후기 분기에는 판매자 분기와 달리 제품 게이트가 없어서, 추출기가 캡션의 **스펙 줄**을
+    제품명으로 들어올린다. 실측: `아마존 우드 점토`(풀조합)에 후기 8행, `코코넛과자향`(향료)에
+    2행이 달렸고, 정작 해시태그의 `빠코볼` 행은 **같은 글에서 0건**이었다.
+
+    판정 4갈래:
+      ① 제품명이 캡션 해시태그면 **그대로 둔다** — `specs` 에 없어도 상관없다.
+      ② 해시태그가 아니면 산문에서 온 유령이다. 후보 태그가 **정확히 하나**면 교체.
+      ③ 후보가 여럿이면 그중 **1층 제품인 게 정확히 하나**일 때만 교체(타이브레이커).
+      ④ 그 외에는 `None`(보류). 지어내지도, 흡수하지도 않는다.
+    마지막에 같은 제품으로 접힌 항목을 하나로 병합한다(`_fold_by_product`).
+
+    ⛔ **되돌리지 말 것 — 초안이 틀렸던 자리.** 처음엔 ①이 없이 '캡션 태그 중 `known_products`
+      에 있는 것 하나면 교체'만 있었다. 그러면 **`specs` 부재를 '제품이 아님'으로 취급**하게 되어
+      태그가 둘인 글에서 진짜 제품이 흡수된다. 실측(시뮬레이션): `빠다코코볼`·`빠코폼`·
+      `눈꽃크런키`·`곰바라기`·`키위스쿱`·`알감자찐감자`·`댕초밥` 이 전부 `빠코볼` 로 빨려
+      들어갔다. **`specs` 부재는 미수집일 뿐이다** — 프로필 액터가 최신 ~12글만 주므로 1층은
+      구조적으로 불완전하다. 판정 기준은 **해시태그 여부**이고 `known_products` 는 ③ 전용이다.
+
+    ⚠️ 이 게이트는 **인스타 전용**이다. 해시태그가 없는 입력(디시)은 후보가 0개라 ②③이 모두
+      불발하고 ①만 남는데, 그러면 모든 이름이 보류로 바뀐다 — 그래서 태그가 하나도 없으면
+      **아무것도 건드리지 않고** 그대로 돌려준다(AC7).
+
+    exclude: 그 마켓의 상호·핸들·별칭(`market_tag_exclusions`). 안 빼면 `#슬라임지나` 가 제품이 된다.
+    known_products: 그 마켓의 1층 제품명 집합. ③ 타이브레이커에만 쓴다.
+    """
+    if not product_hashtags(text, exclude=exclude):
+        return doc                               # 해시태그 없는 소스(디시) → 무변경
+
+    items = list(doc.get("reviews") or [])
+    # 1패스: ①로 확정되는 이름을 먼저 모은다 — 2패스의 흡수 금지 목록(`taken`)이 된다.
+    #        순서에 의존하면 같은 입력이 항목 순서만 달라도 결과가 갈린다.
+    taken = [r.get("mentioned_product") for r in items
+             if resolve_product_name(r.get("mentioned_product"), text, exclude=exclude,
+                                     known_products=known_products)[1] == "keep"]
+    repaired: list[dict] = []
+    for r in items:
+        pick, why = resolve_product_name(r.get("mentioned_product"), text, exclude=exclude,
+                                         known_products=known_products, taken=taken)
+        repaired.append(r if why == "keep" else {**r, "mentioned_product": pick})
+    doc["reviews"] = _fold_by_product(repaired)
+    return doc
+
+
+def resolve_product_name(name: str | None, text: str, *, exclude=None,
+                         known_products=None, taken=None) -> tuple[str | None, str]:
+    """제품명 한 개에 대한 판정 — `(목표 제품명, 사유)`. 위 4갈래의 **단일 출처**다.
+
+    백필(`pipeline.repair_product_attribution`)과 수집 경로가 이 한 벌을 공유한다. 규칙이 두
+    곳에 있으면 조용히 갈라진다 — 판매자 게이트가 `_specs_from_seller_post` 로 합쳐진 것과 같은 이유.
+
+    taken: **같은 조각에서 ①로 이미 확정된 제품명들**. 이 이름들로는 흡수하지 않는다.
+      ⛔ 이 가드가 없으면 1층에 아직 없는 **진짜 제품이 흡수된다.** 실측(`DLOb2euzM60`):
+        캡션 태그는 `#빠코볼` 뿐인데 본문이 `저는 예전부터 빠코폼 파였는데, … 빠코볼도 존잼`
+        이라 두 제품을 대조한다. `빠코폼` 은 태그가 아니라 ①에 안 걸리고, 1층에도 없어서
+        ③이 `빠코볼` 로 바꿔 버린다 — 그러면 비교 후기 한 축이 통째로 사라진다.
+        진짜 유령 글에는 애초에 진짜 제품 행이 **없다**(실측 0/8) — 있다는 것 자체가
+        '이건 다른 제품'이라는 신호다.
+      (계획서 시뮬레이션도 이걸 놓쳤다 — 보존 확인 목록에 `빠코폼` 이 빠져 있었다.)
+
+    사유 문자열: `keep`(①) · `sole_tag`(②) · `l1_tiebreak`(③) · `hold_*`(④) · `no_tags`.
+    """
+    tags = product_hashtags(text, exclude=exclude)
+    if not tags:
+        return (name or None), "no_tags"         # 해시태그 없는 소스 → 무변경(AC7)
+    clean = (name or "").strip()
+    if clean and _norm_tag(clean) in {_norm_tag(t) for t in tags}:
+        return clean, "keep"                     # ① specs 에 없어도 유지
+    claimed = {_norm_tag(t) for t in (taken or ())}
+    free = [t for t in tags if _norm_tag(t) not in claimed]
+    if not free:
+        # 같은 글이 후보 제품을 **이미 갖고 있다** → 이 이름은 그 제품이 아니다.
+        # ⚠️ 그렇다고 '제품이 아니다'는 아니다 — 여기서 None 으로 비우면 **진짜 제품이 사라진다.**
+        #   실측: `DLOb2euzM60` 의 `빠코폼` 은 캡션 본문이 `예전부터 빠코폼 파였는데 … 빠코볼도
+        #   존잼` 이라 명백한 별개 제품인데, None 처리했더니 맞는 이름을 지우는 결과가 됐다.
+        #   이 분기는 **판단 근거가 없는** 자리이므로 추출값을 건드리지 않는 게 최소 개입이다.
+        #   진짜 유령(`슬린이시절` 등)이 남는 건 이 게이트가 아니라 마켓별 제품 목록의 몫이다.
+        return (clean or None), "keep_distinct"
+    if len(free) == 1:
+        return free[0], "sole_tag"               # ②
+    known = {_norm_tag(p) for p in (known_products or ())}
+    in_l1 = [t for t in free if _norm_tag(t) in known]
+    if len(in_l1) == 1:
+        return in_l1[0], "l1_tiebreak"           # ③
+    # ④ 보류 — 지어내지도 흡수하지도 않는다(AC5)
+    return None, ("hold_no_l1_match" if not in_l1 else "hold_ambiguous")
 
 
 def extract_review(text: str, llm: LLM, model: str | None = None) -> dict:

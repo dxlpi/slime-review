@@ -2,290 +2,200 @@
   "meta": {
     "repo": "SlimeReview",
     "path": "/Users/heather/Desktop/SlimeReview",
-    "scored_at": "2026-08-02",
+    "scored_at": "2026-08-07",
     "git_branch": "master",
     "rubric_version": "v2-100pt",
-    "modules_total": 5,
-    "context_files_total": 9,
-    "large_files_300plus": 4
+    "modules_total": 6,
+    "context_files_total": 12,
+    "large_files_300plus": 15,
+    "scoring_note": "1회차 감사(자동 72 → 수동 78)에서 나온 액션을 같은 날 실행한 뒤 재측정. 자동 87 → 수동 95. ⚠️ 이 수동 보정은 방금 그 작업을 한 주체가 매긴 것이라 자기평가 편향이 있다 — 독립적인 숫자는 자동 87 쪽이다.",
+    "history": [
+      {"at": "2026-08-02", "auto": null, "adjusted": 90, "note": "이전 감사(다른 루브릭 라벨, 비교 불가)"},
+      {"at": "2026-08-07 1회차", "auto": 72, "adjusted": 78, "note": "의미론적 drift 발견"},
+      {"at": "2026-08-07 2회차", "auto": 87, "adjusted": 95, "note": "액션 6건 실행 후"}
+    ]
   },
-  "total": 90,
+  "total": 95,
+  "auto_total": 87,
   "grade": "AI-Native / Agentic-Ready",
   "grade_color": "green",
   "categories": {
     "A": {
       "name": "AI Navigation & Coverage",
-      "score": 15,
-      "max": 15,
-      "evidence": {
-        "core_modules": 5,
-        "covered_modules": 5,
-        "coverage_ratio": 1.0,
-        "root_claude": "CLAUDE.md"
-      },
+      "score": 15, "auto_score": 15, "max": 15,
+      "evidence": {"core_modules": 6, "covered_modules": 6, "coverage_ratio": 1.0, "root_claude": "CLAUDE.md"},
       "sub_scores": {},
-      "findings": []
+      "findings": ["커버리지 6/6 — api/CLAUDE.md · web/CLAUDE.md 신설로 4/6에서 회복(1회차 액션 A)"]
     },
     "B": {
       "name": "Context Document Quality",
-      "score": 18,
-      "max": 20,
-      "evidence": {
-        "context_files": 9,
-        "max_lines": 86,
-        "min_lines": 13
-      },
-      "sub_scores": {
-        "B1_Conciseness": 4,
-        "B2_QuickCommands": 4,
-        "B3_KeyFiles": 3,
-        "B4_NonObvious": 3,
-        "B5_CrossRefs": 4
-      },
-      "findings": []
+      "score": 19, "auto_score": 17, "max": 20,
+      "evidence": {"context_files": 12, "claude_md_lines": 161, "was": 182},
+      "sub_scores": {"B1_Conciseness": 3, "B2_QuickCommands": 4, "B3_KeyFiles": 4, "B4_NonObvious": 4, "B5_CrossRefs": 4},
+      "findings": [
+        "루트 CLAUDE.md 182 → 161줄: 커밋 규약 33줄을 docs/commit-convention.md 로 분리, 프런트/API 세부는 새 모듈 가이드로 이관(중복 제거라 지식 손실 없음)",
+        "B1 은 여전히 만점 미달 — 161줄은 루브릭 권장(25-35)의 4.6배다. 남은 분량의 대부분은 `Current status` 이고, 이건 압축보다 **정확성**이 중요한 절이라(1회차 결함이 정확히 여기였다) 더 자르지 않았다",
+        "conciseness 초과 잔존: README.md (101) · slime_rag/CLAUDE.md (138)"
+      ]
     },
     "C": {
       "name": "Tribal Knowledge Externalization",
-      "score": 20,
-      "max": 20,
-      "evidence": {
-        "memory_md": true,
-        "adr": true,
-        "modules_total": 5,
-        "q1_owns": 5,
-        "q2_patterns": 5,
-        "q3_nonobvious": 5,
-        "q4_deps": 5
-      },
-      "sub_scores": {
-        "C_Q1_Owns": 4,
-        "C_Q2_Patterns": 4,
-        "C_Q3_NonObvious": 4,
-        "C_Q4_Dependencies": 4,
-        "C_Q5_TribalStore": 4
-      },
-      "findings": []
+      "score": 20, "auto_score": 20, "max": 20,
+      "evidence": {"memory_md": true, "adr_count": 14, "five_question_pass": "5/5"},
+      "sub_scores": {"C_Q1_Owns": 4, "C_Q2_Patterns": 4, "C_Q3_NonObvious": 4, "C_Q4_Dependencies": 4, "C_Q5_TribalStore": 4},
+      "findings": ["Five-Question 5/5 — api·web 가이드가 마지막 구멍이었다"]
     },
     "D": {
       "name": "Cross-Module Dependency Mapping",
-      "score": 13,
-      "max": 15,
+      "score": 13, "auto_score": 10, "max": 15,
       "evidence": {
-        "architecture_doc": true,
-        "mermaid_diagrams": true,
-        "context_with_deps_section": 6,
-        "monorepo_workspace": false,
-        "mermaid_location": "ARCHITECTURE.md (flowchart LR: pipeline / flowchart TD: import graph)",
-        "manual_override": "auto=10 → 13 (mermaid false negative). 잔여 2pt = monorepo workspace graph — 단일 패키지 Python 레포라 N/A."
+        "architecture_doc": true, "mermaid_diagrams": true,
+        "mermaid_locations": ["ARCHITECTURE.md:16 flowchart LR", "ARCHITECTURE.md:52 flowchart TD"],
+        "ripple_table": "ARCHITECTURE.md Cross-module ripple", "monorepo_workspace": false
       },
       "sub_scores": {},
       "findings": [
-        "잔여 2pt 는 turbo/nx/pnpm workspace 기반 graph 도출 항목 — 이 레포엔 해당 없음 (실질 만점)"
+        "채점기 false negative 보정(+3): score.py:390 이 mermaid 를 context_files(CLAUDE.md/AGENTS.md)에서만 찾는다. ARCHITECTURE.md 는 386-389 에서 존재만 확인하고 내용을 스캔하지 않아 flowchart 2개를 놓친다 — 아직 고치지 않음(스킬 스크립트라 별건)",
+        "두 다이어그램 모두 web→api→pipeline 실선으로 갱신됨"
       ]
     },
     "E": {
       "name": "Verification & Quality Gates",
-      "score": 10,
-      "max": 15,
+      "score": 15, "auto_score": 14, "max": 15,
       "evidence": {
-        "ref_total": 22,
-        "ref_broken": 0,
-        "codeowners": false,
-        "pr_template": false,
-        "ci_workflows": true,
-        "husky": false,
-        "evals_dir": true
+        "ref_total": 36, "ref_broken": 0, "codeowners": true, "pr_template": true,
+        "ci_workflows": true, "claim_gate": true, "evals_dir": true
       },
-      "sub_scores": {
-        "E1_RefAccuracy": 5,
-        "E2_CriticReview": 0,
-        "E3_TaskValidation": 3,
-        "E4_PromptTests": 2
-      },
+      "sub_scores": {"E1_RefAccuracy": 5, "E2_CriticReview": 4, "E3_TaskValidation": 4, "E4_PromptTests": 2},
       "findings": [
-        "CODEOWNERS / PR template 없음 — independent critic infra 부재"
+        "E2 0 → 4: CODEOWNERS(회귀 위험 경로 지도) + PR 체크리스트(항목이 전부 이 레포에서 실제로 회귀난 자리)",
+        "E1 만점 유지 — 경로 36/36. 새 게이트가 자기 자신의 오타도 잡았다(web/CLAUDE.md 의 `data/api.ts`)"
       ]
     },
     "F": {
       "name": "Freshness & Self-Maintenance",
-      "score": 10,
-      "max": 10,
+      "score": 9, "auto_score": 8, "max": 10,
       "evidence": {
-        "drifted_modules": 0,
-        "measurable_modules": 5,
-        "drift_ratio": 0.0,
-        "ctx_validation_workflow": true,
-        "hook_validates_paths": true,
-        "hook_file": ".githooks/pre-push (tracked) — validate_context_paths.py + evals.run --min 1.0",
-        "manual_override": "auto=8 → 10 (scorer 는 .husky/ 만 확인 — .githooks/ + core.hooksPath 관례를 못 봄)"
+        "mtime_drift_ratio": 0.0, "semantic_drift": false,
+        "ctx_validation_workflow": true, "claim_validation_workflow": true,
+        "hook_validates_paths": false
       },
       "sub_scores": {},
       "findings": [
-        "core.hooksPath 활성화는 클론마다 수동 1회 (README 문서화됨) — 훅 자체는 버전 관리됨"
+        "+1: CI 에 주장 검증 게이트 추가 — mtime·경로 검사가 원리적으로 못 잡는 층을 자동화했다. 첫 실행에서 두 번째 stale claim(product_aliases.json)을 실제로 잡았다",
+        "만점 미달 사유: pre-commit/pre-push 훅은 여전히 commit-msg 만 본다. 경로·주장 검증은 CI 에서만 돈다"
       ]
     },
     "G": {
       "name": "Agent Performance Outcomes",
-      "score": 4,
-      "max": 5,
+      "score": 4, "auto_score": 3, "max": 5,
       "evidence": {
-        "eval_dirs": [
-          "evals"
-        ],
-        "metric_files": [
-          "evals/results/latest.json"
-        ],
-        "telemetry_hint": false,
-        "build_log": "BUILD_LOG.md — phase별 핵심 프롬프트 / AI생성 vs 사람수정 / 소요시간",
-        "manual_override": "auto=3 → 4 (지표 파일 + 생산성 기록 존재). before/after 에이전트 텔레메트리는 여전히 없음."
+        "metrics_script": "evals/agent_metrics.py",
+        "metrics_output": "docs/agent-metrics.json",
+        "sessions_measured": 69,
+        "median_tool_calls": 19, "median_human_turns": 5, "median_agent_turns": 41,
+        "median_output_tokens": 34260
       },
       "sub_scores": {},
       "findings": [
-        "tool calls / token / task 완료시간의 before-after 측정 부재 — 5점은 이 계량이 조건"
+        "+1: 도구 호출·토큰·사람 개입률을 69개 세션에서 실측하고 재현 스크립트를 커밋했다(BUILD_LOG 의 정성 서술 옆에 숫자)",
+        "만점(5) 미달 사유: **before/after 가 없다.** 지금 것은 기준선 1점뿐이라, 다음 측정과 비교해야 개선을 말할 수 있다",
+        "일부러 안 세는 지표 2개(세션 시간 합계·캐시 적중률)는 뜻이 없다고 판정하고 근거를 스크립트에 박았다"
       ]
     }
   },
+  "manual_adjustments": [
+    {"cat": "B", "delta": 2, "why": "B2 3→4(명령어 12개가 전부 실행 가능 + 전제 명시), B4 3→4(추론 불가 규칙 명문화). 자동 마커 정규식이 서술형 규칙 문장을 놓친다."},
+    {"cat": "D", "delta": 3, "why": "score.py:390 의 mermaid 탐지 범위 버그 보정. ARCHITECTURE.md 에 flowchart 2개 실재."},
+    {"cat": "E", "delta": 1, "why": "E3 3→4. 검증 명령이 전부 실행 가능하고 CI + commit-msg 훅 + 두 컨텍스트 게이트로 강제됨."},
+    {"cat": "F", "delta": 1, "why": "자동 채점에 없는 축(주장 검증 자동화)을 추가했고 실제로 결함을 잡았다."},
+    {"cat": "G", "delta": 1, "why": "실측 telemetry 가 생겼다(자동 채점기는 session log/OTel 만 찾아서 못 봄). before/after 가 없어 5점은 아님."}
+  ],
+  "fix_log": [
+    {
+      "date": "2026-08-07",
+      "commit": "f117096",
+      "defect": "의미론적 context drift — 컴퍼스가 이미 존재하는 HTTP API 를 `없다`고 단언",
+      "fixed": [
+        "CLAUDE.md 프런트 연결 상태·mock 역할·api 엔드포인트·남은 일(HTTP API → 배포) · 명령어 블록에 uvicorn",
+        "ARCHITECTURE.md `API 미연결` 점선 → api 노드 실선 · 의존성 그래프에 web→api→pipeline · 배포 절",
+        "slime_rag/CLAUDE.md 삭제된 `../app` → `../api`·`../web` · 본문 컬럼 부재 서술",
+        "slime_rag/pipeline.py 바로 아래 코드와 모순되던 주석 2곳"
+      ],
+      "verified": ["validate_context_paths.py 0 broken", "api.main 라우트 5개 대조", "_POST_COLS·REVIEW_SORTS 대조", "test_source_links · test_post_columns 통과"]
+    },
+    {
+      "date": "2026-08-07",
+      "commit": "0313d73",
+      "actions_done": [
+        "A · api/CLAUDE.md + web/CLAUDE.md 신설 — 커버리지 4/6 → 6/6",
+        "F · .github/scripts/validate_context_claims.py + context_claims.json + CI 배선. 첫 실행에서 2번째 stale claim(product_aliases.json — 6월부터 존재·배선돼 있는데 '할 일'로 남아 있었다) 적발",
+        "E · CODEOWNERS + PR 체크리스트 — E2 0/4 → 4/4",
+        "G · evals/agent_metrics.py + docs/agent-metrics.json — 69세션 실측"
+      ]
+    },
+    {
+      "date": "2026-08-07",
+      "commit": "pending",
+      "actions_done": [
+        "B · 루트 CLAUDE.md 182 → 161줄. 커밋 규약 → docs/commit-convention.md, 프런트/API 세부 → 모듈 가이드(중복 제거)"
+      ]
+    }
+  ],
   "insights": [
-    "총점 90/100 · 등급 AI-Native (자동 84 + 수동 보정 +6: D mermaid, G 지표파일, F .githooks)",
-    "E1 hallucinated path 0/22 — Meta 기준 'zero hallucinated paths' 충족",
-    "유일한 0점: E2 독립 critic 인프라 0/4 (CODEOWNERS·PR 템플릿·리뷰 체크리스트 전무)",
-    "잔여 감점 10pt 중 2pt(D monorepo workspace)는 이 레포에 해당 없음 — 실질 상한 98"
+    "총점 95/100 · 등급 AI-Native (자동 87 · 수동 보정 +8)",
+    "⚠️ 수동 보정은 그 작업을 한 주체의 자기평가다 — 독립 숫자는 자동 87",
+    "1회차 감사 대비 +17(자동 기준 72 → 87). 가장 큰 이동은 A(10→15) 와 E(10→14)",
+    "남은 최약점: G 4/5 (before/after 부재 — 구조적으로 다음 측정이 있어야 채워진다) · B1 (CLAUDE.md 161줄)",
+    "감사의 실제 가치는 점수가 아니라 잡아낸 두 건의 stale claim 이었다 — 둘 다 경로 검사·mtime 검사를 통과하던 상태였다"
   ],
   "actions": [
     {
-      "cat": "E2",
-      "title": "PR 템플릿 + 리뷰 체크리스트 + CODEOWNERS 추가",
-      "effort": "S",
-      "hours": 1.0,
-      "impact": "E2 0→4점 (90→94). 유일한 0점 항목 — 컨텍스트 갱신·경로 검증을 머지 조건으로 강제",
-      "impact_score": 9,
-      "priority": 9.0
+      "title": "SlimeSearch.tsx (1,333줄) 분할",
+      "category": "B", "effort": "L", "effort_hours": 6.0,
+      "impact": "단일 파일이 web/ 전체의 76%. 파일당 ~15K token 절감 + 편집 정확도 ↑",
+      "impact_score": 5, "priority": 0.8,
+      "status": "보류",
+      "hold_reason": "① 다른 세션이 이 파일을 지금 편집 중(미커밋 184줄+) ② `디자인 원본과 픽셀 대조 가능` 제약이 걸린 파일이라 분할은 대조 절차와 함께 설계해야 한다. 트리가 조용해진 뒤 착수."
     },
     {
-      "cat": "E2",
-      "title": "PR 템플릿 + 리뷰 체크리스트 + CODEOWNERS 추가",
-      "effort": "S",
-      "hours": 1.0,
-      "impact": "E2 0→4점. 컨텍스트 변경마다 '경로·명령 검증했는가' 체크 강제 → stale context 회귀 차단",
-      "impact_score": 9,
-      "priority": 9.0
+      "title": "다음 회차 agent_metrics 측정 (before/after 성립)",
+      "category": "G", "effort": "S", "effort_hours": 0.2,
+      "impact": "G 4 → 5. 이번 컨텍스트 정비가 세션당 도구 호출·사람 턴을 실제로 줄였는지 검증 — 기준선은 이미 커밋됨(중앙값 19 호출 / 5 사람턴)",
+      "impact_score": 6, "priority": 30.0
     },
     {
-      "cat": "F",
-      "title": "core.hooksPath 활성화를 셋업 스크립트로 자동화",
-      "effort": "S",
-      "hours": 0.25,
-      "impact": "훅 자체는 이미 버전 관리(.githooks/pre-push). 활성화만 수동 1회 — Makefile/setup.sh 에 넣으면 새 클론 누락 제거",
-      "impact_score": 2,
-      "priority": 8.0
+      "title": "pre-push 훅에 경로·주장 검증 배선",
+      "category": "F", "effort": "S", "effort_hours": 0.5,
+      "impact": "F 9 → 10. 지금은 CI 에서만 돌아 푸시 후에야 안다. 훅은 `.claude/precommit-cmd` 가 gitignore 라 새 클론에서 꺼지는 문제도 같이 봐야 함",
+      "impact_score": 6, "priority": 12.0
     },
     {
-      "cat": "C",
-      "title": "τ_topic 캘리브레이션 결과·라벨 교정 규칙을 MEMORY.md 에 승격",
-      "effort": "S",
-      "hours": 0.5,
-      "impact": "현재 relevance 게이트 미확정 상태가 CLAUDE.md 'what's left' 에만 존재 — 확정 시 도메인 규칙으로 고정해야 재질문 방지",
-      "impact_score": 3,
-      "priority": 6.0
+      "title": "score.py 의 mermaid 탐지 범위 버그 수정",
+      "category": "D", "effort": "S", "effort_hours": 0.3,
+      "impact": "D 자동 10 → 13(수동 보정 불필요해짐). ARCHITECTURE.md 에 다이어그램을 둔 모든 레포가 상시 -3점",
+      "impact_score": 4, "priority": 13.3,
+      "where": ".claude/skills/ai-readiness-cartography/scripts/score.py:390"
     },
     {
-      "cat": "G",
-      "title": "evals/results 에 pass-rate 시계열 + 세션 토큰/시간 표 누적",
-      "effort": "S",
-      "hours": 1.0,
-      "impact": "G 4→5점. latest.json 을 history.jsonl 로 확장 + BUILD_LOG 에 phase별 토큰/툴콜 표 → 개선 ROI 자체를 계량",
-      "impact_score": 5,
-      "priority": 5.0
-    },
-    {
-      "cat": "E3",
-      "title": "CI 에 ruff lint/format 게이트 추가 + 변경유형별 검증 명령 표",
-      "effort": "S",
-      "hours": 1.0,
-      "impact": "E3 3→4점. 에이전트가 '이 변경엔 이 명령' 을 표에서 바로 선택 → 검증 누락 task당 ~2min 절감",
-      "impact_score": 5,
-      "priority": 5.0
-    },
-    {
-      "cat": "B",
-      "title": "app/ · sql/ CLAUDE.md 에 Key files 표 + Gotcha 보강",
-      "effort": "S",
-      "hours": 1.0,
-      "impact": "B3/B4 3→4점. 가장 얇은 두 컨텍스트(27·32줄)에 진입 파일·함정 명시 → 탐색 grep 왕복 감소",
-      "impact_score": 4,
-      "priority": 4.0
-    },
-    {
-      "cat": "—",
-      "title": "bias.py(380) · extract.py(354) 책임 분리",
-      "effort": "M",
-      "hours": 3.0,
-      "impact": "루브릭 외 항목이나 에이전트 편집 정확도에 직결 — 파일당 컨텍스트 로드 토큰 ~40% 절감, diff 충돌 감소",
-      "impact_score": 5,
-      "priority": 1.7
+      "title": "slime_rag/CLAUDE.md (138줄) 압축",
+      "category": "B", "effort": "M", "effort_hours": 1.5,
+      "impact": "B1 3 → 4. Non-obvious 절이 20항 넘게 자랐다 — 축별로 갈라 모듈 하위 가이드로 내리는 게 자연스럽다",
+      "impact_score": 4, "priority": 2.7
     }
   ],
   "extras": {
-    "modules": [
+    "scorer_bugs_found": [
       {
-        "path": "/Users/heather/Desktop/SlimeReview/app",
-        "rel": "app",
-        "code_files": 1,
-        "has_context": true,
-        "context_file": "/Users/heather/Desktop/SlimeReview/app/CLAUDE.md",
-        "context_kind": "CLAUDE.md"
-      },
-      {
-        "path": "/Users/heather/Desktop/SlimeReview/eval",
-        "rel": "eval",
-        "code_files": 6,
-        "has_context": true,
-        "context_file": "/Users/heather/Desktop/SlimeReview/eval/CLAUDE.md",
-        "context_kind": "CLAUDE.md"
-      },
-      {
-        "path": "/Users/heather/Desktop/SlimeReview/evals",
-        "rel": "evals",
-        "code_files": 5,
-        "has_context": true,
-        "context_file": "/Users/heather/Desktop/SlimeReview/evals/CLAUDE.md",
-        "context_kind": "CLAUDE.md"
-      },
-      {
-        "path": "/Users/heather/Desktop/SlimeReview/slime_rag",
-        "rel": "slime_rag",
-        "code_files": 20,
-        "has_context": true,
-        "context_file": "/Users/heather/Desktop/SlimeReview/slime_rag/CLAUDE.md",
-        "context_kind": "CLAUDE.md"
-      },
-      {
-        "path": "/Users/heather/Desktop/SlimeReview/sql",
-        "rel": "sql",
-        "code_files": 1,
-        "has_context": true,
-        "context_file": "/Users/heather/Desktop/SlimeReview/sql/CLAUDE.md",
-        "context_kind": "CLAUDE.md"
+        "file": ".claude/skills/ai-readiness-cartography/scripts/score.py",
+        "line": 390,
+        "issue": "has_mermaid 를 context_files(CLAUDE.md/AGENTS.md)에서만 검색. ARCHITECTURE.md 는 386-389 에서 존재만 확인하고 내용을 스캔하지 않아, mermaid 를 아키텍처 문서에 둔 레포는 항상 -3점.",
+        "status": "미수정 — 스킬 스크립트라 이 레포의 변경과 분리"
       }
     ],
-    "large_files": [
-      {
-        "path": "slime_rag/bias.py",
-        "lines": 380
-      },
-      {
-        "path": "slime_rag/extract.py",
-        "lines": 354
-      },
-      {
-        "path": "eval/test_bias.py",
-        "lines": 341
-      },
-      {
-        "path": "slime_rag/sources/apify.py",
-        "lines": 305
-      }
+    "new_gates": [
+      {"file": ".github/scripts/validate_context_claims.py", "what": "살아있는 문서의 부재 주장 검증. 등록되지 않은 부재 주장 = 실패, 등록된 주장의 대상이 생기면 = 실패, 한번 썩은 문구 = 하드 차단"},
+      {"file": ".github/context_claims.json", "what": "부재 주장 레지스트리 + 회귀 가드 3건(http-api-shipped · post-meta-columns-shipped · streamlit-ui-deleted)"}
     ]
-  },
-  "scoring_mode": "auto + manual review (D, G 보정)"
+  }
 }

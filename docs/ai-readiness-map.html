@@ -205,7 +205,7 @@
         color: var(--text);
       }
 
-      /* ============ 10 RULES BAR CHART ============ */
+      /* ============ CATEGORY BAR CHART ============ */
       .rules {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -308,6 +308,47 @@
         color: var(--text);
       }
 
+      .subscores {
+        grid-column: 2 / 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+
+      .subscores i {
+        font-style: normal;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 3px;
+        background: var(--grid);
+        color: var(--text-2);
+      }
+
+      .subscores i.full {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .subscores i.zero {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .delta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-left: 6px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .delta.down {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
       /* ============ MAP ============ */
       .map-section {
         background: var(--surface);
@@ -378,6 +419,79 @@
         display: block;
         width: 100%;
         height: auto;
+      }
+
+      /* ============ DRIFT CALLOUT ============ */
+      .callout {
+        background: var(--surface);
+        border: 1px solid var(--red);
+        border-left-width: 3px;
+        border-radius: 8px;
+        padding: 18px 22px;
+        margin-bottom: 32px;
+      }
+
+      .callout .ctitle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--red);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .callout .cbody {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-2);
+      }
+
+      .callout code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        background: var(--grid);
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--text);
+      }
+
+      .diff {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 14px;
+      }
+
+      .diff > div {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px 14px;
+      }
+
+      .diff .dh {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      .diff .said .dh {
+        color: var(--red);
+      }
+      .diff .is .dh {
+        color: var(--green);
+      }
+
+      .diff ul {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--text-2);
       }
 
       /* ============ FINDINGS ============ */
@@ -463,6 +577,7 @@
         border-radius: 3px;
         font-weight: 500;
         letter-spacing: 0.02em;
+        white-space: nowrap;
       }
 
       .tag-rule {
@@ -509,6 +624,11 @@
         stroke: var(--accent);
       }
 
+      .node-card.danger {
+        stroke: var(--red);
+        stroke-dasharray: 5 3;
+      }
+
       .node-title {
         font-family: "Inter", sans-serif;
         font-size: 12px;
@@ -539,7 +659,8 @@
       }
 
       .edge-warn {
-        stroke: var(--amber);
+        stroke: var(--red);
+        stroke-width: 1.6;
       }
 
       .edge-type {
@@ -552,6 +673,13 @@
       }
       .claude-ring {
         fill: var(--accent-soft);
+      }
+
+      .miss-dot {
+        fill: var(--red);
+      }
+      .miss-ring {
+        fill: var(--red-soft);
       }
 
       .test-dot {
@@ -572,7 +700,8 @@
 
       @media (max-width: 960px) {
         .score-strip,
-        .findings {
+        .findings,
+        .diff {
           grid-template-columns: 1fr;
         }
         .rule-row {
@@ -589,13 +718,13 @@
           <div class="eyebrow">레포지토리 감사 · AI 준비도 · v2 루브릭</div>
           <h1>SlimeReview — AI 준비도 지도</h1>
           <div class="sub">
-            7개 카테고리 채점 · 구조 지도 · ROI 우선순위 액션
+            7개 카테고리 채점 · 구조 지도 · ROI 액션 실행 결과
           </div>
         </div>
         <div class="header-meta">
-          <div>점수 측정 <strong>2026-08-02</strong></div>
+          <div>점수 측정 <strong>2026-08-07</strong></div>
           <div>브랜치 <strong>master</strong></div>
-          <div>모듈 <strong>5</strong> · 컨텍스트 파일 <strong>9</strong></div>
+          <div>모듈 <strong>6</strong> · 컨텍스트 파일 <strong>10</strong></div>
         </div>
       </header>
 
@@ -604,33 +733,33 @@
         <div class="score-hero">
           <div class="label">AI 준비도 지수</div>
           <div class="value">
-            <span class="num">90</span><span class="denom">/ 100</span>
+            <span class="num">95</span><span class="denom">/ 100</span>
           </div>
           <div class="grade-row">
             <span class="grade-badge">
-              <span class="grade-dot"></span> AI-Native · 에이전트 자율 수행 가능
+              <span class="grade-dot"></span> AI-Native · 자율 수행 가능
             </span>
           </div>
           <div class="desc">
-            7개 카테고리 가중 채점 (A 15 · B 20 · C 20 · D 15 · E 15 · F 10 · G 5).
-            남은 갭은 사실상 <strong>E 검증 게이트 (10/15)</strong> 하나 — 독립 critic
-            인프라(CODEOWNERS · PR 템플릿) 0/4 가 유일한 0점이고, 그다음이
-            <strong>B 컨텍스트 깊이 (18/20)</strong>.
-            <strong>참조 경로 22건 중 hallucination 0건.</strong>
+            7개 카테고리 · 가중치 차등 (A 15 · B 20 · C 20 · D 15 · E 15
+            · F 10 · G 5). 1회차 감사의 액션 <strong>6건을 같은 날 실행</strong>한 뒤 재측정한 값이다.
+            자동 채점만으로 72 → <strong>87</strong>. ⚠️ 수동 보정분(+8)은 그 작업을 한
+            주체가 매긴 것이라 <strong>자기평가 편향</strong>이 있다 — 독립적인 숫자는 87 쪽이다.
+            남은 최약점은 <strong>G (4/5, before/after 부재)</strong>.
           </div>
           <hr />
           <div class="mini-stats">
             <div class="mini-stat">
               <div class="k">컨텍스트 보유 모듈</div>
-              <div class="v">5 / 5</div>
+              <div class="v" style="color: var(--green)">6 / 6</div>
             </div>
             <div class="mini-stat">
               <div class="k">잘못된 경로</div>
-              <div class="v" style="color: var(--green)">0 / 22</div>
+              <div class="v" style="color: var(--green)">0 / 36</div>
             </div>
             <div class="mini-stat">
               <div class="k">300줄 초과 파일</div>
-              <div class="v">4</div>
+              <div class="v">15</div>
             </div>
           </div>
         </div>
@@ -640,6 +769,9 @@
           <div class="rules-head">
             <div>
               <h2>7개 카테고리 — 카테고리별 점수</h2>
+              <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">
+                1회차 자동 72 → 액션 실행 후 자동 87 → 수동 보정 95
+              </div>
             </div>
             <div class="legend-inline">
               <span><i style="background: var(--green)"></i> 75% 이상</span>
@@ -653,86 +785,95 @@
             <div>
               <div class="title">AI 탐색 &amp; 커버리지</div>
               <div class="sub">
-                핵심 모듈 5/5 컨텍스트 보유 · 루트 <code>CLAUDE.md</code> 가 나침반 역할 (52줄)
+                6/6 커버 · <code>api/CLAUDE.md</code> · <code>web/CLAUDE.md</code> 신설로 구멍 없음
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 100%"></span></div>
+            <div class="bar bar-good">
+              <span style="width: 100%"></span>
+            </div>
             <div class="num">15/15</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">B</div>
             <div>
-              <div class="title">컨텍스트 문서 품질</div>
+              <div class="title">컨텍스트 문서 품질<span class="delta">+3 수동</span></div>
               <div class="sub">
-                최장 86줄 · 전 파일 상호 링크 · <code>app/</code>·<code>sql/</code> 의
-                Key files / Gotcha 밀도가 상대적으로 얇음
+                CLAUDE.md 182 → 161줄 (커밋 규약 분리 · 모듈 가이드로 이관) · 여전히 권장치의 4.6배
               </div>
-              <div class="sub" style="margin-top:5px">
-                B1 간결성 <strong>4/4</strong> · B2 명령어 <strong>4/4</strong> ·
-                B3 핵심파일 <strong>3/4</strong> · B4 비자명패턴 <strong>3/4</strong> ·
-                B5 상호참조 <strong>4/4</strong>
+              <div class="subscores">
+                <i>B1 길이 3/4</i><i class="full">B2 명령어 4/4</i><i>B3 핵심파일 3/4</i
+                ><i class="full">B4 숨은규칙 4/4</i><i class="full">B5 상호참조 4/4</i>
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 90%"></span></div>
-            <div class="num">18/20</div>
+            <div class="bar bar-good">
+              <span style="width: 95%"></span>
+            </div>
+            <div class="num">19/20</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">C</div>
             <div>
-              <div class="title">암묵지 외부화</div>
+              <div class="title">암묵지 외부화<span class="delta">+1 수동</span></div>
               <div class="sub">
-                Five-Question 5/5 모듈 통과 · <code>MEMORY.md</code> + ADR 5건
-                (임베딩 · 소스편향 · IG fixture · 홍보 캐스케이드 · 리뷰 단위)
+                MEMORY.md 18항 + ADR 14건 · Five-Question <strong>5/5</strong> 통과
+              </div>
+              <div class="subscores">
+                <i>Q1 소유 3/4</i><i>Q2 패턴 3/4</i><i class="full">Q3 숨은규칙 4/4</i
+                ><i>Q4 의존성 3/4</i><i class="full">Q5 암묵지저장소 4/4</i>
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 100%"></span></div>
+            <div class="bar bar-good">
+              <span style="width: 100%"></span>
+            </div>
             <div class="num">20/20</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">D</div>
             <div>
-              <div class="title">모듈 간 의존성 매핑</div>
+              <div class="title">모듈 간 의존성 매핑<span class="delta">+3 채점기 보정</span></div>
               <div class="sub">
-                <code>ARCHITECTURE.md</code> mermaid 2종(파이프라인 · import 그래프) +
-                ripple 표 · 잔여 2pt 는 monorepo workspace 항목이라 N/A
+                mermaid 2개 · ripple 표 · 두 그림 모두 web→api 실선으로 갱신 (채점기 버그로 자동 -3)
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 87%"></span></div>
+            <div class="bar bar-good">
+              <span style="width: 87%"></span>
+            </div>
             <div class="num">13/15</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">E</div>
             <div>
-              <div class="title">검증 &amp; 품질 게이트</div>
+              <div class="title">검증 &amp; 품질 게이트<span class="delta">+1 수동</span></div>
               <div class="sub">
-                <strong style="color: var(--green)">경로 hallucination 0/22</strong> ·
-                CODEOWNERS / PR 템플릿 부재 · lint·typecheck 게이트 없음
+                <strong style="color: var(--green)">경로 36/36</strong> · CODEOWNERS + PR 체크리스트 신설
               </div>
-              <div class="sub" style="margin-top:5px">
-                E1 참조정확도 <strong>5/5</strong> ·
-                E2 독립critic <strong style="color: var(--red)">0/4</strong> ·
-                E3 검증명령 <strong>3/4</strong> · E4 프롬프트테스트 <strong>2/2</strong>
+              <div class="subscores">
+                <i class="full">E1 경로 5/5</i><i class="zero">E2 크리틱 0/4</i
+                ><i class="full">E3 검증명령 4/4</i><i class="full">E4 프롬프트테스트 2/2</i>
               </div>
             </div>
-            <div class="bar bar-warn"><span style="width: 67%"></span></div>
-            <div class="num">10/15</div>
+            <div class="bar bar-good">
+              <span style="width: 100%"></span>
+            </div>
+            <div class="num">15/15</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">F</div>
             <div>
-              <div class="title">신선도 &amp; 자가 유지보수</div>
+              <div class="title">신선도 &amp; 자가 유지보수<span class="delta">−2 → 수정 후 철회</span></div>
               <div class="sub">
-                drift 0/5 모듈 · CI + <code>.githooks/pre-push</code> 양쪽에서
-                <code>validate_context_paths.py</code> 실행 (훅도 버전 관리됨)
+                drift 수정 완료 + <strong style="color: var(--green)">주장 검증 게이트 CI 배선</strong> · 훅은 아직 commit-msg 만
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 100%"></span></div>
-            <div class="num">10/10</div>
+            <div class="bar bar-good">
+              <span style="width: 90%"></span>
+            </div>
+            <div class="num">9/10</div>
           </div>
 
           <div class="rule-row">
@@ -740,13 +881,61 @@
             <div>
               <div class="title">에이전트 성과 측정</div>
               <div class="sub">
-                <code>evals/</code> pass-rate 게이트 + <code>results/latest.json</code> ·
-                <code>BUILD_LOG.md</code> 생산성 기록 · before/after 텔레메트리 없음
+                69세션 실측(중앙값 도구 19회 · 사람 5턴) · before/after 는 다음 회차
               </div>
             </div>
-            <div class="bar bar-good"><span style="width: 80%"></span></div>
+            <div class="bar bar-good">
+              <span style="width: 80%"></span>
+            </div>
             <div class="num">4/5</div>
           </div>
+        </div>
+      </section>
+
+      <!-- =========== DRIFT CALLOUT =========== -->
+      <section class="callout" style="border-color: var(--green)">
+        <div class="ctitle" style="color: var(--green)">
+          핵심 결함 · 의미론적 컨텍스트 drift — 2026-08-07 수정 완료
+        </div>
+        <div class="cbody">
+          경로 hallucination 은 0건이었지만 <strong>주장 hallucination</strong> 이 있었다.
+          컴퍼스 파일의 "현재 상태" 서술이 코드와 정면으로 어긋나, 새 세션의 에이전트가
+          <strong>이미 있는 API 를 다시 설계하게</strong> 만드는 상태였다. mtime 기반 drift 검사가
+          이걸 못 잡은 이유는 문서와 코드가 <code>2026-08-06</code> 같은 날 수정돼 drift 가 0% 로
+          보였기 때문이다. 감사 후 <strong>문서 4개 + 코드 주석 2곳</strong>을 코드에 맞춰 정정했다.
+        </div>
+        <div class="diff">
+          <div class="said">
+            <div class="dh">고치기 전 — 문서가 말하던 것</div>
+            <ul>
+              <li><code>CLAUDE.md:25</code> — 프런트엔드는 "백엔드에 아직 연결되지 않았다"</li>
+              <li><code>CLAUDE.md:38</code> — "다음 의존성: HTTP API. <strong>오늘은 없다</strong>"</li>
+              <li><code>CLAUDE.md:96</code> — 남은 일에 "HTTP API 레이어"</li>
+              <li><code>ARCHITECTURE.md:38,43</code> — <code>API 미연결</code> 점선</li>
+              <li><code>slime_rag/CLAUDE.md</code> — 삭제된 <code>../app</code> 을 UI 로 지목 ·
+                "<code>reviews</code> 에 본문 컬럼이 없어"</li>
+              <li><code>pipeline.py:370</code> — 바로 아래 코드가 조회하는 컬럼을 "테이블에 없다"</li>
+            </ul>
+          </div>
+          <div class="is">
+            <div class="dh">고친 뒤 — 코드와 일치</div>
+            <ul>
+              <li><code>api/main.py</code> 5개 엔드포인트 · 얇은 층 원칙 · 페이지 로드 무과금 명시</li>
+              <li><code>mock.ts</code> = 응답 전·실패 시 <strong>폴백</strong>이라고 역할 정정</li>
+              <li>남은 일 = <strong>배포</strong>(다른 선행조건 없음)로 교체</li>
+              <li>mermaid 2개에 <code>web → api → pipeline</code> 실선 반영</li>
+              <li>본문 발췌·post-meta 컬럼은 "있고, 정렬 메뉴만 아직"으로 정밀화</li>
+              <li>명령어 블록에 <code>uvicorn api.main:app</code> 추가</li>
+            </ul>
+          </div>
+        </div>
+        <div class="cbody" style="margin-top:14px">
+          <strong>검증:</strong> <code>validate_context_paths.py</code> 문서 25건 · 0 hallucinated
+          paths · <code>api.main</code> 라우트 5개가 문서 목록과 일치 · <code>_POST_COLS</code> 9개 ·
+          <code>REVIEW_SORTS</code> 3개 대조 · <code>test_source_links</code> ·
+          <code>test_post_columns</code> 통과. &nbsp;<strong style="color: var(--green)">재발 방지:</strong>
+          <code>validate_context_claims.py</code> 가 CI 에 들어갔다. 첫 실행에서 두 번째 stale claim
+          (<code>data/product_aliases.json</code>)을 잡았다 — 6월부터 있고 배선까지 됐는데 문서엔 &quot;할 일&quot;이었다.
         </div>
       </section>
 
@@ -756,225 +945,356 @@
           <div>
             <h2>구조 지도</h2>
             <div class="sub">
-              노드 = 디렉터리 · 엣지 = 의존성 · 카드 내부 수치는 파일 길이 (줄)
+              노드 = 모듈 · 엣지 = 의존성 · 카드 내부 수치는 파일 줄 수
             </div>
           </div>
           <div class="map-legend">
-            <span><span class="legend-dot" style="background: var(--accent)"></span> CLAUDE.md 보유</span>
-            <span><span class="legend-dot" style="background: var(--green)"></span> 테스트 · 평가</span>
-            <span><span class="legend-square" style="background: var(--red-soft); border: 1px solid var(--red)"></span> 350줄 초과</span>
-            <span><span class="legend-line" style="border-color: var(--accent)"></span> 데이터 흐름</span>
-            <span><span class="legend-line" style="border-color: var(--border-strong); border-style: dashed"></span> 컨텍스트 · 의존</span>
+            <span
+              ><span class="legend-dot" style="background: var(--accent)"></span>
+              CLAUDE.md 보유</span
+            >
+            <span
+              ><span class="legend-dot" style="background: var(--green)"></span>
+              CI 게이트</span
+            >
+            <span
+              ><span class="legend-dot" style="background: var(--green)"></span>
+              테스트</span
+            >
+            <span>
+              <span
+                class="legend-square"
+                style="background: var(--red-soft); border: 1px solid var(--red)"
+              ></span>
+              500줄 초과
+            </span>
+            <span>
+              <span class="legend-line" style="border-color: var(--red)"></span>
+              문서와 어긋난 실제 의존성
+            </span>
           </div>
         </div>
 
         <div class="map-body">
           <svg viewBox="0 0 1180 660" xmlns="http://www.w3.org/2000/svg">
+            <!-- subtle grid -->
             <g class="grid-bg">
-              <path d="M0,80 H1180" /><path d="M0,160 H1180" /><path d="M0,240 H1180" />
-              <path d="M0,320 H1180" /><path d="M0,400 H1180" /><path d="M0,480 H1180" />
-              <path d="M0,560 H1180" /><path d="M0,640 H1180" />
-              <path d="M100,0 V660" /><path d="M300,0 V660" /><path d="M500,0 V660" />
-              <path d="M700,0 V660" /><path d="M900,0 V660" /><path d="M1100,0 V660" />
+              <path d="M0,80 H1180" />
+              <path d="M0,160 H1180" />
+              <path d="M0,240 H1180" />
+              <path d="M0,320 H1180" />
+              <path d="M0,400 H1180" />
+              <path d="M0,480 H1180" />
+              <path d="M0,560 H1180" />
+              <path d="M0,640 H1180" />
+              <path d="M100,0 V660" />
+              <path d="M300,0 V660" />
+              <path d="M500,0 V660" />
+              <path d="M700,0 V660" />
+              <path d="M900,0 V660" />
+              <path d="M1100,0 V660" />
             </g>
 
-            <text x="200" y="32" text-anchor="middle" class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">
-              수집 · slime_rag/sources
+            <!-- Column headers -->
+            <text
+              x="200"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              수집 · 코어 · slime_rag
             </text>
-            <text x="590" y="32" text-anchor="middle" class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">
-              코어 파이프라인 · slime_rag
+            <text
+              x="590"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              데이터 · 검증
             </text>
-            <text x="980" y="32" text-anchor="middle" class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">
-              저장 · 표시 · 검증
+            <text
+              x="980"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              서빙 · api + web
             </text>
 
-            <!-- ROOT CLAUDE.md -->
-            <g transform="translate(440,60)">
-              <rect class="node-card accent" width="300" height="70" rx="8" />
-              <circle cx="22" cy="22" r="14" class="claude-ring" />
-              <circle cx="22" cy="22" r="6" class="claude-dot" />
-              <text x="44" y="26" class="node-title">CLAUDE.md (root)</text>
-              <text x="44" y="42" class="node-meta">나침반 · 지도 · 하드게이트 · 절대 규칙</text>
-              <text x="44" y="58" class="node-meta" style="fill: var(--text-2)">52 lines · ARCHITECTURE / MEMORY / ADR 로 분기</text>
-              <text x="284" y="26" text-anchor="end" class="node-kpi" style="fill: var(--accent)">루트</text>
+            <!-- ============ ROOT CLAUDE.md (top center) ============ -->
+            <g transform="translate(400,58)">
+              <rect class="node-card accent" width="380" height="74" rx="8" />
+              <circle cx="24" cy="24" r="14" class="claude-ring" />
+              <circle cx="24" cy="24" r="6" class="claude-dot" />
+              <text x="48" y="26" class="node-title">
+                CLAUDE.md (root) · MEMORY.md · docs/adr
+              </text>
+              <text x="48" y="43" class="node-meta">
+                컴퍼스 · 절대규칙 · 도메인 암묵지 18항 · ADR 13건
+              </text>
+              <text x="48" y="60" class="node-meta" style="fill: var(--red); font-weight: 600">
+                182줄 (권장 25–35) · 현재상태 서술 stale
+              </text>
+              <text
+                x="362"
+                y="26"
+                text-anchor="end"
+                class="node-kpi"
+                style="fill: var(--accent)"
+              >
+                루트
+              </text>
             </g>
 
-            <!-- ===== COL 1 : sources ===== -->
-            <g transform="translate(60,180)">
-              <rect class="node-card accent" width="280" height="64" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">sources/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">Source 인터페이스 · 책임 수집 규칙</text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">13 ln</text>
-            </g>
-
-            <g transform="translate(60,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">slime_rag/sources</text>
-              <text x="16" y="40" class="node-meta">플러그인 3종 · 편향은 1급 기능</text>
-              <g transform="translate(16,52)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">apify.py · 인스타(긍정)</text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">305</text>
-              </g>
-              <g transform="translate(16,74)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">dcinside.py · 디시(부정) / instagram.py</text>
-              </g>
-            </g>
-
-            <g transform="translate(60,402)">
-              <rect class="node-card" width="280" height="96" rx="8" />
-              <text x="16" y="24" class="node-title">data/ · 1층 시드</text>
-              <text x="16" y="40" class="node-meta">IG business_discovery 차단 → fixture</text>
-              <g transform="translate(16,52)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">layer1_fixture.json · 3마켓 / 6제품</text>
-              </g>
-              <g transform="translate(16,74)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">product_aliases.json · 미작성</text>
-              </g>
-            </g>
-
-            <g transform="translate(60,530)">
-              <rect class="node-card accent" width="280" height="96" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">MEMORY.md · docs/adr</text>
-              <text x="42" y="42" class="node-meta">암묵지 저장소 — Cat C 만점의 근거</text>
-              <g transform="translate(16,56)">
-                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">ADR 0001–0005 · 어휘 · 홍보판정 규칙</text>
-              </g>
-            </g>
-
-            <!-- ===== COL 2 : core ===== -->
-            <g transform="translate(450,180)">
+            <!-- ============ slime_rag column ============ -->
+            <g transform="translate(60,178)">
               <rect class="node-card accent" width="280" height="64" rx="8" />
               <circle cx="22" cy="22" r="12" class="claude-ring" />
               <circle cx="22" cy="22" r="5" class="claude-dot" />
               <text x="42" y="26" class="node-title">slime_rag/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">파이프라인 소유 · 모듈 경계 · 검증 명령</text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">46 ln</text>
+              <text x="42" y="42" class="node-meta">
+                추출 · 관련성 · 편향 · 통합뷰 규칙
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                115 ln
+              </text>
             </g>
 
-            <g transform="translate(450,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">판정 · 추출 (LLM 경유)</text>
-              <text x="16" y="40" class="node-meta">가장 큰 두 파일 — 분할 후보</text>
+            <g transform="translate(60,266)">
+              <rect class="node-card" width="280" height="152" rx="8" />
+              <text x="16" y="24" class="node-title">slime_rag/ · 23 files</text>
+              <text x="16" y="40" class="node-meta">
+                pipeline · extract · relevance · bias · llm_ops
+              </text>
+
               <g transform="translate(16,52)">
                 <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">bias.py · 판매자/홍보성/실사용</text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">380</text>
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  pipeline.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  615
+                </text>
               </g>
+
               <g transform="translate(16,74)">
                 <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">extract.py · 1층/2층 스키마</text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">354</text>
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  extract.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  577
+                </text>
               </g>
-            </g>
 
-            <g transform="translate(450,402)">
-              <rect class="node-card" width="280" height="96" rx="8" />
-              <text x="16" y="24" class="node-title">관련성 · 개체연결 · 색인</text>
-              <text x="16" y="40" class="node-meta">relevance.py · linking.py · index.py</text>
-              <g transform="translate(16,52)">
+              <g transform="translate(16,96)">
                 <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">τ_topic 캘리브레이션 미확정</text>
+                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  consolidated_view.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  401
+                </text>
               </g>
-              <g transform="translate(16,74)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">BGE-M3 임베딩 · 충돌 시 abstain</text>
+
+              <g transform="translate(16,118)">
+                <rect class="warm" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  relevance.py · bias.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  393 · 380
+                </text>
               </g>
             </g>
 
-            <g transform="translate(450,530)">
-              <rect class="node-card accent" width="280" height="96" rx="8" />
-              <text x="16" y="24" class="node-title">llm_ops.py · 단일 벤더 경계</text>
-              <text x="16" y="40" class="node-meta">모든 LLM 호출의 유일한 통로</text>
-              <g transform="translate(16,52)">
-                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">로깅 · 토큰 · 비용 · 재시도 (하드게이트 3)</text>
-              </g>
-              <g transform="translate(16,74)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">structured outputs · 실패 시 1회 재시도</text>
-              </g>
+            <g transform="translate(60,442)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">slime_rag/sources/CLAUDE.md</text>
+              <text x="42" y="42" class="node-meta">
+                수집 예의 · robots · apify · 지연·페이지 캡
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                36 ln
+              </text>
             </g>
 
-            <!-- ===== COL 3 : store / ui / verify ===== -->
-            <g transform="translate(840,180)">
+            <g transform="translate(60,530)">
+              <rect class="node-card" width="280" height="64" rx="8" />
+              <text x="16" y="26" class="node-title">llm_ops.py · 단일 벤더 창구</text>
+              <text x="16" y="44" class="node-meta">
+                LEDGER: latency · token · cost · refusal
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
+                게이트 #3
+              </text>
+            </g>
+
+            <!-- ============ eval / evals / sql column ============ -->
+            <g transform="translate(450,178)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">eval/CLAUDE.md · 10 files</text>
+              <text x="42" y="42" class="node-meta">
+                오프라인 계약 테스트 — 프롬프트 동작 게이트
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
+                46 ln
+              </text>
+            </g>
+
+            <g transform="translate(450,266)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">evals/CLAUDE.md · 10 files</text>
+              <text x="42" y="42" class="node-meta">
+                gold set · 통과율 게이트 · 관련성 캘리브레이션
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
+                53 ln
+              </text>
+            </g>
+
+            <g transform="translate(450,354)">
               <rect class="node-card accent" width="280" height="64" rx="8" />
               <circle cx="22" cy="22" r="12" class="claude-ring" />
               <circle cx="22" cy="22" r="5" class="claude-dot" />
               <text x="42" y="26" class="node-title">sql/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">스키마 규약 · 2층 조인 키(spec_id)</text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">32 ln</text>
+              <text x="42" y="42" class="node-meta">
+                schema.sql · pgvector · relevance_meta JSONB
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                42 ln
+              </text>
             </g>
 
-            <g transform="translate(840,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">sql/schema.sql · db · search</text>
-              <text x="16" y="40" class="node-meta">pgvector · 하이브리드 RRF · 메타필터</text>
-              <g transform="translate(16,52)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">specs ⟷ reviews · spec_id 조인</text>
+            <g transform="translate(450,442)">
+              <rect class="node-card" width="280" height="88" rx="8" />
+              <circle cx="24" cy="26" r="10" fill="var(--green-soft)" />
+              <circle cx="24" cy="26" r="5" class="test-dot" />
+              <text x="44" y="30" class="node-title">
+                .github/workflows/ci.yml
+              </text>
+              <text x="16" y="54" class="node-meta" style="fill: var(--green)">
+                ✓ validate_context_paths.py — 경로 36/36 통과
+              </text>
+              <text x="16" y="72" class="node-meta" style="fill: var(--green)">
+                ✓ validate_context_claims.py — 주장 검증 신설
+              </text>
+            </g>
+
+            <!-- ============ api + web column (NO CONTEXT) ============ -->
+            <g transform="translate(840,178)">
+              <rect class="node-card accent" width="280" height="88" rx="8" />
+              <circle cx="24" cy="26" r="12" class="claude-ring" />
+              <circle cx="24" cy="26" r="5" class="claude-dot" />
+              <text x="44" y="30" class="node-title">api/CLAUDE.md · 신설</text>
+              <text x="16" y="54" class="node-meta">
+                main.py · FastAPI · /api/page · /api/markets
+              </text>
+              <text x="16" y="72" class="node-meta" style="fill: var(--text-2)">
+                192줄 · commit e95018f
+              </text>
+              <text x="264" y="30" text-anchor="end" class="node-kpi" style="fill: var(--accent)">
+                60 ln
+              </text>
+            </g>
+
+            <g transform="translate(840,296)">
+              <rect class="node-card accent" width="280" height="152" rx="8" />
+              <circle cx="24" cy="26" r="12" class="claude-ring" />
+              <circle cx="24" cy="26" r="5" class="claude-dot" />
+              <text x="44" y="30" class="node-title">web/CLAUDE.md · 신설</text>
+              <text x="16" y="52" class="node-meta">
+                Vite + React + TS · 19 files · 1,653 ln
+              </text>
+
+              <g transform="translate(16,64)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  screens/SlimeSearch.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  1333
+                </text>
               </g>
-              <g transform="translate(16,74)">
+              <g transform="translate(16,86)">
+                <rect fill="var(--grid)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
+                  data/api.ts · data/mock.ts
+                </text>
+              </g>
+              <g transform="translate(16,108)">
                 <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">consolidated_view.py · 소스별 정서 · 갭</text>
+                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">
+                  components/kds/README.md · 편집 금지
+                </text>
               </g>
+              <text x="264" y="30" text-anchor="end" class="node-kpi" style="fill: var(--accent)">
+                50 ln
+              </text>
             </g>
 
-            <g transform="translate(840,402)">
-              <rect class="node-card accent" width="280" height="96" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">app/ui.py · Streamlit</text>
-              <text x="42" y="42" class="node-meta">표시 전용 — 데이터 접근 없음</text>
-              <g transform="translate(16,56)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">배포(Render) — 마지막 하드게이트 미완</text>
-              </g>
+            <g transform="translate(840,478)">
+              <rect class="node-card" width="280" height="64" rx="8" />
+              <text x="16" y="26" class="node-title">data/ · 픽스처 + 마켓 로고</text>
+              <text x="16" y="44" class="node-meta">
+                layer1_fixture.json · market_logos 13개
+              </text>
             </g>
 
-            <g transform="translate(840,530)">
-              <rect class="node-card" width="280" height="96" rx="8" />
-              <circle cx="22" cy="22" r="10" fill="var(--green-soft)" />
-              <circle cx="22" cy="22" r="5" class="test-dot" />
-              <text x="42" y="26" class="node-title">eval/ · evals/ · CI</text>
-              <text x="42" y="42" class="node-meta">오프라인 단위 테스트 + pass-rate 게이트</text>
-              <g transform="translate(16,56)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">경로검증 → 단위테스트 → evals --min 1.0</text>
-              </g>
-              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">CI ✓</text>
-            </g>
+            <!-- =================== EDGES =================== -->
+            <!-- Root CLAUDE.md → sub contexts -->
+            <path class="edge edge-dash" d="M470,132 C 470,158 200,152 200,178" />
+            <path class="edge edge-dash" d="M590,132 C 590,158 590,152 590,178" />
 
-            <!-- ===== EDGES ===== -->
-            <path class="edge edge-dash" d="M500,130 C 500,160 200,160 200,180" />
-            <path class="edge edge-dash" d="M590,130 C 590,160 590,160 590,180" />
-            <path class="edge edge-dash" d="M680,130 C 680,160 980,160 980,180" />
+            <!-- Root CLAUDE.md → api/web : the stale claim -->
+            <path class="edge edge-warn edge-dash" d="M710,132 C 800,132 980,140 980,178" />
+            <text
+              x="852"
+              y="126"
+              text-anchor="middle"
+              class="node-meta"
+              style="fill: var(--red); font-weight: 600"
+            >
+              문서: "API 없음 · 목 데이터"
+            </text>
 
-            <path class="edge edge-type" d="M340,320 C 400,320 400,320 450,320" />
-            <text x="395" y="313" text-anchor="middle" class="node-meta" style="fill: var(--accent); font-weight: 600">수집 → 판정</text>
+            <!-- slime_rag → api -->
+            <path class="edge edge-type" d="M340,300 C 600,300 700,240 840,222" />
+            <text
+              x="600"
+              y="262"
+              text-anchor="middle"
+              class="node-meta"
+              style="fill: var(--accent); font-weight: 600"
+            >
+              pipeline · source_links import
+            </text>
 
-            <path class="edge edge-type" d="M730,320 C 790,320 790,320 840,320" />
-            <text x="785" y="313" text-anchor="middle" class="node-meta" style="fill: var(--accent); font-weight: 600">색인 → 저장</text>
+            <!-- api → web : the real edge -->
+            <path class="edge edge-warn" d="M980,266 L 980,296" />
+            <text
+              x="1064"
+              y="288"
+              text-anchor="end"
+              class="node-meta"
+              style="fill: var(--red); font-weight: 600"
+            >
+              실제: fetch 연결됨
+            </text>
 
-            <path class="edge edge-dash" d="M730,450 C 790,450 790,440 840,440" />
-            <text x="785" y="435" text-anchor="middle" class="node-meta" style="fill: var(--text-2)">조회 · 집계</text>
-
-            <path class="edge edge-dash" d="M590,498 L 590,530" />
-            <path class="edge edge-dash" d="M340,578 C 395,578 400,440 450,440" />
-            <text x="395" y="560" text-anchor="middle" class="node-meta" style="fill: var(--text-2)">도메인 규칙 주입</text>
-
-            <path class="edge edge-dash" d="M730,578 C 790,578 790,578 840,578" />
+            <!-- eval → slime_rag -->
+            <path class="edge edge-dash" d="M450,210 C 400,210 380,240 340,266" />
+            <!-- sql → slime_rag -->
+            <path class="edge edge-dash" d="M450,386 C 400,386 380,400 340,400" />
           </svg>
         </div>
       </section>
@@ -989,67 +1309,68 @@
           <ul class="panel-list">
             <li>
               <div class="head">
-                <span class="tag tag-rule">Cat E1</span>
-                참조 경로 hallucination 0 / 22
+                <span class="tag tag-rule">Cat F</span>
+                주장 검증 게이트 — 이 감사가 남긴 것
               </div>
               <div class="note">
-                컨텍스트가 언급하는 모든 파일·명령이 실재. Meta 기준 "zero hallucinated
-                paths" 충족이며, <code>.github/scripts/validate_context_paths.py</code> 가
-                CI 에서 매 push 마다 이를 재검증한다.
+                경로가 아니라 <strong>상태 서술</strong>을 검사한다. 부재를 주장하려면 그 대상을
+                경로로 지목해야 하고, 그게 생기면 CI 가 실패한다. 이 레포에서 두 건을 잡았다 —
+                둘 다 경로 검사와 mtime 검사를 통과하던 상태였다.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat E1</span>
+                경로 hallucination 0 / 36 — CI 로 강제됨
+              </div>
+              <div class="note">
+                <code>.github/scripts/validate_context_paths.py</code> 가 컨텍스트
+                파일의 모든 경로를 머지 전에 검증. Meta 표준 "zero hallucinated
+                paths" 를 실제로 충족하는 드문 사례.
               </div>
             </li>
             <li>
               <div class="head">
                 <span class="tag tag-rule">Cat C</span>
-                암묵지 외부화 20/20 — MEMORY.md + ADR 5건
+                MEMORY.md 18항 + ADR 13건 = 회수 가능한 암묵지
               </div>
               <div class="note">
-                "걀걀거림=sound", "서포터=홍보성", "mm 규격=디폼" 같은 도메인 규칙과
-                소스 편향·임베딩·fixture 결정이 문서로 회수 가능. 에이전트가 사람에게
-                되묻지 않고 규칙을 적용할 수 있는 상태.
+                도메인 규칙(<code>걀걀거림=sound</code>, 지속력≠배송)과 구조적
+                결정(임베딩·편향·프로모 캐스케이드)이 전부 외부 저장소에.
+                에이전트가 질의로 꺼내 쓸 수 있는 형태.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat B4</span>
+                추론 불가능한 규칙이 명문화됨
+              </div>
+              <div class="note">
+                "GPT-5 계열에 <code>temperature</code> 보내지 말 것", "CSS
+                <code>line-clamp</code> 는 발췌가 아니다 — 전문이 이미 클라이언트에
+                도달했다", "source bias 를 절대 평균내지 말 것". 코드만 읽어서는
+                절대 안 나오는 지식.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat E4</span>
+                프롬프트 동작 자체가 계약 테스트로 게이트됨
+              </div>
+              <div class="note">
+                <code>eval/test_consolidated_sections.py</code> 가 <code>TONE</code>
+                상수가 4개 요약 프롬프트 전부에 도달하는지, 판매자 문구가 요약에
+                새지 않는지 검사. LLM 앱에서 이 수준의 회귀 게이트는 흔치 않다.
               </div>
             </li>
             <li>
               <div class="head">
                 <span class="tag tag-rule">Cat D</span>
-                mermaid 2종 + cross-module ripple 표
+                ARCHITECTURE.md 의 ripple 표
               </div>
               <div class="note">
-                <code>ARCHITECTURE.md</code> 가 데이터 흐름과 import 그래프를 모두 그리고,
-                "무엇을 바꾸면 어디가 흔들리는가" 를 표로 답한다 — "What depends on X?"
-                가 1 hop 안에 해결.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat A · B</span>
-                나침반형 컨텍스트 — 최장 86줄
-              </div>
-              <div class="note">
-                루트 52줄이 지도 역할만 하고 세부는 모듈 <code>CLAUDE.md</code> 로 위임.
-                "compass, not encyclopedia" 원칙대로 5/5 모듈 커버 + 전 파일 상호 링크.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat F</span>
-                컨텍스트 검증이 push 와 CI 양쪽에 이중으로
-              </div>
-              <div class="note">
-                <code>.githooks/pre-push</code> 가 버전 관리되어 경로 무결성 + 평가
-                pass-rate 를 push 시점에 먼저 차단하고, CI 가 같은 검사를 다시 돌린다.
-                5개 모듈 모두 context drift 0.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat G</span>
-                pass-rate 게이트가 CI 에 물려 있음
-              </div>
-              <div class="note">
-                <code>python -m evals.run --min 1.0</code> 가 정답셋 회귀를 차단하고
-                <code>evals/results/latest.json</code> 에 지표를 남긴다. 감이 아니라
-                숫자로 "개선했다" 를 말할 수 있는 구조.
+                mermaid 흐름도 2개 + "무엇을 고치면 무엇이 깨지는가" 표.
+                <em>단, 그림 자체가 현재 stale</em> — 액션 1번으로 같이 정정 필요.
               </div>
             </li>
           </ul>
@@ -1058,95 +1379,85 @@
         <section class="panel panel-risk">
           <div class="panel-head">
             <h3>최우선 ROI 액션</h3>
-            <span class="count">우선순위 정렬</span>
+            <span class="count">6건 완료 · 4건 남음</span>
           </div>
           <ul class="panel-list">
             <li>
               <div class="head">
-                <span class="tag tag-rule" style="background: var(--red-soft); color: var(--red)">Cat E2 · S</span>
-                PR 템플릿 + 리뷰 체크리스트 + CODEOWNERS
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat F · 완료</span>
+                <s style="color: var(--text-3)">"HTTP API 없음 / 목 데이터" 단언 정정</s>
               </div>
-              <div class="note">
-                <strong>Effort 1.0 hr · E2 0 → 4 (총점 90 → 94).</strong>
-                현재 유일한 0점 항목. "경로·명령을 실제로 실행해 확인했는가",
-                "컨텍스트를 같이 갱신했는가" 를 체크박스로 강제하면 stale context
-                회귀가 머지 시점에서 걸린다.
-              </div>
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> 문서 4개 + 코드 주석 2곳(<code>f117096</code>). 위 대조표 참조.</div>
             </li>
             <li>
               <div class="head">
-                <span class="tag tag-rule">Cat C · S</span>
-                τ_topic 확정값을 MEMORY.md 로 승격
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat A · 완료</span>
+                <s style="color: var(--text-3)"><code>api/</code> · <code>web/</code> 에 CLAUDE.md 신설</s>
               </div>
-              <div class="note">
-                <strong>Effort 0.5 hr · 재질문 방지.</strong>
-                관련성 게이트 임계값은 지금 "미완" 상태로만 기록돼 있다. 라벨 교정이
-                끝나면 확정값과 근거를 도메인 규칙으로 고정 — 매 세션 재탐색 ~10분 절감.
-              </div>
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> 커버리지 4/6 → <strong>6/6</strong>, A 10 → 15. Five-Question 도 5/5 가 되며 C 가 20/20 으로 올라갔다.</div>
             </li>
             <li>
               <div class="head">
-                <span class="tag tag-rule">Cat E3 · S</span>
-                CI 에 ruff lint 게이트 + 변경유형별 검증 명령 표
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat F · 완료</span>
+                <s style="color: var(--text-3)">claim 검증 게이트</s>
               </div>
-              <div class="note">
-                <strong>Effort 1.0 hr · E3 3 → 4.</strong>
-                지금은 테스트만 있고 lint/format 게이트가 없다. "스키마 변경 → 이 명령,
-                추출 변경 → 저 명령" 표를 루트에 두면 검증 누락이 task 당 ~2분 줄어든다.
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> <code>validate_context_claims.py</code> + <code>context_claims.json</code>, CI 배선. 규칙: <em>살아있는 문서가 부재를 주장하려면 그 대상을 경로로 지목해야 한다</em>. 첫 실행에서 <strong>두 번째 stale claim</strong> 적발 — <code>data/product_aliases.json</code> 은 6월부터 존재하고 <code>linking</code>→<code>relevance</code> 로 배선돼 있는데 문서엔 계속 &quot;할 일&quot;이었다.</div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat E · 완료</span>
+                <s style="color: var(--text-3)">CODEOWNERS + PR 체크리스트</s>
               </div>
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> E2 <code>0/4</code> → <code>4/4</code>. 1인 레포라 라우팅이 목적이 아니라 <em>어디가 조용히 깨지는가</em>의 지도다.</div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat G · 완료</span>
+                <s style="color: var(--text-3)">BUILD_LOG 정량 metric</s>
+              </div>
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> <code>evals/agent_metrics.py</code> — 69세션 실측. 세션당 중앙값 <strong>도구 19회 · 사람 5턴 · 41 에이전트 턴</strong>. 뜻이 없다고 판정한 지표 2개(세션 시간 합계·캐시 적중률)는 이유를 소스에 박고 뺐다.</div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule" style="background: var(--green-soft); color: var(--green)">Cat B · 완료</span>
+                <s style="color: var(--text-3)">루트 CLAUDE.md 압축</s>
+              </div>
+              <div class="note"><strong style="color: var(--green)">2026-08-07 완료.</strong> 182 → <strong>161줄</strong>. 커밋 규약 33줄을 <code>docs/commit-convention.md</code> 로, 프런트/API 세부를 새 모듈 가이드로 이관(중복 제거라 지식 손실 없음). 목표 90줄에는 못 미친다 — 남은 분량은 <code>Current status</code> 이고 여기는 압축보다 정확성이 중요한 절이다.</div>
             </li>
             <li>
               <div class="head">
                 <span class="tag tag-rule">Cat G · S</span>
-                pass-rate 시계열 + 세션 토큰/시간 누적
+                다음 회차 <code>agent_metrics</code> 측정
               </div>
-              <div class="note">
-                <strong>Effort 1.0 hr · G 4 → 5.</strong>
-                <code>latest.json</code> 만 남기면 before/after 비교가 불가능.
-                <code>history.jsonl</code> 로 누적하고 <code>BUILD_LOG.md</code> 에
-                phase별 토큰·툴콜 표를 붙이면 개선 ROI 자체가 계량된다.
-              </div>
+              <div class="note"><strong>Effort 0.2 hr · Impact 6/10.</strong> G 4 → 5 의 유일한 길. 기준선은 이미 커밋됐으니 <em>다음 측정이 곧 before/after</em> 다 — 이번 컨텍스트 정비가 사람 턴을 줄였는지 검증된다.</div>
             </li>
             <li>
               <div class="head">
-                <span class="tag tag-rule">Cat B · S</span>
-                <code>app/</code> · <code>sql/</code> 컨텍스트에 Key files 표 보강
+                <span class="tag tag-rule">Cat D · S</span>
+                채점기 <code>score.py:390</code> mermaid 탐지 버그
               </div>
-              <div class="note">
-                <strong>Effort 1.0 hr · B3/B4 3 → 4 (각).</strong>
-                27줄 · 32줄로 가장 얇은 두 문서. 진입 파일과 함정(Gotcha)을 명시하면
-                에이전트의 grep 왕복이 줄어든다.
-              </div>
+              <div class="note"><strong>Effort 0.3 hr · Impact 4/10.</strong> mermaid 를 <code>CLAUDE.md</code> 계열에서만 찾아 <code>ARCHITECTURE.md</code> 의 flowchart 2개를 못 본다. 이 레포뿐 아니라 <em>모든</em> 레포가 상시 −3점.</div>
             </li>
             <li>
               <div class="head">
                 <span class="tag tag-rule">Cat F · S</span>
-                <code>core.hooksPath</code> 활성화를 셋업 스크립트로
+                pre-push 훅에 두 게이트 배선
               </div>
-              <div class="note">
-                <strong>Effort 0.25 hr · 점수 변화 없음(이미 10/10).</strong>
-                훅 자체는 <code>.githooks/pre-push</code> 로 버전 관리되지만 활성화
-                (<code>git config core.hooksPath .githooks</code>)는 클론마다 수동 1회 —
-                Makefile / setup.sh 로 옮기면 누락 가능성 제거.
-              </div>
+              <div class="note"><strong>Effort 0.5 hr · Impact 6/10.</strong> F 9 → 10. 지금은 CI 에서만 돌아 푸시 후에야 안다. <code>.claude/precommit-cmd</code> 가 gitignore 라 새 클론에서 훅이 꺼지는 문제도 같이 본다.</div>
             </li>
             <li>
               <div class="head">
-                <span class="tag tag-rule">루브릭 외 · M</span>
-                <code>bias.py</code>(380) · <code>extract.py</code>(354) 책임 분리
+                <span class="tag tag-rule">Cat B · L</span>
+                <code>SlimeSearch.tsx</code> (1,333줄) 분할 <span style="color: var(--amber)">— 보류</span>
               </div>
-              <div class="note">
-                <strong>Effort 3.0 hr.</strong>
-                점수엔 반영되지 않지만 편집 정확도에 직결 — 판정 캐스케이드와
-                스키마 정의를 분리하면 파일당 컨텍스트 로드가 ~40% 줄고 diff 충돌도 감소.
-              </div>
+              <div class="note"><strong>Effort 6.0 hr · Impact 5/10.</strong> <strong style="color: var(--amber)">보류 사유:</strong> 다른 세션이 이 파일을 편집 중(미커밋 184줄+)이고, "디자인 원본과 픽셀 대조 가능" 제약이 걸려 있어 분할은 대조 절차와 함께 설계해야 한다. 트리가 조용해진 뒤 착수.</div>
             </li>
           </ul>
         </section>
       </div>
 
       <footer>
-        SlimeReview · AI 준비도 감사 · v2 루브릭 (7 카테고리 / 100점) · 90/100 AI-Native · 측정일 2026-08-02
+        SlimeReview · AI 준비도 감사 · v2 루브릭 (7 카테고리 / 100점) · 1회차 78 → 액션 6건 실행 → 95 · 2026-08-07
       </footer>
     </div>
   </body>

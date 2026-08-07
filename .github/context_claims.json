@@ -1,0 +1,47 @@
+{
+  "_readme": "컨텍스트 문서의 상태 주장 레지스트리. 게이트: .github/scripts/validate_context_claims.py · 배경: 2026-08-07 감사에서 CLAUDE.md 가 이미 있는 HTTP API 를 '없다'고 단언한 게 잡혔다. 경로 검사(0 hallucinated paths)도 mtime drift 검사(0%)도 그 유형을 못 잡는다.",
+
+  "_absence_claims_howto": "살아있는 문서가 '아직 없다'고 말하려면 여기 등록한다. 형식: {id, doc, phrase, absent_path, why}. absent_path 가 생기는 순간 CI 가 실패하며 문서를 고치라고 알려준다. 등록하지 않은 부재 주장은 검증할 수 없으므로 게이트가 막는다 — 과거 서술이라면 ADR 로 옮겨라(ADR·gold 는 면제).",
+  "absence_claims": [],
+
+  "presence_guards": [
+    {
+      "_comment": "이미 실재하는 것을 '없다'고 말하는 특정 문구를 하드 차단한다. absence_claims 가 일반 규칙이라면 이건 한 번 썩었던 자리에 박는 못이다.",
+      "id": "http-api-shipped",
+      "present_path": "api/main.py",
+      "docs": ["CLAUDE.md", "ARCHITECTURE.md", "README.md", "slime_rag/CLAUDE.md", "web/CLAUDE.md"],
+      "forbid": [
+        "There is none today",
+        "not wired to the backend yet",
+        "API 미연결",
+        "the HTTP API layer",
+        "Next dependency: an HTTP API",
+        "API 층이 없어",
+        "아직 목 데이터"
+      ],
+      "why": "2026-08-06 e95018f 가 api/main.py 를 넣었는데 문서 8곳이 하루 넘게 '없다'로 남아 있었다. 새 세션의 에이전트는 그걸 읽고 이미 있는 API 를 다시 설계한다."
+    },
+    {
+      "id": "post-meta-columns-shipped",
+      "present_path": "sql/schema.sql",
+      "docs": ["CLAUDE.md", "slime_rag/CLAUDE.md"],
+      "forbid": [
+        "reviews` 에 본문 컬럼이 없어",
+        "테이블에 없다",
+        "`reviews` has no such columns"
+      ],
+      "why": "e930471 이 body/title/author/posted_at/likes/views/comment_count/votes_up 을 넣었다. 남은 제약은 '컬럼이 없다'가 아니라 '그 커밋 이전 행은 NULL' 이라는 것 — 두 문장은 다른 작업을 부른다."
+    },
+    {
+      "id": "streamlit-ui-deleted",
+      "present_path": "web/src/screens/SlimeSearch.tsx",
+      "docs": ["CLAUDE.md", "ARCHITECTURE.md", "slime_rag/CLAUDE.md", "sql/CLAUDE.md", "eval/CLAUDE.md"],
+      "forbid": [
+        "`../app`",
+        "app/ui.py",
+        "프런트엔드(재작성 예정)"
+      ],
+      "why": "ADR-0012 로 app/ 이 삭제됐는데 slime_rag/CLAUDE.md 가 계속 UI 로 지목했다. 확장자 없는 디렉터리 참조라 경로 검사기가 못 잡는다."
+    }
+  ]
+}

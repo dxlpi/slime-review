@@ -106,7 +106,9 @@ something to correct for** — never average it; show it per source, plus the ga
   already returns them, but `pipeline.REVIEW_SORTS` still offers 수집순 only and rows indexed before
   that commit keep NULLs until they are re-collected (ingest skips an existing `post_id`) ·
   the ADR-0007 re-ruling (above) · expand the entity-linking gold set
-  ([evals/gold/](evals/gold/)) · product alias dictionary (`data/product_aliases.json`) ·
+  ([evals/gold/](evals/gold/)) · **seed the product alias dictionary for the remaining markets** —
+  [`data/product_aliases.json`](data/product_aliases.json) ships and is wired
+  (`linking.load_product_aliases` → `relevance`), but only one market is filled in ·
   toxicity filter criteria · **two user inputs for the link feature**: the gold record's amos thread
   URL (`eval/layer2_gold.json` → `source.url`, the only thing between here and a link visible in the
   deployed demo) and the six fixture product IG permalinks (`data/layer1_fixture.json`).
@@ -132,6 +134,7 @@ python .github/scripts/validate_context_paths.py               # context path in
 
 ALWAYS write commit messages in English — subject, body, and trailers.
 
+python .github/scripts/validate_context_claims.py              # context claim integrity (부재 주장 검증)
 Korean is allowed ONLY as a quoted literal, wrapped in backticks:
 - Identifiers, filenames, or paths that are actually Korean in the codebase
 - UI copy / string values being added or changed

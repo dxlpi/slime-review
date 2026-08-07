@@ -25,6 +25,12 @@ jobs:
       - name: Validate context paths (0 hallucinated paths)
         run: python .github/scripts/validate_context_paths.py
 
+      - name: Validate context claims (0 stale claims)
+        # 자매 게이트: 경로가 아니라 **상태 서술**을 검사한다. 2026-08-07 감사에서 CLAUDE.md 가
+        # 이미 있는 `api/main.py` 를 '없다'고 단언한 게 잡혔는데, 경로 검사도 mtime drift 검사도
+        # 그 유형은 못 잡는다(경로는 실재했고 문서·코드가 같은 날 수정됐다).
+        run: python .github/scripts/validate_context_claims.py
+
       - name: Gold integrity (절대축 일치 + 3축 스키마)
         # 순수 JSON 검사라 numpy/torch 없이 돈다. 동일 텍스트의 M/Q/E 가 갈라지거나
         # AC3 쿼리조건부 하드 네거티브 6건이 삭제되면 실패한다.

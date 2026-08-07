@@ -1,0 +1,72 @@
+{
+  "measured_at": "2026-08-07",
+  "sessions": 69,
+  "date_range": [
+    "2026-07-14",
+    "2026-08-07"
+  ],
+  "per_session_median": {
+    "minutes": 26.7,
+    "tool_calls": 19,
+    "human_turns": 5,
+    "assistant_turns": 41,
+    "tokens_out": 34260
+  },
+  "per_session_p90": {
+    "tool_calls": 138,
+    "human_turns": 24,
+    "tokens_out": 425750
+  },
+  "totals": {
+    "tool_calls": 3450,
+    "human_turns": 635,
+    "tokens_out": 8291218,
+    "tokens_cache_read": 1069560097
+  },
+  "tool_mix_top": [
+    [
+      "Bash",
+      1782
+    ],
+    [
+      "Edit",
+      803
+    ],
+    [
+      "Read",
+      491
+    ],
+    [
+      "Write",
+      160
+    ],
+    [
+      "AskUserQuestion",
+      48
+    ],
+    [
+      "TaskUpdate",
+      45
+    ],
+    [
+      "TaskCreate",
+      23
+    ],
+    [
+      "Agent",
+      22
+    ],
+    [
+      "ToolSearch",
+      18
+    ],
+    [
+      "DesignSync",
+      11
+    ]
+  ],
+  "not_measured": [
+    "session_hours_total",
+    "cache_hit_ratio"
+  ]
+}

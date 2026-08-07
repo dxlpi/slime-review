@@ -108,6 +108,17 @@
       "logo": "data/market_logos/momone.slime.jpg"
     },
     {
+      "market": "모모찌슬라임",
+      "handle": "momozzi_slime",
+      "handles_alt": [],
+      "market_word": "모모찌",
+      "choseong": "ㅁㅁㅉ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": "data/market_logos/momozzi_slime.jpg"
+    },
+    {
       "market": "연찌슬라임",
       "handle": "yeonzzi_slime",
       "handles_alt": [],

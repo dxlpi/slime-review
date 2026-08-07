@@ -53,7 +53,12 @@ class Settings:
     # 토큰 미설정이면 ApifyHashtagSource 는 조용히 스킵(collect_all 이 빈 결과 처리).
     apify_token: str | None = os.getenv("APIFY_TOKEN")
     apify_hashtag_actor: str = os.getenv("APIFY_HASHTAG_ACTOR", "apify/instagram-hashtag-scraper")
-    apify_results_per_hashtag: int = int(os.getenv("APIFY_RESULTS_PER_HASHTAG", "30"))
+    # 창 크기가 곧 비용이다 — 해시태그 액터는 **결과당** 과금($1.90/1000, sources/apify.py).
+    # 일 1회 실행을 전제로 30 → 10 으로 내렸다(2026-08-07): 하루에 새로 올라오는 태그 글이
+    # 10건을 넘지 않으므로 그만큼이면 하루치를 덮는다. 첫 적재처럼 과거분을 크게 훑어야 하면
+    # 환경변수로 한 번 올려서 돌린다 — 기본값이 상시 비용을 정한다.
+    # ⚠️ 액터 자체의 상한(~30)과 다른 값이다. 이건 우리가 **요청하는** 창이다.
+    apify_results_per_hashtag: int = int(os.getenv("APIFY_RESULTS_PER_HASHTAG", "10"))
 
     kb_demo_path: Path = DATA_DIR / "slime_market_kb_demo.json"
     # 1층 공식 스펙 fixture (business_discovery 가 App Review 요구 → 라이브 대신 큐레이션 스냅샷)

@@ -139,9 +139,22 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   발췌와 **별개 필드**로 함께 나간다.
 - **Note:** 정렬(`REVIEW_SORTS`)은 **DB 에 실재하는 컬럼으로만** 만든다. 좋아요/조회/추천 컬럼은
   이제 존재하고 `list_reviews` 도 반환하지만 **정렬 메뉴는 아직 수집순·감성순뿐**이다 — 그 커밋
-  이전에 색인된 행은 값이 NULL 이라(수집은 `post_id` 존재 시 스킵) 재수집 전에 메뉴를 켜면 정렬이
+  이전에 색인된 행은 값이 NULL 이라(**재수집으로는 안 채워진다** — 아래 멱등성 항목) 메뉴를 먼저 켜면 정렬이
   거짓말이 된다. 켜는 건 이 dict 에 한 줄 추가. '최근 수집순'의 '수집'도 같은 정직함이다 —
   `created_at` 은 작성일이 아니라 색인 시각이고, 작성일은 `posted_at` 이 따로 갖는다.
+- **Important:** 색인 멱등성은 **DB 제약**이 갖는다 — `UNIQUE(source, post_id, product)` +
+  `index_post` 의 `ON CONFLICT DO NOTHING`(2026-08-07, 게이트:
+  `eval/test_index_meta.py::test_insert_carries_on_conflict_clause`).
+  그전엔 파이프라인 독스트링만 '멱등'이라 주장했고 실제 스킵은 `index_gold` 에만 있어서,
+  배치를 두 번 돌린 인스타 80행 중 **28행이 중복**이었다. 단순 중복이 아니라 같은 글이 런마다
+  **다른 감성**으로 추출돼(LLM 비결정성) 독립된 후기 두 건처럼 `criterion_stats` 에 들어갔다 —
+  다수/소수 판정을 행 수로 세는 구조라 그대로 편향 집계 오염이다.
+  **Don't:** `DO UPDATE` 로 바꾸지 말 것 — 재수집마다 이미 내려진 판정을 조용히 덮어쓴다.
+  원문 메타 백필이 필요하면 무엇을 덮는지 명시하는 별도 함수로 한다.
+  **Note:** `post_id` 가 NULL 이면 Postgres 가 NULL 을 서로 다른 값으로 봐서 제약을 빠져나간다 —
+  호출부가 조각 식별자를 항상 넘기는 게 전제다.
+  **Note:** `index_post` 의 반환값은 이제 **실제 적재 행 수**(충돌 스킵분 제외)다. `len(texts)` 로
+  되돌리면 한 행도 안 들어간 재실행이 'N건 색인'이라 보고한다.
 
 ## Cross-module dependencies
 - [`../api/main.py`](../api/main.py) → `pipeline`, `source_links`, `linking` (얇은 직렬화층;

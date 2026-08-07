@@ -34,12 +34,31 @@ something to correct for** — never average it; show it per source, plus the ga
 - Layer 1 is **no longer fixture-only** (2026-08-07). `business_discovery` is still App-Review-blocked
   ([ADR-0003](docs/adr/0003-ig-businessdiscovery-fixture.md)), but `pipeline.ingest_seller_profiles`
   scrapes the market's **own feed** via Apify `instagram-profile-scraper` — the same seller→`extract_spec`
-  path `ingest_hashtag` uses, sharing one gate (`_specs_from_seller_post`). Live run: **specs 23→69행,
-  4→10 markets** for $0.0144 Apify + 54 LLM calls. The fixture remains the seed for markets that path
+  path `ingest_hashtag` uses, sharing one gate (`_specs_from_seller_post`). Two live runs:
+  23→69행 (4→10 markets), then **69→101행 (10→12 markets)** across all 14 KB markets for
+  $0.0224 Apify + $0.1726 LLM (89 calls). The fixture remains the seed for markets that path
   can't reach. **Sampling caveat:** the profile actor returns only the **~12 most recent** posts and has
   no `resultsLimit`, so old products need repeat runs over time — but unlike the hashtag path it is
   **not rank-biased** (whole feed, not a top-N subset). It collects **seller posts only**; user reviews
   live on other accounts and stay the hashtag path's job.
+  ⚠️ **The second run moved Layer 1 coverage but not the review-side vocabulary gap** — of the 84
+  product names on review rows, the 76 with no seller-side counterpart stayed at 76. The window is
+  recent-only, so what arrives is new releases while the review corpus is about older products.
+  Layer 1 is therefore **structurally incomplete**: "absent from `specs`" never means "not a product".
+- **Phantom product names are repaired** (2026-08-07). The review branch had no product gate, so the
+  extractor lifted caption **spec lines** (풀조합 `아마존 우드 점토`, 향료 `코코넛과자향`) as products —
+  46 of 80 IG rows, while the actually-hashtagged product got **0 rows on those same posts**.
+  `extract.resolve_product_name` is now the single rule (backfill + ingest share it), enforced in code:
+  ① a caption hashtag is kept even if absent from `specs` · ② sole candidate replaces · ③ exactly one
+  Layer-1 match breaks a tie · ④ otherwise hold. Backfill: 10 renamed, 5 folded, 2 held, **0 LLM calls**
+  (captions were already in `reviews.body`; re-embedding is local BGE-M3).
+  ⚠️ Two guards exist because both directions broke in testing: a name the same post already claims is
+  **left untouched** (`keep_distinct` — renaming it erased `빠코폼`, a real second product in a
+  comparison post; then nulling it was worse), and `GENERIC_TAGS` gained the Korean community tags
+  (`슬라임리뷰` was missing, so a phantom nearly became a *different* phantom). Gate:
+  `eval/test_product_repair.py`. Residual: personal tags (`#꼼픽`·`#숭슬지나`) are real hashtags that
+  no hashtag rule can exclude — only a per-market product registry can, and all 14 KB markets are
+  still `products: []`.
 - The relevance gate's `kind` axis is resolved: the exclusive 4-way taxonomy is replaced by three
   independent binary axes **M/Q/E** ([ADR-0006](docs/adr/0006-mqe-three-axis-relevance.md) — the
   source plan `kind-axis-resolution.md` is author-local and not part of this repo).
@@ -107,7 +126,9 @@ something to correct for** — never average it; show it per source, plus the ga
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
   already returns them, but `pipeline.REVIEW_SORTS` still offers 수집순 only and rows indexed before
-  that commit keep NULLs until they are re-collected (ingest skips an existing `post_id`) ·
+  that commit keep NULLs and **a plain re-run will not fill them** — indexing is now idempotent by
+  DB constraint (`UNIQUE(source, post_id, product)` + `ON CONFLICT DO NOTHING`, 2026-08-07), so a
+  re-collect skips the row rather than refreshing it; filling those columns needs an explicit backfill ·
   the ADR-0007 re-ruling (above) · expand the entity-linking gold set
   ([evals/gold/](evals/gold/)) · **seed the product alias dictionary for the remaining markets** —
   [`data/product_aliases.json`](data/product_aliases.json) ships and is wired
@@ -124,6 +145,8 @@ python -m slime_rag.pipeline              # end-to-end glue (no UI — this is h
 python -m eval.test_bias && python -m eval.test_apify_source && python -m eval.test_relevance_gate   # offline tests
 python -m eval.test_consolidated_sections # 6기준 요약 계약 (CRITERIA 공유 · 제품/주문 축 분리)
 python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 정책 · 원문 메타 매핑
+python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인 멱등성 · 1층 수집 누적성
+python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
 python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
 python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates
 python -m evals.run --min 1.0             # evaluation pass-rate gate

@@ -29,6 +29,7 @@ import Icon from '../components/kds/Icon'
 import Input from '../components/kds/Input'
 import Tab from '../components/kds/Tab'
 import { CRITERIA, page as PLACEHOLDER } from '../data/mock'
+import type { Cell, SummaryRow, SummaryScore } from '../data/mock'
 import { fetchPage, type PageData, type SortKey } from '../data/api'
 
 type Src = 'both' | 'ig' | 'dc'
@@ -87,30 +88,10 @@ const pagerBtn = {
  * 문장이라 24px 로는 빽빽하게 읽힌다. 글자 크기는 건드리지 않는다 — 줄간격만. */
 const PROSE_LINE = '28px'
 
-/* '통합 요약' 제목 옆의 반짝임 아이콘(사용자 지시 2026-08-06 · 원본 `~/Downloads/ai icon.png`).
- * KDS `Icon`(Lucide) 을 쓰지 않는다 — Lucide 는 선 아이콘이고 이건 **면**으로 채운 두 개의
- * 네갈래 별이라 `sparkles` 로 대체하면 다른 그림이 된다. 원본은 큰 별 파랑 / 작은 별 보라의
- * 2색이지만 화면 액센트 하나로 통일한다(사용자 지시) — `--kds-accent`(민트)다. KDS 기본
- * 액센트는 파랑이므로 이 변수는 `slime-accent.css` 가 덮어쓴 값을 탄다.
- * 뾰족한 꼭짓점은 원본처럼 둥글게 — 같은 색 얇은 stroke 로 join 만 굴린다. */
-function AiSparkle({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="var(--kds-accent)"
-      stroke="var(--kds-accent)"
-      strokeWidth="0.6"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ flex: 'none' }}
-    >
-      <path d="M9.98 1.48 Q12.42 7.52 18.46 9.96 Q12.42 12.4 9.98 18.44 Q7.54 12.4 1.5 9.96 Q7.54 7.52 9.98 1.48Z" />
-      <path d="M18.47 14.49 Q19.79 17.15 22.45 18.47 Q19.79 19.79 18.47 22.45 Q17.15 19.79 14.49 18.47 Q17.15 17.15 18.47 14.49Z" />
-    </svg>
-  )
-}
+/* 요약 카드의 '통합 요약' 제목 줄에 붙던 반짝임 아이콘(`AiSparkle`, 사용자 지시 2026-08-06)은
+ * 그 제목 줄과 함께 **빠졌다**(2026-08-07 디자인 개편). 디자인의 요약 카드는 링 게이지로
+ * 시작하고 카드 안에 제목이 없다 — 아이콘이 붙을 자리가 사라진 것이지, 철회한 게 아니다.
+ * 되살리려면 커밋 히스토리에서 이 자리의 SVG(면으로 채운 네갈래 별 2개)를 그대로 꺼내면 된다. */
 
 /* 펼치기/접기 버튼 — 아이콘을 라벨 **왼쪽**에 둔다(사용자 지시 2026-08-06).
  * 아이콘은 '지금 상태'가 아니라 **누르면 갈 방향**을 가리킨다: 접힘 → ›, 펼침 → ⌄.
@@ -231,6 +212,210 @@ function Pager({
 /* 요약은 **미리 생성해 저장**한 것만 쓴다(사용자 결정 2026-08-06) — 페이지 로드마다 LLM 을
  * 부르면 열 때마다 과금된다. 아직 없으면 이 문구가 나간다. */
 const NO_SUMMARY = '아직 생성하지 않았어요 — 요약은 미리 만들어 저장한 것만 보여줘요.'
+
+/* ─────────────────────────────────────────────────────── 요약 카드 (ADR-0014)
+ * ⚠️ 기준 줄에 배지·라벨을 붙이지 말 것(사용자 결정 2026-08-07). 건수('인스타 27 · 아모스갤 6')·
+ *    정서 분포('갈림 19:5')·'인스타만' 을 붙여 봤고 전부 걷어냈다 — 다수/소수는 이미
+ *    verdict/minority 두 칸이 문장으로 말하고 있어서 같은 말이 줄마다 두 번 붙었다.
+ *    집계(`criterion_stats`)는 백엔드에 살아 있고 요약의 다수 판정 재료로 계속 쓰인다.
+ */
+
+/* 축별 아이콘 — **표시 규칙**이라 데이터가 아니라 화면이 갖는다(백엔드는 축이 무엇인지만 안다).
+ * 디자인이 지정한 넷(`scoreList`)은 이름 그대로 쓰고, 마켓 축 둘은 디자인에 없어서 같은
+ * Lucide 세트에서 골랐다. 없는 키는 아이콘 없이 빈 원으로 degrade 한다 — 기준이 늘어도
+ * 레이아웃이 무너지지 않게. */
+const SCORE_ICON: Record<string, string> = {
+  texture: 'hand',
+  scent: 'nose',
+  sound: 'ear',
+  longevity: 'hourglass',
+  cs: 'headset',
+  shipping: 'truck',
+}
+
+/* '향' 축 아이콘 — Lucide 에 코가 없어서 디자인이 인라인 SVG 로 직접 그렸다
+ * (`Slime Search.dc.html` 150–153줄). 그 path 를 그대로 옮긴다.
+ * `strokeWidth` 2 는 디자인 값이다 — KDS `Icon` 기본(1.6)과 다르지만 여기선 원본을 따른다. */
+function NoseIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--kds-accent)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M13.6 2.6c.7 2.4-.3 4.6-2.1 7.3-1.5 2.2-3.7 3.7-3.7 5.8 0 2 1.6 3.4 2.8 4.2.6.4.8 1 .8 1.9" />
+      <path d="M9.1 16.7c1.7-.8 3.8-.6 4.8.8 1 1.3 2.3 1.5 3.2.5.9-1 1-2.6 0-3.8" />
+    </svg>
+  )
+}
+
+/** 링 게이지의 stroke-dashoffset. 디자인의 `364.4 * (1 - 0.78)` 과 같은 식 —
+ *  364.4 는 r=58 원둘레(2πr)고, 점수는 10점 만점이다. 숫자가 아니면 링을 비워 둔다. */
+function ringOffset(score: string): number {
+  const n = Number(score)
+  const ratio = Number.isFinite(n) ? Math.min(Math.max(n / 10, 0), 1) : 0
+  return 364.4 * (1 - ratio)
+}
+
+/* 요약 카드 본문 — 문단 하나가 아니라 **축마다 한 칸**이다(ADR-0014).
+ * 질감·향·소리·지속력이 한 문단에 붙어 있으면 어느 문장이 어느 축인지 매번 되짚어야 한다.
+ * 축마다 아이콘·라벨을 세우면 그 일이 사라진다. 다수 의견(verdict)과 소수 반론(minority)도
+ * 한 문장에 섞지 않고 줄을 나눠 — 어느 쪽이 다수인지가 위치로 드러난다.
+ *
+ * ⚠️ 왼쪽 링과 축별 숫자는 **자리표시자**다(`mock.PLACEHOLDER_SCORE`). 백엔드에 점수 산출이
+ *    아직 없다 — 문장(verdict/minority)만 실데이터다.
+ * ⚠️ 디자인의 `scoreList` 는 제품 축 넷만 그리지만, 여기서는 백엔드가 준 줄을 **전부** 그린다.
+ *    고객 응대·배송을 빼면 마켓 축 요약이 화면에서 표로만 남는데, 그 두 줄은 카드에서
+ *    빠질 근거가 아니라 근거 범위를 밝혀야 할 줄이다(ADR-0015 · 바로 아래 marketNote). */
+function SummaryScores({
+  rows,
+  marketNote,
+  score,
+}: {
+  rows: SummaryRow[]
+  marketNote: string
+  score: SummaryScore
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 32px' }}>
+      {rows.map((r) => {
+        const icon = SCORE_ICON[r.key]
+        return (
+          <div key={r.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <span
+              style={{
+                width: 44,
+                height: 44,
+                flex: 'none',
+                borderRadius: 'var(--kds-radius-round)',
+                background: 'var(--kds-accent-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {icon === 'nose' ? (
+                <NoseIcon />
+              ) : (
+                icon && <Icon name={icon} size={22} color="var(--kds-accent)" />
+              )}
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 'var(--kds-title-s-size)',
+                    lineHeight: 1.1,
+                    fontWeight: 'var(--kds-weight-bold)',
+                    letterSpacing: 'var(--kds-tracking)',
+                  }}
+                >
+                  {/* 점수가 없는 축은 숫자를 지어내지 않는다 — 화면의 '모름'은 `—` 다. */}
+                  {score.byKey[r.key] ?? '—'}
+                </span>
+              </span>
+              <span
+                style={{
+                  fontSize: 'var(--kds-text-m-size)',
+                  lineHeight: 'var(--kds-text-m-line)',
+                  color: 'var(--kds-fg-secondary)',
+                }}
+              >
+                {r.ko}
+              </span>
+              {/* 마켓 축 줄(고객 응대·배송)만 근거 범위를 밝힌다(ADR-0015). 링 옆 '기반' 줄은
+                * 제품 후기 수라 이 두 줄에는 해당하지 않는다 — 안 쓰면 읽는 사람이 배송 평가를
+                * 이 제품 것으로 오해한다. 배지 철회(ADR-0014)의 예외가 아니다: 건수가 아니라
+                * 무엇에 대한 평가인지다. */}
+              {r.scope === 'market' && (
+                <span
+                  style={{
+                    fontSize: 'var(--kds-text-m-size)',
+                    lineHeight: 'var(--kds-text-m-line)',
+                    color: 'var(--kds-fg-tertiary)',
+                  }}
+                >
+                  {marketNote}
+                </span>
+              )}
+              <p
+                style={{
+                  margin: '2px 0 0',
+                  fontSize: 'var(--kds-text-l-size)',
+                  lineHeight: 'var(--kds-text-l-line)',
+                  color: 'var(--kds-fg)',
+                  textWrap: 'pretty',
+                }}
+              >
+                {r.verdict}
+              </p>
+              {/* 소수 반론은 다수 의견 **아래 별도 줄**이다. 한 문단에 이어 붙이면 ADR-0014 가
+                * 구조로 갈라 둔 두 칸이 문장 안에서 다시 섞인다. */}
+              {r.minority && (
+                <p
+                  style={{
+                    margin: '2px 0 0',
+                    fontSize: 'var(--kds-text-m-size)',
+                    lineHeight: 'var(--kds-text-m-line)',
+                    color: 'var(--kds-fg-tertiary)',
+                    textWrap: 'pretty',
+                  }}
+                >
+                  {r.minority}
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* 표 한 칸 — 다수/소수 두 줄. 둘 다 없으면 '언급 없음'(빈칸의 뜻을 화면이 말한다). */
+function CriterionCell({ cell, strong }: { cell: Cell; strong?: boolean }) {
+  if (!cell.verdict) {
+    return (
+      <p style={{ margin: 0, fontSize: 'var(--kds-text-l-size)', lineHeight: 'var(--kds-text-l-line)', color: 'var(--kds-fg-tertiary)' }}>
+        언급 없음
+      </p>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 'var(--kds-text-l-size)',
+          lineHeight: 'var(--kds-text-l-line)',
+          color: strong ? 'var(--kds-fg)' : 'var(--kds-fg-secondary)',
+          textWrap: 'pretty',
+        }}
+      >
+        {cell.verdict}
+      </p>
+      {cell.minority && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: 'var(--kds-text-m-size)',
+            lineHeight: 'var(--kds-text-m-line)',
+            color: 'var(--kds-fg-tertiary)',
+            textWrap: 'pretty',
+          }}
+        >
+          {cell.minority}
+        </p>
+      )}
+    </div>
+  )
+}
 
 const REVIEW_SRC_CSS = `
 #review-src [role="tab"][aria-selected="true"] {
@@ -662,56 +847,108 @@ export default function SlimeSearch() {
             서포터 게시물을 제외한 리뷰를 바탕으로 AI가 작성했어요.
           </p>
 
-          <div style={{ marginBottom: 40 }}>
-            <div
-              style={{
-                border: '1px solid var(--kds-border)',
-                borderRadius: 'var(--kds-radius-12)',
-                padding: '28px 32px',
-                background: 'var(--kds-bg-subtle)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
-              {/* 디자인엔 제목 오른쪽에 'AI 통합' 배지가 있었으나 **뺐다**(사용자 결정 2026-08-06).
-                * 바로 위 섹션 제목이 이미 'AI 요약' 배지를 달고 "AI가 작성했어요"라고 적어 둔다 —
-                * 한 화면에서 같은 말을 두 번 하는 자리였다. 배지가 빠지면서 자리잡기용
-                * space-between 행도 필요 없어졌다. */}
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 'var(--kds-title-s-size)',
-                  lineHeight: 'var(--kds-title-s-line)',
-                  fontWeight: 'var(--kds-weight-bold)',
-                }}
-              >
-                <AiSparkle />
-                통합 요약
-              </span>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 'var(--kds-text-xl-size)',
-                  lineHeight: PROSE_LINE,
-                  color: 'var(--kds-fg)',
-                  textWrap: 'pretty',
-                }}
-              >
-                {page.summary.all ?? NO_SUMMARY}
+          {/* 요약 카드 — 왼쪽 링 게이지 + 오른쪽 축별 2열 그리드(디자인 131–169줄).
+            * 카드 안에 '통합 요약' 제목 줄은 두지 않는다: 디자인에 없고, 바로 위 섹션 제목이
+            * 이미 'AI 요약' 배지를 달고 "AI가 작성했어요"라고 적어 둔다 — 한 화면에서 같은 말을
+            * 두 번 하는 자리였다(같은 이유로 2026-08-06 에 'AI 통합' 배지도 뺐다).
+            *
+            * 요약이 아직 없으면 링도 숫자도 그리지 않는다. 문장이 없는데 점수만 뜨면 그 숫자가
+            * 어디서 왔는지 화면에 근거가 하나도 남지 않는다. */}
+          <div
+            style={{
+              border: '1px solid var(--kds-border)',
+              borderRadius: 'var(--kds-radius-12)',
+              padding: 32,
+              marginBottom: 40,
+              display: 'grid',
+              gridTemplateColumns: page.summary.all.length ? '300px 1fr' : '1fr',
+              gap: 40,
+              alignItems: 'start',
+            }}
+          >
+            {page.summary.all.length ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                  <div style={{ position: 'relative', width: 132, height: 132, flex: 'none' }}>
+                    <svg
+                      width="132"
+                      height="132"
+                      viewBox="0 0 132 132"
+                      aria-hidden="true"
+                      style={{ display: 'block', transform: 'rotate(-90deg)' }}
+                    >
+                      <circle
+                        cx="66"
+                        cy="66"
+                        r="58"
+                        fill="none"
+                        stroke="var(--kds-bg-muted)"
+                        strokeWidth="10"
+                      />
+                      <circle
+                        cx="66"
+                        cy="66"
+                        r="58"
+                        fill="none"
+                        stroke="var(--kds-accent)"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray="364.4"
+                        strokeDashoffset={ringOffset(page.summary.score.overall)}
+                      />
+                    </svg>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 40,
+                        lineHeight: 1,
+                        fontWeight: 'var(--kds-weight-bold)',
+                        letterSpacing: 'var(--kds-tracking)',
+                      }}
+                    >
+                      {page.summary.score.overall}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 'var(--kds-title-m-size)',
+                        lineHeight: 'var(--kds-title-m-line)',
+                        fontWeight: 'var(--kds-weight-bold)',
+                        letterSpacing: 'var(--kds-tracking)',
+                      }}
+                    >
+                      {page.summary.score.label}
+                    </span>
+                    {/* 근거 건수 줄은 요약 본문보다 작게(사용자 지시 2026-08-07) — `text-m`(12px) +
+                      * 3차 색. 읽을 것은 오른쪽 축별 문장이고 이건 그 근거 표시라, 본문과 같은
+                      * 크기면 마지막 문장처럼 읽힌다. */}
+                    <span
+                      style={{
+                        fontSize: 'var(--kds-text-m-size)',
+                        lineHeight: 'var(--kds-text-m-line)',
+                        color: 'var(--kds-fg-tertiary)',
+                      }}
+                    >
+                      {page.summary.allBasis}
+                    </span>
+                  </div>
+                </div>
+                <SummaryScores
+                  rows={page.summary.all}
+                  marketNote={page.summary.marketNote}
+                  score={page.summary.score}
+                />
+              </>
+            ) : (
+              <p style={{ margin: 0, fontSize: 'var(--kds-text-xl-size)', lineHeight: PROSE_LINE }}>
+                {NO_SUMMARY}
               </p>
-              <span
-                style={{
-                  marginTop: 'auto',
-                  fontSize: 'var(--kds-text-l-size)',
-                  color: 'var(--kds-fg-secondary)',
-                }}
-              >
-                {page.summary.allBasis}
-              </span>
-            </div>
+            )}
           </div>
 
           {/* 펼치기 버튼은 제목 옆이 아니라 **다음 줄에 들여써서** 둔다(사용자 지시 2026-08-06).
@@ -836,32 +1073,25 @@ export default function SlimeSearch() {
                     >
                       {c.en}
                     </span>
+                    {/* 고객 응대·배송은 제품이 아니라 마켓 평가다(ADR-0015). 행 라벨 밑에
+                      * 한 번만 적는다 — 세 칸에 각각 붙이면 같은 말이 줄마다 세 번 뜬다. */}
+                    {c.scope === 'market' && (
+                      <span
+                        style={{
+                          fontSize: 'var(--kds-text-m-size)',
+                          lineHeight: 'var(--kds-text-m-line)',
+                          color: 'var(--kds-fg-tertiary)',
+                        }}
+                      >
+                        {page.summary.marketNote}
+                      </span>
+                    )}
                   </div>
                   <div style={{ padding: 20, borderLeft: '1px solid var(--kds-border)' }}>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 'var(--kds-text-l-size)',
-                        lineHeight: 'var(--kds-text-l-line)',
-                        color: 'var(--kds-fg-secondary)',
-                        textWrap: 'pretty',
-                      }}
-                    >
-                      {cell.ig ?? '언급 없음'}
-                    </p>
+                    <CriterionCell cell={cell.ig} />
                   </div>
                   <div style={{ padding: 20, borderLeft: '1px solid var(--kds-border)' }}>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 'var(--kds-text-l-size)',
-                        lineHeight: 'var(--kds-text-l-line)',
-                        color: 'var(--kds-fg-secondary)',
-                        textWrap: 'pretty',
-                      }}
-                    >
-                      {cell.dc ?? '언급 없음'}
-                    </p>
+                    <CriterionCell cell={cell.dc} />
                   </div>
                   <div
                     style={{
@@ -870,17 +1100,7 @@ export default function SlimeSearch() {
                       background: 'var(--kds-bg-subtle)',
                     }}
                   >
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 'var(--kds-text-l-size)',
-                        lineHeight: 'var(--kds-text-l-line)',
-                        color: 'var(--kds-fg)',
-                        textWrap: 'pretty',
-                      }}
-                    >
-                      {cell.all ?? '언급 없음'}
-                    </p>
+                    <CriterionCell cell={cell.all} strong />
                   </div>
                 </div>
               )

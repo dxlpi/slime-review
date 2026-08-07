@@ -2,7 +2,15 @@
   "_readme": "컨텍스트 문서의 상태 주장 레지스트리. 게이트: .github/scripts/validate_context_claims.py · 배경: 2026-08-07 감사에서 CLAUDE.md 가 이미 있는 HTTP API 를 '없다'고 단언한 게 잡혔다. 경로 검사(0 hallucinated paths)도 mtime drift 검사(0%)도 그 유형을 못 잡는다.",
 
   "_absence_claims_howto": "살아있는 문서가 '아직 없다'고 말하려면 여기 등록한다. 형식: {id, doc, phrase, absent_path, why}. absent_path 가 생기는 순간 CI 가 실패하며 문서를 고치라고 알려준다. 등록하지 않은 부재 주장은 검증할 수 없으므로 게이트가 막는다 — 과거 서술이라면 ADR 로 옮겨라(ADR·gold 는 면제).",
-  "absence_claims": [],
+  "absence_claims": [
+    {
+      "id": "summary-score-not-computed",
+      "doc": "web/CLAUDE.md",
+      "phrase": "백엔드에 점수 산출이 아직 없다",
+      "absent_path": "slime_rag/scoring.py",
+      "why": "2026-08-07 디자인 개편으로 요약 카드에 링 게이지와 축별 점수가 생겼는데, 그 숫자는 mock.PLACEHOLDER_SCORE 의 상수다(사용자 결정: 산출은 곧 도입). 화면에 뜨는 숫자가 실데이터로 보이는 게 이 프로젝트에서 가장 비싼 착각이라 문서가 '가짜'라고 못을 박아 둔다. ⚠️ 산출이 slime_rag/scoring.py 가 아닌 곳(예: consolidated_view.py 안)에 들어가면 이 게이트는 안 울린다 — 그때는 이 항목을 직접 지우고 web/CLAUDE.md 와 api.ts 의 폴백을 함께 걷어내라."
+    }
+  ],
 
   "presence_guards": [
     {

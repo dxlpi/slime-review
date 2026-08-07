@@ -6,7 +6,8 @@
  * ⚠️ 본문(`body`)은 서버가 이미 자른 발췌다(ADR-0013 §3). 여기서 다시 이어붙이거나
  *    전문을 따로 요청하지 말 것 — 자르는 자리는 백엔드 한 곳이어야 한다.
  */
-import type { Criterion } from './mock'
+import { MARKET_SCOPE_NOTE, PLACEHOLDER_SCORE } from './mock'
+import type { Cell, Criterion, CriterionRow, Scope, SummaryRow, SummaryScore } from './mock'
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -43,9 +44,12 @@ type RawPage = {
     source_permalink: string | null
   } | null
   embedUrl: string | null
-  summary: { integrated: string | null; instagram: string | null; dcinside: string | null }
-  byCriterion: Record<string, { ig: string | null; dc: string | null; all: string | null }>
+  summary: { integrated: SummaryRow[]; instagram: SummaryRow[]; dcinside: SummaryRow[] }
+  byCriterion: Record<string, CriterionRow>
   summaryMeta: { generatedAt: string | null; model: string | null; nReviews: number | null }
+  /* 주문 축(고객 응대·배송)은 마켓당 한 벌이라 근거 모집단이 다르다 — 제품 후기 수가 아니라
+   * 접은 주문 조각 수다(ADR-0015). 두 값을 같은 '건수'로 섞어 쓰지 말 것. */
+  marketSummaryMeta: { generatedAt: string | null; model: string | null; nOrders: number | null }
   nReviews: number
   igReviews: RawReview[]
   dcReviews: RawReview[]
@@ -55,6 +59,15 @@ type RawPage = {
 
 /** 값이 없을 때 디자인의 자리표시자를 그대로 쓴다 — 레이아웃이 무너지지 않게. */
 const DASH = '—'
+
+/** 아직 요약이 없는 기준의 빈 행. 매 렌더 새 객체를 만들면 표가 통째로 리렌더된다. */
+const EMPTY_CELL: Cell = { verdict: null, minority: null }
+/* 축마다 하나씩 미리 만들어 둔다 — `{...EMPTY_ROW, scope}` 로 즉석 생성하면 매 렌더 새 객체가
+ * 되어 표가 통째로 리렌더된다(위 주석과 같은 이유). */
+const EMPTY_ROWS: Record<Scope, CriterionRow> = {
+  product: { ig: EMPTY_CELL, dc: EMPTY_CELL, all: EMPTY_CELL, scope: 'product' },
+  market: { ig: EMPTY_CELL, dc: EMPTY_CELL, all: EMPTY_CELL, scope: 'market' },
+}
 
 /* 정렬 키 — 화면(`SlimeSearch`)의 좋아요순/조회순/추천순이 쓰는 값. 표시용 문자열(`—`,
  * `12건`)로는 정렬이 안 되므로 원본 숫자를 따로 실어 보낸다.
@@ -94,11 +107,16 @@ export type PageData = {
   media: { caption: string; spec: string; embedUrl: string | null }
   spec: { glues: string[]; scent: string; slimeType: string; texture: string }
   summary: {
-    all: string | null; allBasis: string
-    ig: string | null; igBasis: string
-    dc: string | null; dcBasis: string
+    all: SummaryRow[]; allBasis: string
+    ig: SummaryRow[]; igBasis: string
+    dc: SummaryRow[]; dcBasis: string
+    /* 마켓 축 줄(고객 응대·배송)에 붙는 설명. `allBasis` 는 제품 후기 수라 이 두 줄에는
+     * 해당하지 않는다 — 근거가 다르면 그 자리에서 말해야 한다(ADR-0015). */
+    marketNote: string
+    /* ⚠️ 지금은 **자리표시자**다 — 백엔드에 점수 산출이 없다(`mock.PLACEHOLDER_SCORE` 주석). */
+    score: SummaryScore
   }
-  byCriterion: (c: Criterion) => { ig: string | null; dc: string | null; all: string | null }
+  byCriterion: (c: Criterion) => CriterionRow
   igReviews: {
     id: string; account: string; date: string; body: string; url: string
     sortKey: SortKey
@@ -141,19 +159,31 @@ function toPageData(d: RawPage): PageData {
       texture: d.spec?.official_texture ?? DASH,
     },
 
+    /* 요약은 **축별 줄 목록**이다(ADR-0014) — 문단 한 덩어리가 아니다. 백엔드가 verdict 가
+     * 빈 기준을 이미 빼고 보내므로 여기서 다시 거르지 않는다(거르는 자리는 한 곳이어야 한다). */
     summary: {
-      all: d.summary.integrated,
+      all: d.summary.integrated ?? [],
       allBasis: `인스타 ${d.igCount}건 + 아모스갤 ${d.dcCount}건 기반`,
-      ig: d.summary.instagram,
+      ig: d.summary.instagram ?? [],
       igBasis: `출처 ${d.igCount}건 기반`,
-      dc: d.summary.dcinside,
+      dc: d.summary.dcinside ?? [],
       dcBasis: `출처 ${d.dcCount}건 기반`,
+      // 건수를 모르면(구 payload 폴백 등) 숫자를 지어내지 않고 범위만 말한다.
+      marketNote:
+        d.marketSummaryMeta?.nOrders == null
+          ? MARKET_SCOPE_NOTE
+          : `이 마켓 전체 주문 ${d.marketSummaryMeta.nOrders}건 기준이에요`,
+      /* 점수는 백엔드가 **아직 안 준다** — 산출 로직이 없다(사용자 결정 2026-08-07: 곧 도입).
+       * 그때까지 디자인 자리표시자를 그대로 쓴다. 응답에 `score` 가 실리기 시작하면
+       * `d.score ?? PLACEHOLDER_SCORE` 가 아니라 **폴백을 지우고** 응답만 쓴다 — 폴백이
+       * 남아 있으면 생성 실패한 페이지가 조용히 가짜 숫자를 띄운다. */
+      score: PLACEHOLDER_SCORE,
     },
 
     /* 6기준 표 — 키는 백엔드의 `consolidated_view.CRITERIA` 가 정한다(ADR-0011: 한 리스트가
      * 스키마·프롬프트·화면표를 동시에 움직인다). 여기서 키를 새로 만들면 그 계약이 깨진다.
      * 아직 생성 전이면 전부 null → 화면이 '언급 없음'으로 degrade. */
-    byCriterion: (c: Criterion) => d.byCriterion?.[c.key] ?? { ig: null, dc: null, all: null },
+    byCriterion: (c: Criterion) => d.byCriterion?.[c.key] ?? EMPTY_ROWS[c.scope],
 
     igReviews: d.igReviews.map((r, i) => ({
       id: r.url ?? `ig-${i}`,

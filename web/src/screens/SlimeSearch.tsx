@@ -1046,7 +1046,7 @@ export default function SlimeSearch() {
               const cell = page.byCriterion(c)
               return (
                 <div
-                  key={c.en}
+                  key={c.key}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '150px 1fr 1fr 1fr',
@@ -1065,14 +1065,10 @@ export default function SlimeSearch() {
                     >
                       {c.ko}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 'var(--kds-text-m-size)',
-                        color: 'var(--kds-fg-tertiary)',
-                      }}
-                    >
-                      {c.en}
-                    </span>
+                    {/* 디자인은 기준명 밑에 영문(`Texture`·`Sound`…)을 한 줄 더 뒀지만 **안 그린다**
+                      * (사용자 지시 2026-08-07). 화면 문구는 전부 한국어고, 영문은 읽는 사람에게
+                      * 새 정보를 주지 않는다. `en` 은 백엔드 `CRITERIA` 계약에 그대로 남는다 —
+                      * 지운 건 표시뿐이다. */}
                     {/* 고객 응대·배송은 제품이 아니라 마켓 평가다(ADR-0015). 행 라벨 밑에
                       * 한 번만 적는다 — 세 칸에 각각 붙이면 같은 말이 줄마다 세 번 뜬다. */}
                     {c.scope === 'market' && (

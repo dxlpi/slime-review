@@ -38,9 +38,10 @@ curl -s 'http://127.0.0.1:8000/api/page?product=빠코볼' | python -m json.tool
   **Don't:** 마켓 행이 아직 생성되기 전이면 제품 행의 cs·shipping 으로 폴백한다(ADR-0015 이전
   구 payload) — 이 폴백을 지우면 `generate_market_summaries` 를 돌리기 전까지 배송·응대 두 줄이
   통째로 degrade 한다.
-- **Don't:** `marketSummaryMeta.nOrders` 와 `summaryMeta.nReviews` 를 같은 '건수'로 섞지 말 것.
-  앞은 **접은 주문 조각 수**, 뒤는 제품 후기 수다 — 섞으면 배송 줄이 제품 후기 수만큼 근거가
-  있는 것처럼 읽힌다.
+- **Note:** `marketSummaryMeta.nOrders` 는 **화면에 안 나간다**(사용자 결정 2026-08-07 — 라벨은
+  `해당 마켓 전체 기준`, 건수 없음). provenance 로만 실어 보낸다.
+  **Don't:** 되살리더라도 `summaryMeta.nReviews` 와 같은 '건수'로 섞지 말 것. 앞은 **접은 주문
+  조각 수**, 뒤는 제품 후기 수다 — 섞으면 배송 줄이 제품 후기 수만큼 근거가 있는 것처럼 읽힌다.
 - **Important:** 응답 shape 은 [`../web/src/data/mock.ts`](../web/src/data/mock.ts) 와 **같은 모양**을
   유지한다. 그래야 목 데이터와 실데이터를 마크업 수정 없이 갈아끼울 수 있고, 디자인 원본과의
   픽셀 대조가 계속 성립한다.

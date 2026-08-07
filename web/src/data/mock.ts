@@ -25,8 +25,13 @@ export const CRITERIA = [
 export type Criterion = (typeof CRITERIA)[number]
 export type Scope = 'product' | 'market'
 
-/** 마켓 축 줄에 붙는 설명. 제품 페이지에서 이 두 줄만 모집단이 다르다는 걸 말한다. */
-export const MARKET_SCOPE_NOTE = '이 마켓 전체 기준이에요'
+/** 마켓 축 줄에 붙는 설명. 제품 페이지에서 이 두 줄만 모집단이 다르다는 걸 말한다.
+ *
+ * ⚠️ 건수를 넣지 말 것(사용자 결정 2026-08-07). 한때 '이 마켓 전체 주문 45건 기준이에요'로
+ *    띄웠는데, 화면에서 숫자를 걷어낸 ADR-0014 개정과 같은 이유로 되돌렸다 — 읽는 사람이
+ *    알아야 할 건 **무엇에 대한 평가인가**지 표본 크기가 아니다. 건수는 `marketSummaryMeta`
+ *    에 provenance 로 남아 있다. */
+export const MARKET_SCOPE_NOTE = '해당 마켓 전체 기준'
 
 /** 기준 한 칸 — 다수 의견과 소수 반론이 **구조로** 갈린다(ADR-0014). 둘 다 null 이면 미언급. */
 export type Cell = { verdict: string | null; minority: string | null }
@@ -106,15 +111,15 @@ export const page = {
       { key: 'scent', ko: '향', en: 'Scent', scope: 'product', verdict: '향에 대한 다수 의견 자리. 한 문장.', minority: null },
       { key: 'shipping', ko: '배송', en: 'Shipping', scope: 'market', verdict: '이 마켓의 배송에 대한 다수 의견 자리.', minority: null },
     ] as SummaryRow[],
-    allBasis: '인스타 —건 + 아모스갤 —건 기반',
+    allBasis: '인스타 —건 + 아모스갤 —건',
     ig: [
       { key: 'texture', ko: '질감', en: 'Texture', scope: 'product', verdict: '인스타그램 후기만으로 본 다수 의견 자리.', minority: null },
     ] as SummaryRow[],
-    igBasis: '출처 —건 기반',
+    igBasis: '출처 —건',
     dc: [
       { key: 'texture', ko: '질감', en: 'Texture', scope: 'product', verdict: '아모스갤 글만으로 본 다수 의견 자리.', minority: null },
     ] as SummaryRow[],
-    dcBasis: '출처 —건 기반',
+    dcBasis: '출처 —건',
     marketNote: MARKET_SCOPE_NOTE,
     score: PLACEHOLDER_SCORE,
   },

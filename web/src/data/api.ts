@@ -163,16 +163,14 @@ function toPageData(d: RawPage): PageData {
      * 빈 기준을 이미 빼고 보내므로 여기서 다시 거르지 않는다(거르는 자리는 한 곳이어야 한다). */
     summary: {
       all: d.summary.integrated ?? [],
-      allBasis: `인스타 ${d.igCount}건 + 아모스갤 ${d.dcCount}건 기반`,
+      allBasis: `인스타 ${d.igCount}건 + 아모스갤 ${d.dcCount}건`,
       ig: d.summary.instagram ?? [],
-      igBasis: `출처 ${d.igCount}건 기반`,
+      igBasis: `출처 ${d.igCount}건`,
       dc: d.summary.dcinside ?? [],
-      dcBasis: `출처 ${d.dcCount}건 기반`,
-      // 건수를 모르면(구 payload 폴백 등) 숫자를 지어내지 않고 범위만 말한다.
-      marketNote:
-        d.marketSummaryMeta?.nOrders == null
-          ? MARKET_SCOPE_NOTE
-          : `이 마켓 전체 주문 ${d.marketSummaryMeta.nOrders}건 기준이에요`,
+      dcBasis: `출처 ${d.dcCount}건`,
+      /* 건수를 붙이지 않는다(사용자 결정 2026-08-07) — `marketSummaryMeta.nOrders` 는
+       * provenance 로만 온다. 이유는 ADR-0014 개정과 같다: 숫자는 화면에서 걷어냈다. */
+      marketNote: MARKET_SCOPE_NOTE,
       /* 점수는 백엔드가 **아직 안 준다** — 산출 로직이 없다(사용자 결정 2026-08-07: 곧 도입).
        * 그때까지 디자인 자리표시자를 그대로 쓴다. 응답에 `score` 가 실리기 시작하면
        * `d.score ?? PLACEHOLDER_SCORE` 가 아니라 **폴백을 지우고** 응답만 쓴다 — 폴백이

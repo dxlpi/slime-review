@@ -12,11 +12,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 
 from .config import settings
 from .db import connect
 from . import linking
+
+log = logging.getLogger("index")
 
 _SENT_KO = {"pos": "좋음", "neu": "보통", "neg": "아쉬움"}
 
@@ -159,7 +162,18 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     (`source_links.evidence_group_key`). 안 하면 한 조각이 제품 수만큼 링크로 도배된다.
     raw — 원본 RawReview(선택). 주면 원문 본문·작성 메타를 함께 적재한다(ADR-0013).
     안 주면 해당 컬럼은 NULL — 골드 시드처럼 RawReview 가 없는 경로가 그렇다.
-    반환: 적재한 행 수.
+    반환: **실제로 적재된** 행 수(중복 스킵분 제외).
+
+    멱등성은 `UNIQUE (source, post_id, product)` + `ON CONFLICT DO NOTHING` 이 **DB에서**
+    보장한다. 예전엔 파이프라인 독스트링만 '멱등'이라 주장하고 강제하는 장치가 없어서,
+    수집 배치를 두 번 돌린 결과 인스타 80행 중 28행이 중복이었다(2026-08-07 정리).
+    같은 글이 두 런에서 **다른 감성**으로 추출돼(LLM 비결정성) 독립된 후기 두 건처럼 쌓였고,
+    그게 `criterion_stats` 의 다수/소수 판정 재료로 들어갔다.
+    ⚠️ `DO UPDATE` 로 바꾸지 말 것 — 재수집마다 이미 내려진 판정을 조용히 덮어쓴다.
+      원문 메타(likes·posted_at 등) 백필이 필요하면 무엇을 덮는지 명시하는 별도 함수로 할 일이지,
+      수집 경로가 겸할 일이 아니다.
+    ⚠️ `post_id` 가 None 이면 Postgres 가 NULL 을 서로 다른 값으로 취급해 이 제약을 빠져나간다.
+      호출부가 조각 식별자를 항상 넘기는 게 전제다.
     """
     kb = linking.load_kb()
     links = linking.link_post(doc, kb=kb, aliases=aliases)
@@ -187,6 +201,7 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     own = conn is None
     conn = conn or connect()
     try:
+        n_ins = 0
         with conn.cursor() as cur:
             for r, lk, text, vec in zip(reviews, links, texts, vecs):
                 cur.execute(
@@ -200,6 +215,7 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                        likes, views, comment_count, votes_up, votes_down)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                             %s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (source, post_id, product) DO NOTHING
                     """,
                     (source, post_id, lk.market, lk.market_confidence,
                      lk.product,
@@ -210,8 +226,11 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
                      Jsonb(r), text, _tokenize(text), vec, rel_meta, src_ref,
                      *post_vals),
                 )
+                n_ins += cur.rowcount        # 충돌로 스킵되면 0 — 세어서 드러낸다
         conn.commit()
-        return len(texts)
+        if n_ins < len(texts):
+            log.info("색인 중복 스킵 %d/%d행 (post_id=%s)", len(texts) - n_ins, len(texts), post_id)
+        return n_ins
     finally:
         if own:
             conn.close()

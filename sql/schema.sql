@@ -54,6 +54,15 @@ CREATE INDEX IF NOT EXISTS reviews_market_idx ON reviews (market);
 CREATE INDEX IF NOT EXISTS reviews_type_idx   ON reviews (slime_type);
 CREATE INDEX IF NOT EXISTS reviews_source_idx ON reviews (source);
 
+-- 한 조각(post_id)의 한 제품은 출처당 한 행. `index_post` 의 ON CONFLICT DO NOTHING 이
+-- 이 제약에 걸린다 — 멱등성을 코드 주석이 아니라 DB 가 강제하는 자리다(2026-08-07).
+-- ⚠️ post_id 가 NULL 인 행은 Postgres 가 NULL 을 서로 다른 값으로 봐서 이 제약을 빠져나간다.
+DO $$ BEGIN
+  ALTER TABLE reviews ADD CONSTRAINT reviews_source_post_product_key
+    UNIQUE (source, post_id, product);
+EXCEPTION WHEN duplicate_table OR duplicate_object THEN NULL;   -- 이미 있으면 무시(멱등)
+END $$;
+
 -- 기존 배포 DB 멱등 마이그레이션: review_class 컬럼이 없으면 추가(기본 'genuine' → 기존 행 무해).
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS review_class TEXT NOT NULL DEFAULT 'genuine';
 CREATE INDEX IF NOT EXISTS reviews_class_idx ON reviews (review_class);
@@ -89,6 +98,28 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS views        INTEGER;     -- 디시
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment_count INTEGER;    -- 디시 댓글 수 / 인스타 댓글 수
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_up     INTEGER;     -- 디시 추천
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_down   INTEGER;     -- 디시 비추천(화면 미표시, 무손실 보관)
+
+-- 기존 배포 DB 멱등 마이그레이션(2026-08-07): 디시 **댓글** post_id 를 런 의존 enumerate 인덱스
+-- → 안정 comment_no 로 재작성. 옛 형식은 `…#cmt:{parent_no}:{i}` 였고 `i` 가 그 런의 리스트
+-- 위치라, 수집 결과가 한 건만 달라져도 같은 댓글이 **다른 post_id** 로 들어갔다 →
+-- UNIQUE(source, post_id, product) 가 댓글에 대해 아무것도 막지 못했다(글·인스타는 정상).
+-- `source_ref.comment_no` 는 이미 저장돼 있어 무손실이다(대상 19행 전부 보유, 실측).
+--
+-- ⚠️ 자르는 기준은 `#cmt` 다. **콜론으로 자르면 안 된다** — post_id 가 `https://` 로 시작해서
+--    split_part(post_id, ':', 1) 은 URL 이 아니라 문자열 `https` 를 돌려준다(대상 전 행 파괴).
+-- ⚠️ 결과 형식은 코드가 새로 만드는 것과 같아야 한다(`pipeline.dc_post_id`):
+--    raw.url(= `…&no=<스레드>#cmt`) || ':' || comment_no.
+-- ⚠️ 위 UNIQUE 제약과 충돌하면 이 문장이 **실패한다** — 그게 맞는 동작이다(계획 R1).
+--    같은 댓글이 이미 두 `i` 로 들어와 있다는 뜻이라 자동 DELETE 가 아니라 수동 판단이 필요하다.
+--    사전 확인 쿼리: 재작성 후 id 를 GROUP BY 해 count(*) > 1 이 0행인지 본다.
+-- 멱등성: `~ ':[0-9]+:[0-9]+$'` 가 **옛 형식만** 고른다. 새 형식(`…#cmt:1091684`)은 콜론-숫자
+--    그룹이 하나뿐이라 두 번째 실행부터 0행이 매칭된다.
+UPDATE reviews
+   SET post_id = split_part(post_id, '#cmt', 1) || '#cmt:' || (source_ref->>'comment_no')
+ WHERE source = 'amos'
+   AND post_id LIKE '%#cmt%'
+   AND post_id ~ ':[0-9]+:[0-9]+$'
+   AND source_ref->>'comment_no' IS NOT NULL;
 
 -- 리뷰 요약 저장 (2026-08-06 사용자 결정: 미리 생성 → 저장 → 화면은 읽기만).
 -- 페이지 로드마다 LLM 을 부르면 열 때마다 과금된다. 발표용으로 한 번 만들어 두고 재사용한다.

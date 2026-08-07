@@ -31,8 +31,12 @@ class _FakeLink:
 
 
 class _FakeCursor:
-    def __init__(self, sink: list):
+    """psycopg 커서 대역. `rowcount` 는 index_post 가 **실제 적재 행 수**를 세는 데 쓴다 —
+    ON CONFLICT DO NOTHING 이 충돌분을 조용히 스킵하므로 len(texts) 는 더 이상 정답이 아니다.
+    기본 1(정상 적재)로 두고, 중복 스킵 시나리오는 rowcount=0 으로 주입한다."""
+    def __init__(self, sink: list, rowcount: int = 1):
         self.sink = sink
+        self.rowcount = rowcount
 
     def __enter__(self):
         return self
@@ -46,12 +50,13 @@ class _FakeCursor:
 
 class _FakeConn:
     """psycopg 연결 대역 — cursor()/commit() 만 필요. index_post 는 conn=own 이 아니므로 close() 안 부름."""
-    def __init__(self):
+    def __init__(self, rowcount: int = 1):
         self.executed: list = []
         self.committed = False
+        self.rowcount = rowcount        # 커서가 보고할 적재 행 수(0 = 중복 스킵)
 
     def cursor(self):
-        return _FakeCursor(self.executed)
+        return _FakeCursor(self.executed, self.rowcount)
 
     def commit(self):
         self.committed = True
@@ -197,10 +202,53 @@ def test_source_ref_replicated_to_fanout_rows():
     print("✓ source_ref 가 제품별 팬아웃 행 전체에 복제 OK")
 
 
+def test_insert_carries_on_conflict_clause():
+    """INSERT 에 `ON CONFLICT (source, post_id, product) DO NOTHING` 이 반드시 붙는다.
+
+    멱등성을 여기서 잃으면 수집 배치를 다시 돌릴 때 같은 글이 통째로 재색인된다.
+    실측(2026-08-07): 인스타 80행 중 28행이 그렇게 생긴 중복이었고, 같은 글이 런마다
+    **다른 감성**으로 추출돼 독립된 후기 두 건처럼 `criterion_stats` 집계에 들어갔다.
+    ⚠️ `DO UPDATE` 로 바꾸는 것도 회귀다 — 재수집이 기존 판정을 조용히 덮어쓴다.
+    """
+    _n, conn = _run_index_post()
+    sql, _params = conn.executed[0]
+    flat = " ".join(sql.split())
+    assert "ON CONFLICT (source, post_id, product) DO NOTHING" in flat, \
+        f"ON CONFLICT DO NOTHING 절이 없다: {flat}"
+    print("✓ INSERT 에 ON CONFLICT DO NOTHING 절 부착 OK")
+
+
+def test_returns_actual_inserted_count_not_row_count():
+    """반환값은 **실제 적재된** 행 수다 — 충돌로 스킵된 행은 세지 않는다.
+
+    예전엔 `len(texts)` 를 그대로 돌려줬다. ON CONFLICT 가 붙은 지금 그러면 한 행도
+    안 들어간 재실행이 '2건 색인'이라고 보고한다 — 조용한 과대보고이고, 파이프라인
+    카운터(`ingest_*` 의 반환 dict)가 그 값을 그대로 싣는다.
+    """
+    doc = {"reviews": [{"overall": {"summary": "A", "model_sentiment": "pos"}},
+                       {"overall": {"summary": "B", "model_sentiment": "neg"}}]}
+    fake_conn = _FakeConn(rowcount=0)          # 전 행이 기존 행과 충돌 → 스킵
+    originals = _patch({
+        index: {"embed": lambda texts: [[0.0] * 4 for _ in texts]},
+        linking: {"load_kb": lambda: object(),
+                  "link_post": lambda d, *, kb, aliases=None: [
+                      _FakeLink("빈짱", 0.9, "한줌"), _FakeLink("빈짱", 0.9, "빠삭귤")]},
+    })
+    try:
+        n = index.index_post(doc, source="instagram", post_id="s1", conn=fake_conn)
+    finally:
+        _restore(originals)
+    assert len(fake_conn.executed) == 2, "INSERT 는 두 번 시도돼야 한다(스킵은 DB가 판단)"
+    assert n == 0, f"중복 스킵이면 0 을 반환해야 한다, 실제 {n}"
+    print("✓ 중복 스킵 시 실제 적재 수(0) 반환 OK")
+
+
 if __name__ == "__main__":
     test_relevance_meta_carried_when_provided()
     test_relevance_meta_null_when_absent()
     test_source_ref_carried_when_provided()
     test_source_ref_null_when_absent()
     test_source_ref_replicated_to_fanout_rows()
+    test_insert_carries_on_conflict_clause()
+    test_returns_actual_inserted_count_not_row_count()
     print("\n모든 오프라인 테스트 통과 ✅")

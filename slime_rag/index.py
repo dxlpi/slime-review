@@ -142,6 +142,25 @@ _POST_COLS = ("body", "title", "author", "posted_at",
               "likes", "views", "comment_count", "votes_up", "votes_down")
 
 
+def existing_post_ids(conn, source: str, post_ids: list[str]) -> set[str]:
+    """이미 색인된 조각 식별자만 골라 돌려준다. **추출 전 컷 전용** — 한 번의 왕복.
+
+    색인 키를 소유한 모듈이 그 키의 조회도 소유한다. 호출부가 `reviews` 를 직접 SELECT 하면
+    `post_id` 조립 규칙이 두 곳으로 갈리고, 그때 컷은 **조용히 아무것도 안 걸러진다**
+    (틀린 키로 조회하면 결과가 빈 집합이라 '전부 처음 보는 조각'처럼 보인다).
+
+    ⚠️ 이 판정은 `reviews` 에 **행이 남은** 조각만 잡는다. 추출 결과가 `reviews: []` 인 조각은
+      행을 안 남기므로 다음 런에 다시 유료 추출된다 — 구조적 구멍이고, 근본 해결은 '봤지만 안
+      남긴' 조각의 툼스톤 원장이다(계획 §8 에서 의도적으로 미해결).
+    """
+    if not post_ids:
+        return set()                          # 빈 목록에 ANY(ARRAY[]) 를 던지지 않는다
+    rows = conn.execute(
+        "SELECT DISTINCT post_id FROM reviews WHERE source=%s AND post_id = ANY(%s)",
+        (source, list(post_ids))).fetchall()
+    return {r[0] for r in rows}
+
+
 def _sent(review: dict, block: str) -> str | None:
     b = review.get(block)
     return b.get("sentiment") if b else None

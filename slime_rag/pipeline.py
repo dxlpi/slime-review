@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from .config import settings, ROOT
@@ -189,18 +190,42 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     src = ApifyHashtagSource(token=settings.apify_token,
                              results_per_hashtag=settings.apify_results_per_hashtag)
     raws = list(src.collect(keywords, limit=limit))
+    n_collected = len(raws)                           # 컷 전 원본 수 — 아래에서 raws 가 줄어든다
+    gate_terms = bias.load_gate_terms()               # 파일 읽기 — 무과금이라 컷보다 먼저 둔다
+
+    # 추출 전 기보유 컷 — **`bias.partition` 앞**이다. 이 경로에서 LLM 을 먼저 쓰는 건 추출이
+    # 아니라 홍보성 캐스케이드라, 컷을 `extract_review` 직전에 두면 게이트 통과분의 verdict 값을
+    # 이미 치른 뒤가 된다. `partition` 앞으로 올리면 홍보성 판정분까지 같이 아낀다.
+    #
+    # 판매자 글이 같이 걸릴 걱정은 없다 — 필터는 `reviews`(2층) 조회인데 판매자 캡션은 `specs`
+    # 로만 가고 `reviews` 에 행을 만들지 않는다. 기보유로 판정될 길 자체가 없다.
+    # (판매자 경로의 재추출 억제는 `ingest_seller_profiles` 의 `skip_seen` 소관이고, 판정
+    #  기준도 다르다 — 저긴 `reviews` 가 아니라 이미 본 게시물 URL 을 본다.)
+    with connect() as conn:
+        seen = index.existing_post_ids(
+            conn, "instagram", [sc for r in raws if (sc := r.meta.get("shortcode"))])
+    fresh = [r for r in raws if r.meta.get("shortcode") not in seen]
+    n_seen = len(raws) - len(fresh)
+    # 조각당 추출 1콜 + 게이트를 통과했을 홍보 verdict 1콜. 게이트는 순수 단어매칭이라 무과금이다.
+    saved_by_dedup = n_seen + sum(1 for r in raws
+                                  if r.meta.get("shortcode") in seen
+                                  and bias.promo_gate(r.text, gate_terms))
+    if n_seen:
+        log.info("기보유 조각 %d건 스킵 → LLM 호출 %d회 절감(추출+홍보판정)", n_seen, saved_by_dedup)
+    raws = fresh
+
     llm = LLM()
     # 홍보성 판정은 게이트(recall)→LLM(verdict) 캐스케이드. 값싼 게이트가 '홍보 의심'만 통과시키고,
     # 명백한 실사용은 즉시 genuine 단락(LLM 미호출) → 호출 수를 크게 줄인다. precision 은 LLM 몫.
-    gate_terms = bias.load_gate_terms()
     promo_detector = bias.make_gated_llm_promo_detector(llm, settings.model_extract, terms=gate_terms)
     sellers, users = bias.partition(raws, kb, promo_detector=promo_detector)
     # 관측성: 게이트 통계는 판매자 제외(non-seller) 대상. 게이트통과=LLM호출, 단락=절감.
     n_suspect = sum(1 for u in users if bias.promo_gate(u.text, gate_terms))
     n_saved = len(users) - n_suspect
-    log.info("해시태그 수집 %d건 → 판매자 %d, 유저후기 %d "
+    log.info("해시태그 수집 %d건(기보유 %d 제외 → 신규 %d) → 판매자 %d, 유저후기 %d "
              "(게이트통과 %d / genuine단락 %d / 절감 LLM호출 %d)",
-             len(raws), len(sellers), len(users), n_suspect, n_saved, n_saved)
+             n_collected, n_seen, len(raws), len(sellers), len(users),
+             n_suspect, n_saved, n_saved)
     n_spec = n_skip_nohash = n_thin = 0
     with connect() as conn:
         with conn.cursor() as cur:
@@ -224,8 +249,12 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     with connect() as conn:
         for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
             known.setdefault(mk, set()).add(pr)
-    all_excl = frozenset().union(*(extract.market_tag_exclusions(m) for m in kb.markets)) \
-        if kb.markets else frozenset()
+    # ⚠️ 여기서 필요한 건 **KB 객체**(`resolve_market`·`markets` 속성)지 위의 `kb` dict 가 아니다.
+    #   `bias.partition` 은 원본 JSON dict 를 받고, 개체연결 쪽은 파싱된 객체를 받는다 — 같은
+    #   이름으로 두 형태가 오가는 자리라 한쪽을 다른 쪽에 넘기면 AttributeError 로 죽는다.
+    kb_obj = linking.load_kb()
+    all_excl = frozenset().union(*(extract.market_tag_exclusions(m) for m in kb_obj.markets)) \
+        if kb_obj.markets else frozenset()
 
     for u in users:                                  # 실사용/홍보성 → 2층 색인
         rc = u.meta.get("review_class", "genuine")
@@ -233,7 +262,7 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
         # 유령 제품 차단 — 캡션의 **스펙 줄**(풀조합/향료)이 제품명으로 올라오는 걸 막는다.
         # 판매자 분기엔 원래 있던 게이트가 후기 분기엔 없어서 인스타 80행 중 46행이 오염됐다.
         # 규칙은 프롬프트가 아니라 코드로 강제한다(전언 차단·판매자 게이트와 같은 수법).
-        mkt = _market_from_caption(kb, u.text)
+        mkt = _market_from_caption(kb_obj, u.text)
         doc = extract.repair_product_names(
             doc, u.text,
             exclude=_tag_exclusions(mkt) if mkt else all_excl,
@@ -254,10 +283,13 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
 
     with connect() as conn:
         n_join = join_specs(conn)
-    counts = {"collected": len(raws), "seller_specs": n_spec,
+    counts = {"collected": n_collected, "seller_specs": n_spec,
               "seller_no_hashtag": n_skip_nohash, "seller_thin_spec": n_thin,
               "promo": n_promo, "genuine": n_genuine, "joined_now": n_join,
+              # `llm_calls_saved`(홍보 게이트 단락분)와 이름을 **가른다** — 합치면 어느 절감인지
+              # 사후에 못 나누고, 둘은 아끼는 대상도 다르다(판정 단락 vs 조각 자체를 안 봄).
               "gate_suspect": n_suspect, "llm_calls_saved": n_saved,
+              "skipped_seen": n_seen, "llm_calls_saved_by_dedup": saved_by_dedup,
               "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref}
     log.info("ingest_hashtag 완료: %s", counts)
     return counts
@@ -265,7 +297,7 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
 
 # ---------------------------------------------------------------- 1층 수집(마켓 본인 피드)
 def ingest_seller_profiles(markets: list[str] | None = None, *,
-                           only_missing: bool = False,
+                           only_missing: bool = False, skip_seen: bool = True,
                            limit_per_market: int = 12, dry_run: bool = True) -> dict:
     """마켓 **본인 계정 피드** → 1층 공식 스펙. ADR-0003 이 막힌 자리의 우회 경로다.
 
@@ -281,6 +313,14 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
 
     markets: 대상 market_word 목록. None 이면 **KB 의 핸들 있는 마켓 전부**.
     only_missing=True: 그중 `specs` 가 아직 하나도 없는 마켓만. 첫 훑기용 싼 경로다.
+    skip_seen=True(기본): 이미 스펙을 만든 적 있는 **게시물 URL**(`specs.source_permalink`)은
+      `extract_spec` 을 다시 부르지 않는다. 여기 컷의 근거는 중복이 아니라 **순수 비용**이다 —
+      `specs` 는 `UNIQUE(market, product)` upsert 라 중복 행 자체는 원래 안 생기지만, 액터가
+      매번 같은 최신 ~12글을 주므로 캡션 1건당 LLM 값이 런마다 그대로 나간다.
+      ⚠️ 대가: 판매자가 **캡션을 고쳐도 반영되지 않는다**(계획 R4). 고쳐야 할 때는
+        `skip_seen=False` 로 강제 재추출한다 — 그래서 컷이 상수가 아니라 옵션이다.
+      ⚠️ 스펙 행을 못 만든 게시물(해시태그 없음·제품성 탈락)은 URL 이 안 남아 매번 다시 본다.
+        `reviews` 쪽 컷과 같은 구조적 구멍이고, 하루 규모가 유계라 의도적으로 남긴다.
     ⚠️ `only_missing` 이 **기본값이었던 게 버그였다**(~2026-08-07). 이 함수의 존재 이유가
       '액터가 최신 ~12글만 주니 주기적으로 돌려 앞으로 쌓는 것'인데, 기본 대상이
       '스펙 0개인 마켓'이면 두 번째 실행부터 대상이 **빈 목록**이 된다 — 누적하라고 만든
@@ -307,7 +347,7 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
 
     cost = len(targets) / 1000 * InstagramProfileSource.COST_PER_1000
     out: dict = {"targets": [w for w, _h in targets], "handles": [h for _w, h in targets],
-                 "apify_cost_usd": round(cost, 4), "dry_run": dry_run}
+                 "apify_cost_usd": round(cost, 4), "dry_run": dry_run, "skip_seen": skip_seen}
     if dry_run or not targets:
         log.info("ingest_seller_profiles(dry): %d마켓 · 예상 Apify 비용 $%.4f", len(targets), cost)
         return out
@@ -315,22 +355,35 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
     src = InstagramProfileSource(token=settings.apify_token)
     raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
     llm = LLM()
-    n_spec = n_skip = n_nomarket = n_thin = 0
+    n_spec = n_skip = n_nomarket = n_thin = n_seen = 0
     with connect() as conn:
+        # 기보유 컷의 판정 기준은 `specs`(제품)가 아니라 **이미 스펙을 만든 게시물 URL** 이다 —
+        # 같은 게시물이 다시 와도 새 제품이 나올 리 없고, 제품 기준으로 보면 한 글의 여러 제품 중
+        # 하나만 남은 경우를 '봤다'로 오판한다.
+        seen_urls = {r[0] for r in conn.execute(
+            "SELECT DISTINCT source_permalink FROM specs WHERE source_permalink IS NOT NULL"
+        ).fetchall()} if skip_seen else set()
         with conn.cursor() as cur:
             for sp in raws:
                 market = by_handle.get((sp.meta or {}).get("owner_username"))
                 if not market:                      # 액터가 리다이렉트된 계정을 줄 수 있다
                     n_nomarket += 1
                     continue
+                if sp.url in seen_urls:             # 유료 `extract_spec` 앞에서 자른다
+                    n_seen += 1
+                    continue
                 n, skipped, thin = _specs_from_seller_post(cur, market, sp.text, sp.url, llm)
                 n_spec += n
                 n_skip += int(skipped)
                 n_thin += thin
         conn.commit()
+    if n_seen:
+        log.info("기보유 판매자 게시물 %d건 스킵 → extract_spec 호출 %d회 절감", n_seen, n_seen)
     out.update({"collected_posts": len(raws), "specs_upserted": n_spec,
                 "skipped_no_hashtag": n_skip, "skipped_unknown_handle": n_nomarket,
                 "skipped_thin_spec": n_thin,
+                # 게시물 1건 = `extract_spec` 1콜이라 스킵 수가 곧 절감 호출 수다.
+                "skipped_seen": n_seen, "llm_calls_saved_by_dedup": n_seen,
                 "llm": {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}})
     log.info("ingest_seller_profiles 완료: %s", out)
     return out
@@ -361,8 +414,39 @@ def dc_post_id(raw) -> str | None:
     return f"{raw.url}:{cno}" if cno else None
 
 
+def _max_thread_no(conn, anchors: list[str] | None = None) -> int | None:
+    """이 **수집 앵커**로 이미 색인한 아모스갤 글번호의 최댓값. 없으면 None(= 전량 수집).
+
+    ⚠️ `source='amos'` **전체** 최댓값이 아니다. 수집은 제품 앵커 키워드 검색이라
+      (ADR-0007 ACTIVE scope=product), 전체 최댓값을 쓰면 **처음 수집하는 제품**의 워터마크가
+      남의 제품이 올려놓은 최신 글번호가 된다 — 그 제품의 과거 글 전부가 상세 요청도 없이
+      잘리고, 목록이 최신순이라 첫 페이지에서 페이징까지 끝난다. 카운트에는 '새 글 없음'과
+      구분되지 않는 0 만 남으므로 **조용한 유실**이다(이 저장소가 금지하는 실패 모드).
+    앵커에 해당하는 행이 없으면 None 을 돌려 전량 수집으로 떨어진다 — 페일오픈이다.
+    앵커 표면형이 KB 정규명과 어긋나도 같은 방향으로 실패한다(워터마크가 낮아져 HTTP 만 더 쓴다).
+    """
+    sql = ("SELECT max((source_ref->>'thread_no')::bigint) FROM reviews "
+           "WHERE source='amos' AND source_ref->>'thread_no' ~ '^[0-9]+$'")
+    params: list = []
+    if anchors:
+        sql += " AND product = ANY(%s)"
+        params.append(list(anchors))
+    row = conn.execute(sql, params or None).fetchone()
+    return int(row[0]) if row and row[0] is not None else None
+
+
+# 워터마크 안전 마진 — 실제 컷은 `max(thread_no) - WATERMARK_MARGIN` 이다(계획 R5).
+# 수집이 **키워드 검색** 기반이라 목록 순서와 글번호 순서가 정확히 같지 않다: 이번 런에
+# 안 걸린 옛 글이 다음 런의 다른 키워드로 뒤늦게 매칭될 수 있다. 워터마크를 정확히 최댓값에
+# 두면 그런 글이 영영 안 들어온다. 마진 안쪽은 Phase 1 의 조각 단위 컷이 잡으므로
+# **HTTP 만 조금 더 쓰고 LLM 은 안 쓴다** — 그게 이 마진의 값이다.
+# 200 은 아모스갤 신규 스레드 ~18.9건/일(실측) 기준 약 열흘치다.
+WATERMARK_MARGIN = 200
+
+
 def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | None = None,
-                    limit: int = 30, comment_pages: int = 1, dry_run: bool = False) -> dict:
+                    limit: int = 30, comment_pages: int = 1, dry_run: bool = False, *,
+                    incremental: bool = True, revisit_threads: list[int] | None = None) -> dict:
     """
     디시 실수집 → 관련성 게이트 → **스레드 배치 추출** → 색인 (계획 C-4).
 
@@ -370,27 +454,91 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     `ingest_hashtag` 로 이어져 있었다. 지금 연결하는 이유는 지금이 **추출 단위를 정하기 가장 싼
     시점**이기 때문이다. 나중에 per-comment 로 굳은 뒤 뜯는 것보다 배치 단위로 처음부터 잇는 게 싸다.
 
-    dry_run=True 면 LLM·DB 를 건드리지 않고 수집·게이트까지만 돌려 카운트를 돌려준다(키 없이 점검용).
+    dry_run=True 면 **LLM 을 부르지 않고** 수집·게이트·기보유 컷까지 돌려 카운트를 돌려준다
+      (OpenAI 키 없이 점검용). ⚠️ 컷 판정에 `reviews` 조회가 한 번 들어가므로 **DB 는 필요하다** —
+      예전엔 컷 앞에서 반환했지만, 그러면 유료 실행을 풀지 말지 정하는 데 필요한 숫자
+      (`skipped_seen`·`llm_calls_saved_by_dedup`)를 dry_run 이 보여주지 못한다.
     반환: 카운트 요약.
+
+    incremental=True(기본): **이 앵커로** 이미 색인한 글번호 최댓값에서 `WATERMARK_MARGIN` 을
+      뺀 값을 워터마크로 삼아, 그보다 옛 글은 **상세 요청 자체를 보내지 않는다**(Phase 2 ·
+      HTTP 절감). 앵커에 색인 이력이 없으면(= 처음 수집하는 제품) 워터마크가 없어 전량
+      수집으로 떨어진다 — 그 판단을 `counts["watermark_anchors"]` 와 로그로 드러낸다.
+    revisit_threads: 워터마크 아래라도 다시 볼 글번호(선택). **새 댓글은 옛 글에 달리므로
+      워터마크로는 안 잡힌다** — 자동 선정은 하지 않고 호출부가 명시한다. 검색 목록에 없어도
+      닿도록 수집기가 이 글번호들을 **직접 조회**한다.
     """
     from . import extract
-    from .sources import DCInsideSource, collect_all, expand_queries
+    from .sources import DCInsideSource, expand_queries
 
     src = DCInsideSource(gallery_id="amos", comment_pages=comment_pages)
     queries = expand_queries(slime, aliases=aliases or [], market_word=market)
     target = {"market": market, "slime": slime}
-    raws = collect_all([src], keywords=queries, per_source_limit=limit, target=target)
+    # 워터마크는 **앵커별**이다 — 전체 최댓값을 쓰면 처음 보는 제품의 과거 글이 통째로 잘린다.
+    anchors = [slime, *(aliases or [])]
+    watermark = None
+    if incremental:
+        with connect() as conn:
+            top = _max_thread_no(conn, anchors)
+        watermark = None if top is None else top - WATERMARK_MARGIN
+        if watermark is None:
+            log.info("워터마크 없음(앵커 %s 의 색인 이력 없음) → 전량 수집", anchors)
+    # `collect_all` 을 쓰지 않는다 — 소스별 인자를 넘길 자리가 없고, 단일 소스 경로에서 수집
+    # 예외를 삼키면 '조용히 0건'이 된다(그건 오류가 아니라 결과처럼 보인다).
+    raws = list(src.collect(queries, limit=limit, target=target,
+                            min_thread_no=watermark, revisit_threads=revisit_threads))
     n_post = sum(1 for r in raws if r.meta.get("type") == "post")
     counts = {"collected": len(raws), "posts": n_post, "comments": len(raws) - n_post,
-              "queries": queries}
-    if dry_run or not raws:
+              "queries": queries, "min_thread_no": watermark,
+              # 워터마크가 무엇을 기준으로 잡혔는지 — '새 글 없음'과 '옛 글을 안 봤음'을 가른다.
+              "watermark_anchors": anchors,
+              # 예산 초과로 **처리 안 된** 후보 수. 기보유 컷은 수집 뒤에 도는지라 게이트 예산은
+              # 이미 본 조각에도 쓰인다 — 이 값이 0 보다 크면 limit 을 올릴 신호다(침묵 절단 금지).
+              "gate_unprocessed": getattr(src.last_gate, "unprocessed", 0)}
+    # 추출 전 기보유 컷 — 디시는 **배치 추출**이라 컷이 `extract_collected` 앞에 있어야 한다.
+    # 뒤에 두면 이미 LLM 값을 치른 뒤다. 이 경로엔 추출보다 먼저 도는 LLM 이 없다(관련성
+    # 게이트가 임베딩 기반이고 `classify_fn` 은 기본 None) — 그래서 여기가 첫 유료 단계다.
+    seen: set[str] = set()
+    if raws:                                   # 수집 0건이면 DB 도 건드리지 않는다
+        with connect() as conn:
+            seen = index.existing_post_ids(
+                conn, "amos", [pid for r in raws if (pid := dc_post_id(r))])
+    fresh = [r for r in raws if dc_post_id(r) not in seen]
+    n_seen = len(raws) - len(fresh)
+    # 기보유 **글**은 그 스레드에 새 조각이 남아 있으면 배치에 **문맥으로** 남긴다.
+    # 배치 추출의 존재 이유 절반이 형제 문맥이다(AC13: 제품명을 생략한 댓글의 귀속, 그리고
+    # `extract_collected` 의 market 상속은 글에서 온 값을 권위로 삼는다). 글을 빼 버리면
+    # 증분 런에서만 조용히 그 성질을 잃는다 — 배치는 어차피 돌아야 하므로 추가 호출은 없고,
+    # 늘어나는 건 그 호출의 입력 토큰뿐이다.
+    # ⚠️ 스레드 판정은 `extract.thread_key` **한 곳**에서 온다. 글의 meta 엔 스레드 번호가 없어서
+    #   (`_parse_post` 는 nick·조회·추천만 싣는다) `meta["thread_no"]` 로 맞추면 글 쪽이 늘 None 이
+    #   되고, 그 None 이 집합에 들어가면 **죽은 스레드의 글까지 전부 매칭**된다 — 문맥은 안 남고
+    #   버릴 글에 유료 호출만 나가는 양방향 오작동이다(2026-08-07 실측).
+    live_threads = {k for r in fresh if (k := extract.thread_key(r))}
+    context = [r for r in raws
+               if r.meta.get("type") == "post" and dc_post_id(r) in seen
+               and extract.thread_key(r) in live_threads]
+    batch_input = fresh + context
+    # 절감량은 '거른 조각 수'가 아니라 **사라진 배치 수**다 — 조각당 1콜이 아니기 때문.
+    saved_calls = extract.count_thread_batches(raws) - extract.count_thread_batches(batch_input)
+    counts["skipped_seen"] = n_seen
+    counts["llm_calls_saved_by_dedup"] = saved_calls
+    counts["context_posts"] = len(context)     # 추출엔 들어가되 색인은 안 되는 기보유 글
+    if n_seen:
+        log.info("기보유 조각 %d건 스킵(문맥 유지 %d건) → 추출 호출 %d회 절감",
+                 n_seen, len(context), saved_calls)
+
+    # 컷은 무료(DB 왕복 하나)라 **dry_run 도 그 뒤에서** 끝낸다 — 유료 실행을 풀기 전에
+    # 사용자가 보고 싶은 숫자가 바로 이 절감량이다. 컷 앞에서 반환하면 dry_run 이 그걸 못 보여준다.
+    if dry_run:
         counts["dry_run"] = True
         log.info("ingest_dcinside(dry) 완료: %s", counts)
         return counts
 
-    llm = LLM()
-    pairs = extract.extract_collected(raws, llm, settings.model_extract)
-    n_rows = n_ref = n_noref = n_no_cno = 0           # 관측성: 원문 링크 식별자 유/무 행수
+    # 신규 조각이 0건이면 LLM 을 **만들지도** 않는다 — 생성자가 API 키를 요구하고, 부를 일도 없다.
+    llm = LLM() if batch_input else None
+    pairs = extract.extract_collected(batch_input, llm, settings.model_extract) if batch_input else []
+    n_rows = n_ref = n_noref = n_no_cno = n_context_skip = 0   # 관측성 카운터
     with connect() as conn:
         for raw, doc in pairs:
             # post_id 는 조각별로 달라야 한다 — 스레드 배치라도 귀속은 조각 단위(AC12).
@@ -402,6 +550,12 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
                 # 순번으로 때우면 런마다 키가 흔들려 멱등성이 통째로 무효가 된다.
                 log.warning("댓글 id 없음 → 색인 스킵(스레드 %s)", raw.meta.get("thread_no"))
                 n_no_cno += 1
+                continue
+            if post_id in seen:
+                # 문맥용으로만 배치에 넣은 기보유 글 — 임베딩·INSERT 를 건너뛴다.
+                # 세어서 드러낸다: 아래 단언이 '문맥으로 넣은 수 = 색인 건너뛴 수'를 강제하지
+                # 않으면, 문맥 계산이 바뀔 때 이 continue 가 조용한 스킵으로 변한다.
+                n_context_skip += 1
                 continue
             # 링크용 식별자는 post_id 와 별개다 — 이건 표시용 주소 조립 규칙이고(ADR-0009)
             # post_id 는 색인 유일성 키다. 같은 재료로 만들지만 소비처가 다르다.
@@ -419,6 +573,15 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     counts["rows_with_source_ref"] = n_ref
     counts["rows_without_source_ref"] = n_noref
     counts["skipped_no_comment_no"] = n_no_cno
+    # 불변식: 문맥으로 넣은 글 수 == 색인에서 건너뛴 수. 양쪽을 **둘 다 내보내야** 등식이
+    # 사후에도 검증 가능하다 — 입력 쪽만 내보내면 그 `continue` 는 세지 않은 스킵이 된다.
+    # ⚠️ `assert` 가 아니다: 여기까지 왔다는 건 유료 추출과 커밋이 이미 끝났다는 뜻이라,
+    #   예외로 죽으면 그 런의 비용 원장(`counts["llm"]`)까지 같이 사라진다. 게다가 `python -O`
+    #   에선 단언 자체가 없어져 검사가 조용히 증발한다. 로그로 크게 남기고 카운트를 반환한다.
+    counts["context_skipped"] = n_context_skip
+    if n_context_skip != len(context):
+        log.error("문맥 글 불변식 위반: 배치 투입 %d건 vs 색인 스킵 %d건 — 문맥 판정과 "
+                  "색인 스킵 조건이 어긋났다(스레드 키 규칙 확인).", len(context), n_context_skip)
     counts["llm"] = {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}
     log.info("ingest_dcinside 완료: %s", counts)
     return counts
@@ -964,6 +1127,100 @@ def order_view_for(market: str, *, with_summary: bool = True) -> dict:
         sectionize = lambda prompt, schema: LLM().complete(
             prompt, model=settings.model_judge, schema=schema, label="consolidated.order")
     return cv.build_order_view(market, records, llm_sectionize=sectionize)
+
+
+# ---------------------------------------------------------------- 변경분 요약 갱신
+# ADR-0015(축 분리) 이전에 저장된 payload 는 여섯 기준이 전부 제품 행에 들어 있다 — 형태가
+# 다르므로 근거가 안 늘었어도 재생성 대상이다. tz-aware 로 둔다: `generated_at` 이 aware 라
+# naive 상수와 비교하면 TypeError 가 난다(라이브 확인 2026-08-07 — `Etc/UTC` aware 로 온다).
+ADR_0015_CUTOFF = datetime(2026, 8, 7, tzinfo=timezone.utc)
+
+# 요약 1건당 실측 호출 수(제품 축 3소스 + 서포터 버킷) × gpt-5.4 호출당 평균 비용.
+# 어림값이라 `est_cost_usd` 는 **결정 재료**지 청구서가 아니다 — 사용자가 보고 dry_run 을 푼다.
+_CALLS_PER_SUMMARY = 3.3
+_USD_PER_CALL = 0.0072
+
+
+def _generated_at(row: dict) -> datetime | None:
+    """저장 요약의 생성 시각 → tz-aware datetime. 못 읽으면 None.
+
+    `_fetch_summary` 가 ISO 문자열로 돌려주므로 여기서 파싱한다. naive 로 들어오면 UTC 로
+    간주해 aware 로 올린다 — 커토프가 aware 라 섞으면 비교 자체가 TypeError 다.
+    """
+    raw = row.get("generated_at")
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _is_stale(row: dict | None, current: int, min_delta: int) -> bool:
+    """이 요약을 다시 만들어야 하는가. **무료 판정** — LLM 을 부르지 않는다.
+
+    네 가지만 본다: 미생성 / 근거가 `min_delta` 이상 늘었다 / 다른 모델로 만들었다 /
+    ADR-0015 이전 payload 형태다. 생성 시각을 못 읽으면 **오래된 것으로 본다** — 모르는 걸
+    최신으로 치면 옛 형태 payload 가 영영 안 갱신된다.
+    """
+    if row is None:
+        return True                                        # 미생성
+    if current - (row.get("n_reviews") or 0) >= min_delta:
+        return True                                        # 근거가 늘었다
+    if row.get("model") != settings.model_judge:
+        return True                                        # 모델 교체
+    gen = _generated_at(row)
+    return gen is None or gen < ADR_0015_CUTOFF            # 구 payload 형태
+
+
+def refresh_stale_summaries(*, min_delta: int = 3, min_evidence: int = 3,
+                            dry_run: bool = True) -> dict:
+    """근거가 늘어난 요약만 재생성한다. **판정은 무료, 생성만 유료.**
+
+    ⚠️ `dry_run=False` 는 유료다 — 대상 수 × 약 3.3 콜. 기본값이 `True` 인 이유이고,
+      `est_cost_usd` 를 함께 돌려주는 이유다(계획 R7: 사용자가 보고 결정한다).
+
+    **왜 개수가 유효한 워터마크인가:** 색인이 `ON CONFLICT DO NOTHING` 이라 행은 늘기만 한다.
+    줄어들 길은 수동 삭제뿐이다.
+
+    **왜 SQL 로 세지 않는가:** 두 축의 '개수' 정의가 다르다. `n_reviews` 는 행 수지만
+    `n_orders` 는 팬아웃을 접은 **조각 수**다(`_fold_orders`). 주문 축을 `count(*)` 로 세면
+    "배송 후기 27건"처럼 부풀려진다. `with_summary=False` 는 `llm_sectionize=None` 으로 떨어져
+    LLM 을 한 번도 안 부르면서 화면과 **같은 계산**을 한다 — 그래서 재구현하지 않는다.
+
+    **왜 `specs` 기준으로 열거하는가:** 후기 쪽 `(market, product)` 조합 중 83개가 스펙에 없다
+    (실측). 그 안엔 유령(풀조합·향료), 별칭, 개인 태그가 섞여 있고 지금은 가릴 방법이 없다.
+    스펙 없는 제품에 요약을 만들지 않는 것이 **유령에 유료 요약을 쓰지 않는 자동 필터**다.
+    대가로 판매자가 실제로 파는데 1층이 아직 못 모은 제품도 요약이 없다 — 해결은 '판매자 제품
+    목록 먼저' 과제와 같은 자리이고 여기서는 의도적으로 미해결이다.
+    """
+    stale: list[dict] = []
+    for market in list_markets():
+        for p in list_products(market):
+            product = p["product"]
+            now = consolidated_for(market, product, with_summary=False).get("n_reviews") or 0
+            if now < min_evidence:
+                continue                                   # 근거 빈약 → 요약을 만들지 않는다
+            if _is_stale(stored_summaries(market, product), now, min_delta):
+                stale.append({"market": market, "product": product, "n": now, "axis": "product"})
+        now_o = order_view_for(market, with_summary=False).get("n_orders") or 0
+        if now_o >= min_evidence and _is_stale(stored_market_summaries(market), now_o, min_delta):
+            stale.append({"market": market, "product": None, "n": now_o, "axis": "order"})
+
+    if dry_run:
+        out = {"stale": stale, "count": len(stale), "dry_run": True,
+               "est_cost_usd": round(len(stale) * _CALLS_PER_SUMMARY * _USD_PER_CALL, 4)}
+        log.info("refresh_stale_summaries(dry): %d건 · 예상 $%.4f", out["count"], out["est_cost_usd"])
+        return out
+
+    for s in stale:
+        if s["product"]:
+            generate_summaries(s["market"], s["product"])
+        else:
+            generate_market_summaries(s["market"])
+    log.info("refresh_stale_summaries: %d건 재생성", len(stale))
+    return {"regenerated": len(stale), "stale": stale, "dry_run": False}
 
 
 # ---------------------------------------------------------------- 데모 실행

@@ -628,6 +628,49 @@ def extract_thread(title: str | None, texts: list[str], llm: LLM,
     return docs
 
 
+def thread_key(raw) -> str:
+    """이 조각이 속한 스레드의 글번호. 못 읽으면 `''`(고아 그룹).
+
+    **글과 댓글의 규칙이 다르다** — 댓글은 `meta["parent_no"]` 를 갖지만 **글의 meta 엔
+    스레드 번호가 없다**(`_parse_post` 가 싣는 건 nick·ip·조회·댓글수·추천뿐). 그래서 글은
+    URL 의 `no=` 에서 파싱한다. `source_links.build_source_ref` 도 같은 이유로 같은 규칙을 쓴다.
+
+    ⚠️ 이 함수가 그 규칙의 **단일 출처**다. 호출부가 `meta["thread_no"]` 하나로 통일하고 싶다는
+      유혹에 빠지지 말 것 — 그 키는 댓글에만 있어서, 글에 대해선 조용히 `None` 이 되고
+      `None in {..., None}` 같은 와일드카드 매칭까지 만들어 낸다(2026-08-07 실제 결함).
+    """
+    if raw.meta.get("type") == "comment":
+        return raw.meta.get("parent_no") or ""
+    m = _NO_RE.search(raw.url or "")
+    return m.group(1) if m else ""
+
+
+def group_threads(raws: list) -> dict[str, dict]:
+    """수집 조각들을 스레드 단위로 묶는다(`thread_key` 기준). 매칭 실패분은 `''` 고아 그룹.
+
+    `extract_collected`(실제 추출)와 `count_thread_batches`(비용 추정), 그리고 파이프라인의
+    문맥 판정이 **이 한 벌을 공유한다** — 그룹핑이 두 곳에 있으면 절감량 보고가 실제 호출 수와
+    조용히 어긋난다.
+    """
+    threads: dict[str, dict] = {}
+    for p in (r for r in raws if r.meta.get("type") == "post"):
+        threads.setdefault(thread_key(p), {"post": None, "comments": []})["post"] = p
+    for c in (r for r in raws if r.meta.get("type") == "comment"):
+        threads.setdefault(thread_key(c), {"post": None, "comments": []})["comments"].append(c)
+    return threads
+
+
+def count_thread_batches(raws: list, batch_size: int = MAX_THREAD_SOURCES) -> int:
+    """이 조각 목록을 추출하면 LLM 을 **몇 번** 부르는지. 순수 함수(무LLM·무네트워크).
+
+    디시 경로는 조각당 1콜이 아니라 **스레드 배치당 1콜**이라, 기보유 컷의 절감량을
+    '거른 조각 수'로 보고하면 실제보다 부풀려진다. 컷 전후로 이 값을 재서 차이를 보고한다.
+    """
+    return sum(
+        -(-len(([t["post"]] if t["post"] else []) + t["comments"]) // batch_size)   # ceil
+        for t in group_threads(raws).values())
+
+
 def extract_collected(raws: list, llm: LLM, model: str | None = None,
                       batch_size: int = MAX_THREAD_SOURCES) -> list[tuple]:
     """
@@ -646,20 +689,7 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
 
     반환: [(raw, doc), ...] — index.index_post 입력으로 그대로 사용(호출부 무변경).
     """
-    posts = [r for r in raws if r.meta.get("type") == "post"]
-    comments = [r for r in raws if r.meta.get("type") == "comment"]
-
-    def _no(raw) -> str:
-        m = _NO_RE.search(raw.url or "")
-        return m.group(1) if m else ""
-
-    # 스레드 그룹핑 — 댓글은 parent_no, 글은 자기 no. 매칭 실패분은 ''(고아) 그룹으로 모인다.
-    threads: dict[str, dict] = {}
-    for p in posts:
-        threads.setdefault(_no(p), {"post": None, "comments": []})["post"] = p
-    for c in comments:
-        threads.setdefault(c.meta.get("parent_no") or "", {"post": None, "comments": []})\
-            ["comments"].append(c)
+    threads = group_threads(raws)
 
     out: list[tuple] = []
     for _, thread in threads.items():

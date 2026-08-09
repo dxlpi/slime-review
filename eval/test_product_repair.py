@@ -142,6 +142,25 @@ def test_hold_items_are_not_folded_together():
     print("✓ 보류분은 접지 않음 OK")
 
 
+def test_excluded_tag_is_not_protected_as_a_distinct_product():
+    """보존 가드가 **마켓·광역 태그까지** 지키면 안 된다.
+
+    실측 회귀(2026-08-09 라이브 색인): 캡션 `#슬라임지나 #빠코볼` 에서 같은 글의 다른 행이
+    `빠코볼` 을 이미 claim 하자, `슬라임지나` 가 `keep_distinct` 로 살아남아 **마켓 이름이
+    제품 행**이 됐다(`꼼픽` 도 같은 경로로 새 행이 생겼다).
+    ⚠️ 그러면서도 **진짜 2번째 제품은 계속 지켜야 한다** — 이 가드가 원래 막던 사고
+      (`빠코폼` 이 `빠코볼` 로 흡수·삭제되는 것)는 그대로 막혀 있어야 한다. 양방향이다.
+    """
+    for noise in ("슬라임지나", "지나", "슬라임리뷰"):
+        got, why = _resolve(noise, "#슬라임지나  #빠코볼", taken=["빠코볼"])
+        assert (got, why) == (None, "hold_excluded_name"), f"{noise} → {got} ({why})"
+
+    kept, why = _resolve("빠코폼", CAP_TWO_PRODUCTS, taken=["빠코볼"])
+    assert (kept, why) == ("빠코폼", "keep_distinct"), \
+        f"진짜 2번째 제품이 제외 규칙에 휩쓸렸다: {kept} ({why})"
+    print("✓ 보존 가드: 마켓·광역 태그는 보류 · 진짜 2번째 제품은 유지 OK")
+
+
 # ---------------------------------------------------------------- ③′ 레지스트리 폴백
 # 1층(`specs`)은 캡션이 두꺼운 제품만 담는다(제품성 게이트: 네 칸 전부 null 이면 드롭).
 # 제품 후보 레지스트리는 판매자 피드 전량의 해시태그라 훨씬 넓다(실측 408행 대 약 2,200후보).

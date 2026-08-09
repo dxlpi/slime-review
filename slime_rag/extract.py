@@ -616,6 +616,16 @@ def resolve_product_name(name: str | None, text: str, *, exclude=None,
     claimed = {_norm_tag(t) for t in (taken or ())}
     free = [t for t in tags if _norm_tag(t) not in claimed]
     if not free:
+        # ⚠️ 먼저: 그 이름이 **애초에 제외 대상**(마켓 상호·핸들·별칭·광역어)이면 '다른 제품'이
+        #   아니라 그냥 노이즈다. 아래 보존 규칙은 1층에 아직 없는 **진짜 제품**을 지키려고
+        #   있는 건데, 이 검사가 없으면 마켓 태그까지 같이 지켜 준다.
+        #   실측(2026-08-09): 캡션 `#슬라임지나 #빠코볼` 에서 같은 글의 다른 행이 `빠코볼` 을
+        #   이미 claim 하자 `슬라임지나` 가 `keep_distinct` 로 살아남아 **마켓 이름이 제품 행**이
+        #   됐다(`꼼픽` 도 같은 경로). ①이 이미 걸렀다고 믿을 수 없는 이유는, ①은 '캡션
+        #   해시태그인가'만 보는데 제외된 태그는 애초에 그 목록에 없기 때문이다.
+        ex = {_norm_tag(e) for e in (exclude or ())} | {_norm_tag(g) for g in GENERIC_TAGS}
+        if clean and _norm_tag(clean) in ex:
+            return None, "hold_excluded_name"
         # 같은 글이 후보 제품을 **이미 갖고 있다** → 이 이름은 그 제품이 아니다.
         # ⚠️ 그렇다고 '제품이 아니다'는 아니다 — 여기서 None 으로 비우면 **진짜 제품이 사라진다.**
         #   실측: `DLOb2euzM60` 의 `빠코폼` 은 캡션 본문이 `예전부터 빠코폼 파였는데 … 빠코볼도

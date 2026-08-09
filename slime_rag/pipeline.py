@@ -1425,6 +1425,149 @@ def repair_product_attribution(*, dry_run: bool = True) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- 후처리(무과금)
+def backfill_review_markets(*, dry_run: bool = True) -> dict:
+    """`market` 이 비어 있는 후기 행에 마켓을 채운다(**LLM 0회**). 반환: 카운트.
+
+    왜 필요한가: 제품 귀속은 해시태그 게이트라 결정적인데(실측 96%), 마켓 귀속은 개체연결이
+    자신 없으면 보류해서 **46%가 빈다**. 보류 자체는 옳다(디시 이용자는 마켓을 안 쓴다) —
+    문제는 그 결과가 조용히 1층을 끊는다는 것이다:
+
+        join_specs:  WHERE r.market = s.market AND r.product = s.product
+
+    NULL 은 이 조건을 절대 만족하지 못한다 → `spec_id` 가 안 붙고 → 스펙 카드가 빈다.
+    그리고 `spec_id` 로 마켓을 되찾을 수도 없다(실측 0건) — 조인이 마켓을 요구하니까 순환이다.
+
+    채우는 근거 둘, **둘 다 결정적**이다:
+      ① `specs` 에 그 제품명이 **정확히 한 마켓**에만 있으면 마켓은 정해진다(추론이 아니다).
+      ② 원문 캡션에 그 마켓의 표면형이 있으면 그 마켓이다(`_market_from_caption`).
+    ①이 우선이다 — 1층은 판매자 본인 글에서 왔고 캡션 언급보다 강한 증거다.
+    두 근거가 **엇갈리면 채우지 않는다**(`conflicts` 로 드러낸다). 보류가 오귀속보다 낫다.
+
+    ⚠️ `render_review` 가 마켓을 검색 텍스트에 **굽는다**. 그래서 `market` 만 바꾸면
+      `evidence`·`tokens`·`embedding` 이 옛 값('[None 빠코볼] …')을 가리킨 채 남는다 —
+      `repair_product_attribution` 이 제품명에 대해 겪은 것과 같은 함정이라 셋을 함께 다시 만든다.
+      재임베딩은 로컬 BGE-M3 라 무과금이다.
+    """
+    kb = linking.load_kb()
+    with connect() as conn:
+        by_product: dict[str, set] = {}
+        for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
+            by_product.setdefault(pr, set()).add(mk)
+        rows = conn.execute(
+            "SELECT id, product, body, attributes FROM reviews "
+            "WHERE market IS NULL AND product IS NOT NULL ORDER BY id").fetchall()
+
+    plan, conflicts, n_nospec, n_nocaption = [], 0, 0, 0
+    for rid, product, body, attrs in rows:
+        from_spec = by_product.get(product)
+        spec_mk = next(iter(from_spec)) if from_spec and len(from_spec) == 1 else None
+        cap_mk = _market_from_caption(kb, body) if body else None
+        if spec_mk and cap_mk and spec_mk != cap_mk:
+            conflicts += 1                       # 엇갈리면 채우지 않는다(무음 추측 금지)
+            continue
+        target = spec_mk or cap_mk
+        if not target:
+            n_nospec += int(not from_spec)
+            n_nocaption += int(cap_mk is None)
+            continue
+        plan.append({"id": rid, "market": target, "product": product,
+                     "why": "spec_unique" if spec_mk else "caption",
+                     "attributes": attrs})
+
+    out = {"dry_run": dry_run, "scanned": len(rows), "fillable": len(plan),
+           "conflicts": conflicts, "no_spec_match": n_nospec,
+           "by_reason": {w: sum(1 for p in plan if p["why"] == w)
+                         for w in ("spec_unique", "caption")}}
+    if dry_run or not plan:
+        log.info("backfill_review_markets(dry): %s", out)
+        return out
+
+    changed = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for p in plan:
+                text = index.render_review(p["market"], p["product"], p["attributes"] or {})
+                vec = index.embed([text])[0]     # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET market=%s, evidence=%s, tokens=%s, embedding=%s "
+                    "WHERE id=%s",
+                    (p["market"], text, index._tokenize(text), vec, p["id"]))
+                changed += 1
+        conn.commit()
+        out["joined_now"] = join_specs(conn)      # 마켓이 찼으니 1층 조인을 다시 시도한다
+    out["updated"] = changed
+    log.info("backfill_review_markets: %s", out)
+    return out
+
+
+# 주제 판정 어휘 — **통제어휘를 재사용한다.** 여기서 새 목록을 손으로 만들면 도메인 어휘가
+# 두 벌이 되고, 한쪽만 늘어난 채 조용히 갈린다(`CRITERIA` 를 한 곳에 둔 것과 같은 이유).
+_TOPIC_TERMS = tuple({*extract_mod().TYPE_ENUM, *extract_mod().FEEL_VOCAB,
+                      "슬라임", "액괴", "촉감", "꾹꾹", "조물", "통꾹", "베이스", "글리터"})
+
+
+def purge_offtopic_reviews(*, dry_run: bool = True) -> dict:
+    """제품명이 일상어라 딸려 온 **주제 밖 게시물** 행을 지운다(LLM 0회). 반환: 카운트.
+
+    왜 생겼나: 해시태그 수집은 제품명으로 검색하는데(ADR-0007 scope=product) 제품명이
+    일상어면 무관한 게시물이 딸려 온다. 실측(2026-08-09): `#미트칠리핫도그` 92건 중 슬라임
+    글은 3건이고 나머지는 급식 메뉴·핫도그 가게였다. **관련성 게이트가 이걸 못 걸렀다** —
+    걸렀다면 여기까지 안 왔다. 그래서 색인 뒤 결정적으로 치우는 단계가 하나 더 필요하다.
+
+    판정은 **본문에 슬라임 도메인 어휘가 하나도 없으면 주제 밖**이다. 어휘는 통제어휘
+    (`TYPE_ENUM`·`FEEL_VOCAB`)를 그대로 쓴다.
+
+    ⚠️ 과잉 삭제가 이 함수의 진짜 위험이다 — 지워진 진짜 후기는 **화면에 흔적이 없다**
+      (유령 제품과 반대 방향의, 더 알아채기 어려운 실패). 그래서 셋을 지킨다:
+        · `dry_run=True` 가 기본이고 지울 목록을 통째로 돌려준다(사람이 보고 판정한다).
+        · 원문은 `data/raw/ig_hashtag/` 에 남아 있어 재처리로 **되돌릴 수 있다**(Apify $0).
+        · 판정 근거를 행마다 함께 돌려준다.
+      **Don't:** 짧다는 이유로 지우지 말 것 — '향 완내스'는 3어절짜리 진짜 후기다.
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, product, market, body FROM reviews "
+            "WHERE source='instagram' AND body IS NOT NULL ORDER BY id").fetchall()
+        known = {p for (p,) in conn.execute("SELECT DISTINCT product FROM specs").fetchall()}
+
+    # ⚠️ 어휘만으로 자르면 **해시태그만 있는 진짜 후기**가 같이 날아간다. 실측: `#슬지나
+    #   #빠코볼 #키위스쿱` 이 본문 전부인 행 2건 — 슬라임 단어가 하나도 없지만 명백히
+    #   슬라임 후기다. 그래서 구제 조건을 하나 더 둔다.
+    #   ⛔ 다만 **'1층에 있는 제품명'만으로 구제하면 안 된다**(초안이 그랬고 틀렸다):
+    #     `미트칠리핫도그` 는 지나가 실제로 파는 슬라임 이름이면서 동시에 급식 메뉴라,
+    #     그 조건만으로는 핫도그 글 12건이 통째로 살아남았다. 제품명이 일상어인 경우가
+    #     정확히 이 함수가 존재하는 이유이므로, 이름 하나로는 증거가 안 된다.
+    #   구제 조건은 **1층에 있는 제품명**이다 — 판매자가 실제로 파는 이름이라는 뜻이라,
+    #   '이 이름이 이 마켓의 제품인가'에 대한 가장 강한 증거다.
+    #   ⛔ **'1층 제품명 + 캡션에 마켓 표면형'으로 좁히지 말 것**(2026-08-09 실제로 시도했다
+    #     가 되돌렸다). 급식 글 11건은 잡히지만 **진짜 후기 4건이 같이 잡혔다**:
+    #     `@invaporslimephase #바질토마토블렌디드 [4.8/5]`(핸들만 있고 한글 마켓명이 없음) ·
+    #     `#바질토마토블렌디드 #토마토믹스향 #위티픽`(태그만) · `쿨라임 막마켓때 산 #빠코볼`.
+    #     `_market_from_caption` 이 IG 핸들과 일부 별칭을 못 잡아서인데, 그 구멍을 메우는
+    #     것보다 **덜 지우는 쪽**이 옳다 — 지워진 진짜 후기는 화면에 흔적이 없다.
+    #   그 대가로 제품명이 일상어이면서 1층에도 있는 경우(`미트칠리핫도그`)는 남는다.
+    #   그건 **사람이 판정할 목록**이지 규칙으로 자를 자리가 아니다.
+    victims = [{"id": r[0], "product": r[1], "market": r[2],
+                "body": (r[3] or "").replace("\n", " ")[:90]}
+               for r in rows
+               if not any(t in (r[3] or "") for t in _TOPIC_TERMS) and r[1] not in known]
+    out = {"dry_run": dry_run, "scanned": len(rows), "offtopic": len(victims),
+           "by_product": {}, "rows": victims}
+    for v in victims:
+        k = str(v["product"])
+        out["by_product"][k] = out["by_product"].get(k, 0) + 1
+    if dry_run or not victims:
+        log.info("purge_offtopic_reviews(dry): %d/%d행", len(victims), len(rows))
+        return out
+    with connect() as conn:
+        conn.execute("DELETE FROM reviews WHERE id = ANY(%s)", ([v["id"] for v in victims],))
+        conn.commit()
+    out["deleted"] = len(victims)
+    log.info("purge_offtopic_reviews: %d행 삭제", len(victims))
+    return out
+
+
 # ---------------------------------------------------------------- 셋업(전체)
 def setup(reset: bool = False) -> dict:
     """스키마→1층→2층→조인 일괄. UI/데모 진입점. 반환: 카운트 요약."""

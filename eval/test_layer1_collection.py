@@ -178,6 +178,7 @@ def _run_ingest(conn, raws, *, boom_at=None, **kw):
         conn.upserts += 1
         return 1, False, 0
 
+    kw.setdefault("dry_run", False)
     saved = (pipeline.connect, pipeline._raw_seller_posts,
              pipeline._specs_from_seller_post, pipeline.LLM)
     pipeline.connect = lambda: conn
@@ -186,7 +187,7 @@ def _run_ingest(conn, raws, *, boom_at=None, **kw):
     pipeline.LLM = lambda *_a, **_k: object()
     try:
         return _with_kb(_MARKETS, lambda: pipeline.ingest_seller_profiles(
-            from_raw=True, dry_run=False, **kw))
+            from_raw=True, **kw))
     finally:
         (pipeline.connect, pipeline._raw_seller_posts,
          pipeline._specs_from_seller_post, pipeline.LLM) = saved
@@ -246,6 +247,33 @@ def test_commit_cycle_counts_paid_posts_not_skipped_ones():
     print("✓ 주기 단위 = 유료 처리분(스킵 미계수) OK")
 
 
+def test_dry_run_predicts_the_exact_number_of_paid_calls():
+    """`dry_run` 의 예상 콜 수가 실제 유료 런의 콜 수와 **정확히 같다**.
+
+    ⚠️ 되돌리는 방식은 dry_run 이 디스크 건수만 세게 두는 것이다. 그러면 '예상 1,913건 →
+      실제 1,837콜'로 어긋나는데, **어긋나는 쪽이 예상치**라 값을 치르기 전에 확인하려고
+      만든 숫자가 정작 값을 예고하지 못한다. 컷은 `_seller_posts_to_process` 한 벌이다.
+    """
+    raws = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(9)]
+    raws.append(_Raw("https://ig/p/x", "남의계정"))     # KB 에 없는 핸들 → 마켓 미상
+    seen = [r.url for r in raws[:6]]
+
+    dry_conn = _CommitLogConn(seen=seen)
+    dry = _run_ingest(dry_conn, raws, dry_run=True)
+    live = _run_ingest(_CommitLogConn(seen=seen), raws, commit_every=3)
+
+    assert dry["paid_posts"] == live["paid_posts"] == 3, \
+        f"예상 {dry['paid_posts']} vs 실제 {live['paid_posts']} — 예상치가 값을 못 예고한다"
+    assert dry["available_posts"] == 10, "디스크 총량은 컷 이전 값 그대로 보고한다"
+    assert (dry["skipped_seen"], dry["skipped_unknown_handle"]) == (6, 1), \
+        f"컷 내역이 어긋난다: {dry}"
+    assert dry["est_llm_cost_usd"] == round(3 * pipeline._SPEC_CALL_USD, 2)
+    assert dry_conn.commits == [] and dry_conn.upserts == 0, \
+        f"dry_run 이 DB 를 썼다 — 읽기 전용이어야 한다: {dry_conn.commits}"
+    print(f"✓ dry 예상 {dry['paid_posts']}콜 == 실제 {live['paid_posts']}콜 · "
+          f"쓰기 0 · 예상 ${dry['est_llm_cost_usd']} OK")
+
+
 if __name__ == "__main__":
     test_upsert_never_overwrites_a_stored_value_with_null()
     test_upsert_keeps_stored_beads_when_new_extraction_has_none()
@@ -255,4 +283,5 @@ if __name__ == "__main__":
     test_long_run_commits_periodically_not_only_at_the_end()
     test_crash_midrun_keeps_what_was_already_paid_for()
     test_commit_cycle_counts_paid_posts_not_skipped_ones()
+    test_dry_run_predicts_the_exact_number_of_paid_calls()
     print("\n1층 수집 경로 오프라인 테스트 통과 ✅")

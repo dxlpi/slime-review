@@ -233,6 +233,15 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
   세면 기보유가 많은 증분 런에서 빈 커밋만 자주 나가고 유료 구간은 길게 열린 채 남는다.
   **Note:** 중단하면 반환 dict(카운터)는 사라지고 행만 남는다 — 그 런의 지출 정본은 반환값이
   아니라 `llm_ops.LEDGER` 다. 게이트: `eval/test_layer1_collection.py`.
+- **Important:** 그 경로의 유료 컷은 **`_seller_posts_to_process` 한 벌**이고, `dry_run` 과 실제
+  유료 런이 그걸 **공유한다**. 예전엔 `dry_run` 이 디스크 건수만 세서 '예상 1,913건 → 실제
+  1,837콜'로 어긋났다 — 어긋나는 쪽이 **예상치**라, 값을 치르기 전에 확인하려고 만든 숫자가
+  정작 값을 예고하지 못했다. `dry_run` 리포트의 키 이름(`paid_posts`·`skipped_seen`·
+  `skipped_unknown_handle`)이 유료 런과 같은 것도 같은 이유다(나란히 못 읽으면 대조가 안 된다).
+  **Note:** 그래서 `from_raw=True` 의 `dry_run` 은 **DB 를 읽는다**(기보유 URL 조회). 읽기
+  전용이고 커밋도 커서도 없다 — 게이트가 `dry_conn.commits == []` 로 잡는다.
+  **Note:** `_SPEC_CALL_USD` 는 실측 평균이라 **예상치 전용**이다. 캡션 길이로 흔들리므로
+  실제 지출을 이 상수로 역산하지 말 것 — 거기도 `llm_ops.LEDGER` 가 정본이다.
 - **Important:** 판매자 경로의 마켓 열거자는 **`_seller_targets` 하나**다. `ingest_seller_profiles`
   와 `collect_seller_feeds` 가 공유한다 — 복제하면 '수집은 14마켓인데 적재는 12마켓' 같은
   어긋남이 조용히 생기고 어느 쪽이 맞는지 사후에 못 가른다.

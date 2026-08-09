@@ -820,8 +820,8 @@ def load_product_registry() -> dict[str, list[str]]:
             for market, entry in (doc.get("markets") or {}).items()}
 
 
-def _raw_seller_posts(targets: list[tuple[str, str]], *, count_only: bool = False):
-    """디스크에 쌓인 판매자 피드 원문 → `RawReview` 목록(또는 건수만).
+def _raw_seller_posts(targets: list[tuple[str, str]]) -> list:
+    """디스크에 쌓인 판매자 피드 원문 → `RawReview` 목록.
 
     `collect_seller_feeds` 가 남긴 스냅샷을 **재과금 없이** 다시 읽는 통로다. 매핑은 수집
     경로와 같은 함수(`_post_to_seller_review`)를 써야 한다 — 여기서 dict 를 직접 풀면
@@ -830,17 +830,53 @@ def _raw_seller_posts(targets: list[tuple[str, str]], *, count_only: bool = Fals
     from .sources.apify import _post_to_seller_review
     from . import rawstore
 
-    n, out = 0, []
+    out = []
     for _market, handle in targets:
         for item in rawstore.latest_items("ig_profile_feed", handle):
             review = _post_to_seller_review(item, item.get("ownerUsername") or handle,
                                             platform="instagram")
             if review is None:                  # 빈/저품질 캡션 — 수집 경로와 같은 기준
                 continue
-            n += 1
-            if not count_only:
-                out.append(review)
-    return n if count_only else out
+            out.append(review)
+    return out
+
+
+# `extract_spec` 1콜의 평균 실비. 실측 두 건의 같은 값이다: 89콜 $0.1726(2026-08-07) ·
+# 1,837콜 예상 $3.56(2026-08-09). 캡션 길이에 따라 흔들리므로 **예상치 전용**이고,
+# 실제 지출은 언제나 `llm_ops.LEDGER` 가 정본이다.
+_SPEC_CALL_USD = 0.00194
+
+
+def _seen_spec_urls(conn) -> set[str]:
+    """이미 스펙을 만든 **게시물 URL** 집합.
+
+    판정 기준이 `specs`(제품)가 아니라 게시물 URL 인 이유: 같은 게시물이 다시 와도 새 제품이
+    나올 리 없고, 제품 기준으로 보면 한 글의 여러 제품 중 하나만 남은 경우를 '봤다'로 오판한다.
+    """
+    return {r[0] for r in conn.execute(
+        "SELECT DISTINCT source_permalink FROM specs WHERE source_permalink IS NOT NULL"
+    ).fetchall()}
+
+
+def _seller_posts_to_process(raws, by_handle: dict, seen_urls: set) -> tuple[list, int, int]:
+    """판매자 게시물 → `([(market, post)], 마켓 미상 수, 기보유 스킵 수)`.
+
+    **유료 컷의 단일 정의**다 — `dry_run` 의 예상치와 실제 유료 런이 이 한 벌을 공유한다.
+    ⚠️ 복제하지 말 것. 예전엔 `dry_run` 이 디스크 건수만 세고 컷을 안 걸어서 '예상 1,913건
+      → 실제 1,837콜'로 어긋났다. 어긋나는 쪽이 **예상치**라, 값을 치르기 전에 확인하려고
+      만든 숫자가 정작 값을 못 예고한다(2026-08-09).
+    """
+    todo, n_nomarket, n_seen = [], 0, 0
+    for sp in raws:
+        market = by_handle.get((sp.meta or {}).get("owner_username"))
+        if not market:                              # 액터가 리다이렉트된 계정을 줄 수 있다
+            n_nomarket += 1
+            continue
+        if sp.url in seen_urls:                     # 유료 `extract_spec` 앞에서 자른다
+            n_seen += 1
+            continue
+        todo.append((market, sp))
+    return todo, n_nomarket, n_seen
 
 
 def ingest_seller_profiles(markets: list[str] | None = None, *,
@@ -890,7 +926,12 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
         나갔는지는 반환값이 아니라 `llm_ops.LEDGER` 가 정본이다.
       ⚠️ 마켓 경계에서만 커밋하는 걸로 바꾸지 말 것 — 이 저장소의 실제 분포는 마켓당
         수백 건이라(늪지 298 · 연찌 229 · 머머 194) 경계 하나가 곧 $0.5 짜리 유실 창이다.
-    dry_run=True(기본): 네트워크·LLM·DB 미접촉. 대상과 예상비용만 돌려준다.
+    dry_run=True(기본): 네트워크·LLM 미접촉. 대상과 예상비용만 돌려준다.
+      `from_raw=True` 면 **DB 를 읽는다**(기보유 URL 조회 — 읽기 전용, 커밋 없음).
+      값을 치르기 전에 보는 숫자가 실제 콜 수와 같아야 하므로 유료 컷을 그대로 통과시킨다:
+      `paid_posts` 는 `available_posts`(디스크 총량)에서 마켓 미상·기보유를 뺀 값이다.
+      ⚠️ 예전엔 디스크 건수만 셌다 — '예상 1,913건 → 실제 1,837콜'. 어긋나는 쪽이
+        예상치라 값을 치르기 **전에** 알 수 없었다(2026-08-09).
     ⚠️ dry_run=False 는 **유료**다 — Apify 프로필 요금 + 캡션 1건당 `extract_spec` LLM 호출.
       (`from_raw=True` 면 Apify 몫은 빠지고 LLM 몫만 남는다.)
     """
@@ -909,8 +950,19 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
     if dry_run or not targets:
         log.info("ingest_seller_profiles(dry): %d마켓 · 예상 Apify 비용 $%.4f%s",
                  len(targets), cost, " (from_raw — Apify 미접촉)" if from_raw else "")
-        if from_raw:                            # 무엇을 재처리할지는 무과금으로 셀 수 있다
-            out["available_posts"] = _raw_seller_posts(targets, count_only=True)
+        if from_raw and targets:                # 무엇을 재처리할지는 무과금으로 셀 수 있다
+            raws = _raw_seller_posts(targets)
+            with connect() as conn:             # 읽기 전용 — 커밋도 커서도 없다
+                seen_urls = _seen_spec_urls(conn) if skip_seen else set()
+            todo, n_nomarket, n_seen = _seller_posts_to_process(raws, by_handle, seen_urls)
+            # 키 이름은 유료 런의 리포트와 **같다** — 예상과 실제를 나란히 읽으려면
+            # 같은 이름이어야 하고, 다르면 어느 쪽이 어느 쪽의 예고인지 사후에 못 가른다.
+            out.update({"available_posts": len(raws), "paid_posts": len(todo),
+                        "skipped_unknown_handle": n_nomarket, "skipped_seen": n_seen,
+                        "est_llm_cost_usd": round(len(todo) * _SPEC_CALL_USD, 2)})
+            log.info("원문 재처리(dry): 디스크 %d건 → 유료 %d콜(기보유 %d · 마켓 미상 %d) "
+                     "· 예상 LLM $%.2f", len(raws), len(todo), n_seen, n_nomarket,
+                     out["est_llm_cost_usd"])
         return out
 
     if from_raw:
@@ -920,31 +972,20 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
         src = InstagramProfileSource(token=settings.apify_token)
         raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
     llm = LLM()
-    n_spec = n_skip = n_nomarket = n_thin = n_seen = 0
+    n_spec = n_skip = n_thin = 0
     n_paid = n_committed = 0                    # 유료로 처리한 게시물 수 / 그중 커밋된 수
     with connect() as conn:
-        # 기보유 컷의 판정 기준은 `specs`(제품)가 아니라 **이미 스펙을 만든 게시물 URL** 이다 —
-        # 같은 게시물이 다시 와도 새 제품이 나올 리 없고, 제품 기준으로 보면 한 글의 여러 제품 중
-        # 하나만 남은 경우를 '봤다'로 오판한다.
-        seen_urls = {r[0] for r in conn.execute(
-            "SELECT DISTINCT source_permalink FROM specs WHERE source_permalink IS NOT NULL"
-        ).fetchall()} if skip_seen else set()
+        seen_urls = _seen_spec_urls(conn) if skip_seen else set()
+        todo, n_nomarket, n_seen = _seller_posts_to_process(raws, by_handle, seen_urls)
         with conn.cursor() as cur:
             try:
-                for sp in raws:
-                    market = by_handle.get((sp.meta or {}).get("owner_username"))
-                    if not market:                  # 액터가 리다이렉트된 계정을 줄 수 있다
-                        n_nomarket += 1
-                        continue
-                    if sp.url in seen_urls:         # 유료 `extract_spec` 앞에서 자른다
-                        n_seen += 1
-                        continue
+                for market, sp in todo:
                     n, skipped, thin = _specs_from_seller_post(cur, market, sp.text, sp.url, llm)
                     n_spec += n
                     n_skip += int(skipped)
                     n_thin += thin
                     n_paid += 1
-                    # 주기를 세는 단위는 `raws` 순회 위치가 아니라 **값이 나간 건수**다 —
+                    # 주기를 세는 단위는 `todo` 순회 위치가 아니라 **값이 나간 건수**다 —
                     # 스킵분까지 세면 기보유가 많은 증분 런에서 주기가 실제 유실 창과
                     # 무관해진다(빈 커밋만 자주 나가고 정작 유료 구간은 길게 열려 있다).
                     if commit_every and n_paid % commit_every == 0:

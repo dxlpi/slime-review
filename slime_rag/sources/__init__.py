@@ -16,7 +16,9 @@
 - `base`          — RawReview, Source, Throttle, robots_allowed, get, 노이즈/유해 필터
 - `dcinside`      — DCInsideSource (2층 백본: 본문+댓글)
 - `instagram`     — InstagramSource (1층 fixture / Graph API 스텁)
-- `apify`         — ApifyHashtagSource(2층 해시태그) · InstagramProfileSource(1층 판매자)
+- `apify`         — ApifyHashtagSource(2층 해시태그) · ApifyPostUrlSource(2층 URL 직접)
+                    · InstagramProfileSource(1층 판매자 최신 ~12)
+                    · ApifyProfileFeedSource(1층 판매자 피드 전량 · 원문 디스크 저장)
 - `orchestration` — expand_queries, collect_all
 """
 
@@ -29,7 +31,10 @@ from .base import (
 )
 from .dcinside import DCInsideSource
 from .instagram import InstagramSource
-from .apify import ApifyHashtagSource, InstagramProfileSource
+from .apify import (
+    ApifyHashtagSource, ApifyPostUrlSource,
+    ApifyProfileFeedSource, InstagramProfileSource,
+)
 from .orchestration import expand_queries, collect_all
 
 __all__ = [
@@ -37,6 +42,7 @@ __all__ = [
     "robots_allowed", "get",
     "is_low_quality", "has_toxic", "toxic_via_llm",
     "DCInsideSource", "InstagramSource",
-    "ApifyHashtagSource", "InstagramProfileSource",
+    "ApifyHashtagSource", "ApifyPostUrlSource",
+    "ApifyProfileFeedSource", "InstagramProfileSource",
     "expand_queries", "collect_all",
 ]

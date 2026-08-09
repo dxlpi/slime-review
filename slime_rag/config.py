@@ -60,11 +60,24 @@ class Settings:
     # ⚠️ 액터 자체의 상한(~30)과 다른 값이다. 이건 우리가 **요청하는** 창이다.
     apify_results_per_hashtag: int = int(os.getenv("APIFY_RESULTS_PER_HASHTAG", "10"))
 
+    # --- 마켓 피드 전량 수집 (Apify instagram-scraper, 1층 판매자) ---
+    # profile-scraper 는 최신 ~12개만 주고 resultsLimit 이 없다. 제품 목록을 만들려면
+    # 피드를 깊게 훑어야 해서 **다른 액터**를 쓴다(directUrls=프로필 URL + resultsLimit).
+    # ⚠️ 결과당 과금($2.70/1000, 무료 플랜)이라 이 값이 곧 상한 비용이다: 14마켓 × 200 ≈ $7.6.
+    apify_profile_feed_actor: str = os.getenv(
+        "APIFY_PROFILE_FEED_ACTOR", "apify/instagram-scraper")
+    apify_feed_results_per_market: int = int(os.getenv("APIFY_FEED_RESULTS_PER_MARKET", "200"))
+
     kb_demo_path: Path = DATA_DIR / "slime_market_kb_demo.json"
     # 1층 공식 스펙 fixture (business_discovery 가 App Review 요구 → 라이브 대신 큐레이션 스냅샷)
     layer1_fixture_path: Path = DATA_DIR / "layer1_fixture.json"
     # 2층 해시태그 큐레이션 목록 (Apify 스크래퍼 입력)
     ig_hashtags_path: Path = DATA_DIR / "ig_hashtags.json"
+    # 수집 원문 스냅샷 저장소 — **가공 전** 액터 응답 그대로(rawstore.py). git 미추적.
+    raw_dir: Path = DATA_DIR / "raw"
+    # 해시태그에서 유도한 마켓별 제품 후보 레지스트리(무과금 파생물). 이름·건수·날짜·URL 만
+    # 담고 캡션 본문은 담지 않아 커밋 가능하다(ADR-0013).
+    product_registry_path: Path = DATA_DIR / "product_registry.json"
 
 
 settings = Settings()

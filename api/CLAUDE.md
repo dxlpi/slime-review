@@ -16,6 +16,8 @@ SQL·표시 정책·집계는 전부 [`../slime_rag`](../slime_rag/CLAUDE.md) �
 | `GET /api/markets` · `/api/markets/{market}/products` | 검색 드롭다운 재료 |
 | `GET /api/logo/{handle}` | 마켓 로고 파일(ADR-0010) |
 | `GET /api/health` | 배포 헬스체크 |
+| `GET /api/admin/spec-queue` | 🔒 1층 스펙 검수 큐(빈 칸·임베드 URL) — `ADMIN_ENABLED=1` 일 때만 존재 |
+| `POST /api/admin/spec-override` | 🔒 검수 1건 저장(오버레이 파일 + `specs` 한 행) → 다음 항목 |
 
 ## Common patterns (workflow)
 ```bash
@@ -57,7 +59,17 @@ curl -s 'http://127.0.0.1:8000/api/page?product=빠코볼' | python -m json.tool
   깨지는 걸 막는 가드다.
 - **Note:** 로고는 파일 경로를 그대로 주지 않는다(서버 로컬 경로) — `/api/logo/{handle}` 로 서빙하고
   파일이 없으면 모노그램으로 degrade 한다(ADR-0010 의 '삭제=철회' 성질).
+- **Important:** 🔒 관리 라우트는 **배포에 없다**([ADR-0016](../docs/adr/0016-human-in-the-loop-spec-review.md)).
+  `ADMIN_ENABLED=1` 이 없으면 **라우트를 등록하지 않으므로 404** 다 — 핸들러 안에서 403 을
+  던지는 게 아니다. 403 이면 경로는 존재하고 스키마도 노출되지만, 등록을 안 하면 '없는 경로'라는
+  사실이 HTTP 로 참이 된다. 이유: ① 결과물(`data/spec_overrides.json`)이 git 추적 파일이라 배포
+  서버 임시 디스크에 쓰면 재배포 때 증발한다 ② 정적 프런트에 박은 토큰은 비밀이 아니다.
+  검수자 1명 · 대상 39행이라 인증을 만드는 것보다 배포에서 빼는 게 정직하다.
+  **Don't:** 게이트를 인증으로 바꾸면서 이 라우트를 배포에 넣지 말 것 — ①이 그대로 남는다.
 - **Warning:** CORS 는 지금 Vite 개발서버(`5173`)만 허용한다. 배포 시 실제 오리진으로 교체.
+  **`allow_methods` 는 게이트를 따라간다** — `ADMIN_ENABLED` 없으면 `["GET"]`, 있으면
+  `["GET","POST"]`. 공개 배포가 GET-only 라는 성질을 유지하려는 것이라 무조건 POST 를
+  열지 말 것.
 - **Don't:** 기준 줄에 배지·라벨을 붙이지 말 것(사용자 결정 2026-08-07). 건수(`인스타 27 · 아모스갤 6`)·
   정서 분포(`갈림 19:5`)·`인스타만` 을 만들어 띄워 봤고 전부 걷어냈다 — 다수/소수는 이미
   `verdict`/`minority` 두 칸이 **문장으로** 말해서 같은 말이 줄마다 두 번 붙었다

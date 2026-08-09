@@ -27,7 +27,7 @@ from functools import lru_cache
 
 from .config import settings, ROOT
 from .db import connect, apply_schema
-from . import layer1, index, linking, search, source_links
+from . import layer1, index, linking, search, source_links, spec_overrides
 from . import consolidated_view as cv
 from .llm_ops import LLM, summary
 
@@ -70,7 +70,25 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, official_textur
     ⚠️ 되돌리지 말 것. 값을 실제로 **고쳐야** 할 때(판매자가 향을 바꿨다 등)는 이 경로가 아니라
       무엇을 덮는지 명시하는 별도 갱신으로 한다 — `index_post` 의 `DO NOTHING` 과 같은 원칙이다.
     `beads` 는 배열이라 NULL 이 아니라 **빈 배열**이 '미언급'이므로 `cardinality` 로 가른다.
+
+    ⚠️ **사람 검수 오버레이가 들어오는 값을 마스킹한다**(ADR-0016). 이 마스킹을 지우면
+    재수집이 사람 검수를 **조용히 되돌린다**: 위 COALESCE 는 '들어오는 값이 non-null 이면
+    기존 값을 덮는다'라, 사람이 채운 제품이 다른 캡션에서 다시 잡히는 순간 LLM 값이 이긴다.
+    프로필 액터가 최신 ~12글만 주므로 같은 제품이 여러 글에 걸쳐 잡히는 건 **정상**이다 —
+    이론적 위험이 아니라 예정된 사고다(위 COALESCE 도입 사유와 같은 구조).
+    자리가 여기인 이유는 위 도크스트링이 이미 말한다: fixture 시드와 판매자 자동추출이
+    **공유하는 단일 경로**라, 새 수집 경로가 생겨도 규칙이 갈라지지 않는다.
+    **Don't:** 읽기 시점(`consolidated_for`·`list_products`·`/api/page`)에서 얹지 말 것 —
+    읽는 곳이 넷을 넘어서 하나만 빠뜨려도 화면과 요약 프롬프트가 서로 다른 스펙을 본다.
     """
+    row = spec_overrides.apply(
+        {"market": market, "product": product, "scent": scent, "base_combo": base_combo,
+         "slime_type": stype, "official_texture": official_texture,
+         "beads": list(beads or []), "source_permalink": source_permalink},
+        spec_overrides.cached())
+    scent, base_combo, stype = row["scent"], row["base_combo"], row["slime_type"]
+    official_texture, beads = row["official_texture"], row["beads"]
+    source_permalink = row["source_permalink"]
     cur.execute(
         """
         INSERT INTO specs (market, product, scent, base_combo, slime_type,
@@ -88,6 +106,30 @@ def _upsert_spec(cur, market, product, scent, base_combo, stype, official_textur
         (market, product, scent, base_combo, stype, official_texture,
          list(beads or []), source_permalink),
     )
+    _clear_overridden_blanks(cur, market, product)
+
+
+def _clear_overridden_blanks(cur, market: str, product: str) -> None:
+    """사람이 **일부러 비운** 칸을 실제로 비운다. 마스킹만으로는 안 되는 한 경우.
+
+    마스킹은 위 COALESCE 를 통과해야 하는데, 비움은 값이 NULL 이라 COALESCE 가 **기존 값을
+    지킨다** — 즉 '이 칸은 원래 없는 정보였다'는 사람의 판정만 반영이 안 된다.
+    검수 도구의 편집 권한에는 '틀린 값 고치기'가 들어 있고(추출기가 향료·재료어를 제품으로
+    잡은 사례가 실측돼 있다), 고침의 한 형태가 비움이다.
+
+    ⚠️ `unknown` 은 여기 안 걸린다 — 그건 값을 만들지도 지우지도 않고 큐에서만 뺀다.
+    걸리는 건 사람이 `value: null`(배열은 `[]`)을 **명시한** 칸뿐이다.
+    """
+    cell = spec_overrides.entry(spec_overrides.cached(), market, product)
+    blanks = [f for f, rec in cell.items()
+              if f in spec_overrides.OVERRIDABLE and isinstance(rec, dict)
+              and not rec.get("unknown") and "value" in rec
+              and spec_overrides.is_blank(f, rec["value"])]
+    if not blanks:
+        return                      # 정상 경로 — 추가 쿼리 없음
+    sets = ", ".join(f"{f}=" + ("'{}'" if f in spec_overrides.LIST_FIELDS else "NULL")
+                     for f in blanks)
+    cur.execute(f"UPDATE specs SET {sets} WHERE market=%s AND product=%s", (market, product))
 
 
 # 제품성 판정 필드 — **하나라도** 차면 제품으로 인정한다.
@@ -166,6 +208,160 @@ def join_specs(conn) -> int:
     )
     conn.commit()
     return cur.rowcount
+
+
+# ---------------------------------------------------------------- 1층 사람 검수(ADR-0016)
+_SPEC_COLS = ("market", "product", "scent", "base_combo", "slime_type",
+              "official_texture", "beads", "source_permalink")
+
+
+def _spec_rows(conn) -> list[dict]:
+    """`specs` 전 행 → dict 목록(DB 컬럼 이름 그대로). `spec_overrides` 가 먹는 모양."""
+    rows = conn.execute(
+        f"SELECT {', '.join(_SPEC_COLS)} FROM specs ORDER BY market, product").fetchall()
+    out = []
+    for r in rows:
+        row = dict(zip(_SPEC_COLS, r))
+        row["beads"] = list(row["beads"] or [])
+        out.append(row)
+    return out
+
+
+def apply_spec_overrides(conn=None) -> dict:
+    """오버레이 전량 → `specs` 재적용. 반환 `{"updated", "fields", "orphans"}`.
+
+    `setup()` 꼬리와 수동 복구가 쓰는 경로다. `specs` 는 파생 테이블이라
+    `setup(reset=True)` 한 번에 사람 검수가 통째로 날아가는데, 오버레이는 git 에 있으므로
+    리빌드 뒤 이걸 돌리면 복원된다(그게 오버레이를 DB 밖에 둔 이유다 — ADR-0016 D1).
+
+    ⚠️ 고아(오버레이엔 있는데 `specs` 에 없는 조합)는 **조용히 버리지 않고 돌려준다**.
+       `extract.resolve_product_name` 이 제품을 개명·병합할 수 있어서(실측: 10 renamed,
+       5 folded) 사람이 채운 항목이 대상 없이 남을 수 있다.
+    """
+    if conn is None:
+        with connect() as own:
+            return apply_spec_overrides(own)
+    data = spec_overrides.reload()
+    rows = _spec_rows(conn)
+    updated = n_fields = 0
+    for row in rows:
+        merged = spec_overrides.apply(row, data)
+        diff = {f: merged[f] for f in spec_overrides.OVERRIDABLE if merged[f] != row[f]}
+        if not diff:
+            continue
+        sets = ", ".join(f"{f}=%s" for f in diff)              # 키는 OVERRIDABLE 고정 어휘
+        conn.execute(f"UPDATE specs SET {sets} WHERE market=%s AND product=%s",
+                     [*diff.values(), row["market"], row["product"]])
+        updated += 1
+        n_fields += len(diff)
+    conn.commit()
+    orphans = spec_overrides.orphans(data, {(r["market"], r["product"]) for r in rows})
+    log.info("오버레이 재적용: %d행 %d칸 · 고아 %d", updated, n_fields, len(orphans))
+    return {"updated": updated, "fields": n_fields,
+            "orphans": [{"market": m, "product": p} for m, p in orphans]}
+
+
+def _market_label(market_word: str | None) -> str:
+    """조회 키 → 화면에 쓸 상호('지나' → '슬라임지나'). 없으면 키 그대로."""
+    global _KB_CACHE
+    if _KB_CACHE is None:
+        _KB_CACHE = linking.load_kb()
+    entry = _KB_CACHE.market_by_word(market_word) or {}
+    return entry.get("market") or (market_word or "")
+
+
+def spec_review_queue() -> list[dict]:
+    """사람이 봐야 하는 1층 스펙 행 목록. 정렬은 `(market, product)` 로 **안정적**이다.
+
+    큐에 뜨는 조건은 `spec_overrides.needs_review` 하나다 — 네 텍스트 칸 중 오버레이 적용
+    후에도 비어 있고 `unknown` 표시가 없는 칸이 하나라도 있으면. 정렬이 안정적이어야 하는
+    이유는 사용법이다: 사람이 한 건 저장하고 다음으로 넘어가는데, 순서가 런마다 바뀌면
+    같은 항목을 다시 만나거나 건너뛰게 된다.
+
+    ⚠️ `embedUrl` 은 **여기서** 만든다(`source_links.embed_url`). 프런트에서 URL 을
+       조립하지 않는다 — 틀린 링크는 링크 없음보다 나쁘다(ADR-0009).
+    """
+    data = spec_overrides.cached()
+    with connect() as conn:
+        rows = _spec_rows(conn)
+    items = []
+    for row in rows:
+        missing = spec_overrides.needs_review(row, data)
+        if not missing:
+            continue
+        merged = spec_overrides.apply(row, data)
+        items.append({
+            "market": merged["market"],
+            "marketLabel": _market_label(merged["market"]),
+            "product": merged["product"],
+            # 이미 값이 있는 칸도 함께 보낸다 — 화면이 prefill 해서 **고칠 수 있게**
+            # (NULL 채우기만 되는 도구는 반쪽이다: 추출기가 틀린 값을 넣은 사례가 실측돼 있다).
+            "values": {f: merged[f] for f in spec_overrides.OVERRIDABLE},
+            "missing": missing,
+            "unknown": [f for f in spec_overrides.OVERRIDABLE
+                        if spec_overrides.is_unknown(data, merged["market"],
+                                                     merged["product"], f)],
+            "permalink": merged["source_permalink"],
+            "embedUrl": source_links.embed_url(merged),
+        })
+    for i, it in enumerate(items):
+        it["index"], it["total"] = i + 1, len(items)
+    return items
+
+
+def save_spec_override(market: str, product: str, fields: dict | None = None, *,
+                       unknown_fields=(), note: str | None = None,
+                       at: str | None = None) -> dict:
+    """사람이 채운 값 → 오버레이 파일 기록 + `specs` 그 한 행 즉시 반영.
+
+    `fields` 는 `{칸: 값}`(빈 문자열은 '비움'으로 정규화), `unknown_fields` 는 '보고도 모름'.
+    반환 `{"saved", "unknown", "remaining", "next"}` — 화면이 바로 다음 항목을 그린다.
+
+    ⚠️ 기록이 **먼저**고 DB 반영이 나중이다. 반대로 하면 파일 쓰기가 실패했을 때 DB 에만
+       값이 남는데, `specs` 는 파생 테이블이라 다음 리셋에 사라진다 — 사람은 저장됐다고
+       믿고 넘어간 뒤다.
+    ⚠️ `unknown` 은 DB 를 건드리지 않는다. 큐에서만 뺀다(1급 규칙: 값을 만들지 않는다).
+    """
+    fields = dict(fields or {})
+    bad = [f for f in (*fields, *unknown_fields) if f not in spec_overrides.OVERRIDABLE]
+    if bad:
+        raise ValueError(f"오버레이 대상 칸이 아니다: {bad} (허용: {list(spec_overrides.OVERRIDABLE)})")
+    at = at or datetime.now(timezone.utc).date().isoformat()
+
+    with connect() as conn:
+        row = conn.execute(
+            f"SELECT {', '.join(_SPEC_COLS)} FROM specs WHERE market=%s AND product=%s",
+            [market, product]).fetchone()
+        if row is None:
+            raise ValueError(f"specs 에 없는 조합이다: {market}/{product}")
+        current = dict(zip(_SPEC_COLS, row))
+        current["beads"] = list(current["beads"] or [])
+
+        data = spec_overrides.load()
+        for f, v in fields.items():
+            if f in spec_overrides.LIST_FIELDS:
+                v = [s.strip() for s in (v or []) if s and s.strip()]
+            elif isinstance(v, str):
+                v = v.strip() or None                  # 빈 입력 = 비움(None), 공백만도 같다
+            fields[f] = v
+            data = spec_overrides.record(data, market, product, f, v,
+                                         was=current[f], at=at, note=note)
+        for f in unknown_fields:
+            data = spec_overrides.record(data, market, product, f, None,
+                                         was=current[f], at=at, note=note, unknown=True)
+        spec_overrides.save(data)                      # ① 파일이 먼저(원자적)
+        spec_overrides.reload()                        # 같은 프로세스의 재수집 마스킹에 즉시 반영
+
+        if fields:                                     # ② DB 는 그 한 행만
+            sets = ", ".join(f"{f}=%s" for f in fields)
+            conn.execute(f"UPDATE specs SET {sets} WHERE market=%s AND product=%s",
+                         [*fields.values(), market, product])
+            conn.commit()
+
+    queue = spec_review_queue()
+    return {"market": market, "product": product,
+            "saved": sorted(fields), "unknown": sorted(unknown_fields),
+            "remaining": len(queue), "next": queue[0] if queue else None}
 
 
 # ---------------------------------------------------------------- 해시태그 인제스트(2층 라이브 글루)
@@ -265,6 +461,10 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
     with connect() as conn:
         for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
             known.setdefault(mk, set()).add(pr)
+    # ③′ 2단 타이브레이크 재료 — 1층이 못 짚을 때만 본다(`extract.resolve_product_name`).
+    # `specs` 는 캡션이 두꺼운 제품만 담고(제품성 게이트) 레지스트리는 피드 전량의 해시태그라,
+    # 실측 408행 대 약 2,200후보다. 파일이 없으면 `{}` 라 폴백이 그냥 안 걸린다.
+    registry = load_product_registry()
     # ⚠️ 여기서 필요한 건 **KB 객체**(`resolve_market`·`markets` 속성)지 위의 `kb` dict 가 아니다.
     #   `bias.partition` 은 원본 JSON dict 를 받고, 개체연결 쪽은 파싱된 객체를 받는다 — 같은
     #   이름으로 두 형태가 오가는 자리라 한쪽을 다른 쪽에 넘기면 AttributeError 로 죽는다.
@@ -282,7 +482,8 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
         doc = extract.repair_product_names(
             doc, u.text,
             exclude=_tag_exclusions(mkt) if mkt else all_excl,
-            known_products=known.get(mkt, ()))
+            known_products=known.get(mkt, ()),
+            known_fallback=registry.get(mkt, ()))
         ref = source_links.build_source_ref("instagram", u.url, u.meta)
         rows = index.index_post(doc, source="instagram",
                                 post_id=u.meta.get("shortcode"), review_class=rc,
@@ -1002,24 +1203,28 @@ def repair_product_attribution(*, dry_run: bool = True) -> dict:
 
     # 1) 조각(post)마다 ①로 확정되는 이름을 먼저 모은다 — 그 조각이 **이미 갖고 있는 제품**은
     #    다른 이름의 흡수 대상이 될 수 없다(`taken`). 행 단위로만 보면 이 맥락이 안 보인다.
-    ctx = {}                                   # post_id → (exclude, known, taken)
+    # 규칙은 수집 경로와 **한 벌**이다(③′ 레지스트리 폴백 포함) — 갈리면 백필과 수집이
+    # 같은 캡션에 다른 이름을 붙인다.
+    registry = load_product_registry()
+    ctx = {}                                   # post_id → (exclude, known, registry, taken)
     for rid, post_id, market, product, body, attrs in rows:
         if post_id in ctx:
             continue
         mkt = market or _market_from_caption(kb, body)
         excl = _tag_exclusions(mkt) if mkt else all_excl   # 마켓 미상이면 전 마켓 태그를 뺀다(페일세이프)
-        ctx[post_id] = (excl, known.get(mkt, ()), [])
+        ctx[post_id] = (excl, known.get(mkt, ()), registry.get(mkt, ()), [])
     for _rid, post_id, _mk, product, body, _at in rows:
-        excl, kn, taken = ctx[post_id]
-        if extract.resolve_product_name(product, body, exclude=excl, known_products=kn)[1] == "keep":
+        excl, kn, reg, taken = ctx[post_id]
+        if extract.resolve_product_name(product, body, exclude=excl, known_products=kn,
+                                        known_fallback=reg)[1] == "keep":
             taken.append(product)
 
     # 2) 행마다 목표 제품명 판정
     plan: list[dict] = []
     for rid, post_id, market, product, body, attrs in rows:
-        excl, kn, taken = ctx[post_id]
+        excl, kn, reg, taken = ctx[post_id]
         target, why = extract.resolve_product_name(
-            product, body, exclude=excl, known_products=kn, taken=taken)
+            product, body, exclude=excl, known_products=kn, known_fallback=reg, taken=taken)
         plan.append({"id": rid, "post_id": post_id, "market": market, "from": product,
                      "to": target, "why": why, "score": extract._filled_score(attrs or {})})
 
@@ -1094,12 +1299,18 @@ def setup(reset: bool = False) -> dict:
             conn.execute("TRUNCATE reviews, specs RESTART IDENTITY CASCADE")
             conn.commit()
         n_specs = load_specs(conn)
+        # 1층 적재 **직후** 사람 검수 복원(ADR-0016). `specs` 는 파생 테이블이라 위 TRUNCATE 로
+        # 손으로 채운 값이 통째로 날아간다 — 그걸 되돌리는 유일한 자리이고, 오버레이가 git 에
+        # 사는 이유 그 자체다. 여기서 빼면 `reset=True` 한 번이 검수 노동을 조용히 지운다.
+        ov = apply_spec_overrides(conn)
         n_rev = index_gold(conn)
         n_join = join_specs(conn)
         counts = {
             "specs": conn.execute("SELECT count(*) FROM specs").fetchone()[0],
             "reviews": conn.execute("SELECT count(*) FROM reviews").fetchone()[0],
             "indexed_now": n_rev, "joined_now": n_join, "specs_loaded": n_specs,
+            # 고아는 카운트로 드러낸다 — 제품 개명·병합으로 대상이 사라진 검수 항목(무음 드롭 금지).
+            "overrides_applied": ov["updated"], "override_orphans": len(ov["orphans"]),
         }
     log.info("setup 완료: %s", counts)
     return counts

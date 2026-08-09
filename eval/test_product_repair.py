@@ -142,6 +142,75 @@ def test_hold_items_are_not_folded_together():
     print("✓ 보류분은 접지 않음 OK")
 
 
+# ---------------------------------------------------------------- ③′ 레지스트리 폴백
+# 1층(`specs`)은 캡션이 두꺼운 제품만 담는다(제품성 게이트: 네 칸 전부 null 이면 드롭).
+# 제품 후보 레지스트리는 판매자 피드 전량의 해시태그라 훨씬 넓다(실측 408행 대 약 2,200후보).
+# ③이 1층에서 **0건**일 때만 그 넓은 쪽을 본다 — 순서가 뒤집히면 잡음이 1층을 이긴다.
+REG = {"빠코볼", "푸딩크런키", "빅말차쿠키디", "키위스쿱"}   # 지나 레지스트리(1층의 상위집합)
+
+
+def test_registry_breaks_a_tie_layer1_cannot():
+    """후보 둘 다 1층에 없고 그중 **하나만** 레지스트리에 있으면 그쪽으로 복구한다(③′).
+
+    이게 없으면 보류(④)로 떨어져 후기 한 건이 제품 없이 남는다 — 1층이 구조적으로
+    불완전한 동안(프로필 액터 ~12글 창) 흔한 경우다.
+    """
+    cap = "#슬라임지나 #빅말차쿠키디 #꼼픽\n본문에 없는 이름"
+    got, why = extract.resolve_product_name("정체불명", cap, exclude=EXCL,
+                                            known_products=L1, known_fallback=REG)
+    assert (got, why) == ("빅말차쿠키디", "registry_tiebreak"), f"{got} ({why})"
+    print("✓ ③′ 1층이 못 짚는 타이를 레지스트리가 가른다 OK")
+
+
+def test_registry_never_overrides_a_layer1_decision():
+    """⛔ **합집합 금지 회귀.** 1층이 정확히 하나를 짚었으면 레지스트리는 개입하지 않는다.
+
+    두 집합을 하나로 합치면 1층 단독 판정이던 글이 레지스트리 쪽 후보가 끼어들어
+    `hold_ambiguous` 로 **퇴화**한다 — 있던 판정이 사라지는 방향의 회귀라 화면에서는
+    '제품 없는 후기'로만 보이고 원인이 안 보인다. 2단은 판정을 더하기만 한다(단조).
+    """
+    cap = "#슬라임지나 #빠코볼 #키위스쿱\n본문에 없는 이름"      # 빠코볼만 1층, 둘 다 레지스트리
+    solo, why_solo = extract.resolve_product_name("정체불명", cap, exclude=EXCL,
+                                                  known_products=L1)
+    both, why_both = extract.resolve_product_name("정체불명", cap, exclude=EXCL,
+                                                  known_products=L1, known_fallback=REG)
+    assert (solo, why_solo) == ("빠코볼", "l1_tiebreak"), f"전제가 깨졌다: {solo} ({why_solo})"
+    assert (both, why_both) == (solo, why_solo), \
+        f"레지스트리가 1층 판정을 바꿨다: {both} ({why_both})"
+    print("✓ ③′ 는 1층 판정을 못 뒤집는다(단조) OK")
+
+
+def test_registry_holds_when_it_matches_more_than_one():
+    """레지스트리도 둘 이상이면 보류다 — 넓은 목록일수록 '하나'를 요구해야 한다.
+
+    레지스트리는 사람이 승격한 목록이 아니라 **유도된 후보**라 잡음이 섞인다
+    (실측: 늪지의 `액괴`·`워터글루`·`jigglyslime`). 다수 일치를 추측으로 메우면
+    그 잡음이 제품명이 된다.
+    """
+    cap = "#슬라임지나 #빅말차쿠키디 #키위스쿱\n본문에 없는 이름"
+    got, why = extract.resolve_product_name("정체불명", cap, exclude=EXCL,
+                                            known_products=L1, known_fallback=REG)
+    assert (got, why) == (None, "hold_no_l1_match"), f"둘 다 걸렸는데 골랐다: {got} ({why})"
+    print("✓ ③′ 다중 일치는 보류 OK")
+
+
+def test_registry_does_not_resurrect_dropped_rules():
+    """폴백은 ①②와 마켓/광역 태그 배제보다 **뒤**다 — 앞 규칙을 되살리지 않는다.
+
+    레지스트리에 마켓명이 잘못 들어와도 `exclude` 가 먼저 걸러야 하고(`#슬라임지나`),
+    해시태그가 아예 없는 입력(디시)은 여전히 무변경이어야 한다.
+    """
+    dirty = REG | {"슬라임지나", "슬라임리뷰"}
+    got, _why = extract.resolve_product_name("아마존 우드 점토", CAP_SPECLINE, exclude=EXCL,
+                                             known_products=set(), known_fallback=dirty)
+    assert got == "빠코볼", f"마켓 태그가 레지스트리를 타고 제품이 됐다: {got}"
+
+    got2, why2 = extract.resolve_product_name("한글과자한줌", "ㅂㅉ 한줌 비교글", exclude=EXCL,
+                                              known_products=set(), known_fallback=dirty)
+    assert (got2, why2) == ("한글과자한줌", "no_tags"), f"디시 입력을 건드렸다: {got2} ({why2})"
+    print("✓ ③′ 는 앞 규칙(배제·해시태그 없음)을 되살리지 않는다 OK")
+
+
 if __name__ == "__main__":
     test_glue_and_scent_lines_become_the_hashtagged_product()
     test_market_tag_never_becomes_a_product()
@@ -153,4 +222,8 @@ if __name__ == "__main__":
     test_two_phantoms_from_one_post_fold_into_one_row()
     test_fold_keeps_the_richer_item()
     test_hold_items_are_not_folded_together()
+    test_registry_breaks_a_tie_layer1_cannot()
+    test_registry_never_overrides_a_layer1_decision()
+    test_registry_holds_when_it_matches_more_than_one()
+    test_registry_does_not_resurrect_dropped_rules()
     print("\n제품명 귀속 복구 오프라인 테스트 통과 ✅")

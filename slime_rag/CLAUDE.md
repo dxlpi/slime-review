@@ -17,6 +17,7 @@
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
 | `source_links.py` | 원문 링크 정책(순수) — `permalink`/`embed_url`/`evidence_group_key`/`build_source_ref`/`group_evidence_sources` + `logo_asset`(마켓 로고 표시 게이트). DB·네트워크·streamlit 무의존 |
+| `spec_overrides.py` | **1층 스펙 사람 검수 오버레이**(순수 정책 + 파일 IO, [ADR-0016](../docs/adr/0016-human-in-the-loop-spec-review.md)) — `OVERRIDABLE`(6칸) / `QUEUE_FIELDS`(4칸) · `load`/`save`(원자적) · `apply`(**오버레이가 이긴다**) · `needs_review` · `record`(`was` 보존) · `orphans` · 프로세스 캐시. DB·네트워크·LLM 무의존 |
 | `logos.py` | 마켓 IG 프로필 아바타 **1회성 수동 수집** CLI(ADR-0010) — 파이프라인 미배선, 자동갱신 없음 |
 | `consolidated_view.py` | 소스별 정서·갭·향불일치 + **기준별 건수**(`criterion_stats`) + 인스타/디시/통합 **리뷰 요약**(6기준 `CRITERIA` × **`{verdict, minority}`**, 미언급=빈칸; 홍보성 분리). **축 둘**(ADR-0015): 제품 축 `build_consolidated`(질감·향·소리·지속력 + 장단점) / 주문 축 `build_order_view`(고객응대·배송, **마켓당 한 벌**, 팬아웃 `_fold_orders` 접기). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
 | `rawstore.py` | **수집 원문 스냅샷 저장소** — 가공 전 액터 응답을 그대로 디스크에(`data/raw/<kind>/<key>/<시각>.json`). append-only·최신캡처 우선 병합·키별 워터마크·`manifest`(무과금 관측). 네트워크·LLM·DB 무의존 |
@@ -31,6 +32,7 @@
 source .venv/bin/activate
 python -m slime_rag.linking      # 셀프테스트 예 (대부분 모듈에 __main__ 셀프테스트 존재)
 python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, 포트 55432)
+python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과금·DB 무접촉)
 ```
 - **LLM 추가/교체는 `llm_ops.py` 한 곳만** 수정 — 벤더는 이 파일에만 의존(Anthropic→OpenAI 전환이 파이프라인 무변경으로 끝난 게 증거).
 - **새 소스 추가 = `Source` 구현체 추가** → `sources/` 에 파일 하나. 파이프라인 무변경.
@@ -228,6 +230,36 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   **Don't:** 결과를 KB `products[]` 에 쓰지 말 것 — 저 칸은 1층 스펙 객체를 담고
   `layer1.iter_specs` 가 그 모양을 읽는다. 이름만 있는 항목은 `_PRODUCTHOOD_FIELDS` 전부 null 이라
   `_specs_from_seller_post` 가 제품성 미달로 버리는 바로 그 모양이 된다.
+- **Important:** 그 레지스트리는 제품명 복구의 **2단 타이브레이크**(③′)로 들어간다 —
+  `extract.resolve_product_name(known_fallback=...)`, 재료는 `pipeline.load_product_registry()`.
+  1층(`specs`)에서 일치가 **0건일 때만** 본다. `specs` 는 캡션이 두꺼운 제품만 담고(제품성 게이트)
+  레지스트리는 피드 전량의 해시태그라, 실측 408행 대 약 2,200후보 — 폴백이 더하는 이름이
+  **1,998개**다(늪지 +298 · 연찌 +229 · 머머 +194 · 베이퍼 +59 · 지나 +29).
+  **Don't:** 두 집합을 **합집합으로 합치지 말 것** — 1층에서 정확히 하나이던 판정이 레지스트리
+  후보가 끼어들어 `hold_ambiguous` 로 **퇴화**한다. 있던 판정이 사라지는 방향이라 화면엔
+  '제품 없는 후기'로만 보이고 원인이 안 보인다. 2단은 판정을 더하기만 한다(단조).
+  **Don't:** 레지스트리를 1층보다 **앞**에 두지 말 것 — 사람이 승격한 목록이 아니라 유도된
+  후보라 잡음이 섞인다(실측: 늪지의 `액괴`·`워터글루`·`jigglyslime` — 광역어·재료어인데
+  마켓/종류 후보 임계값 아래라 products 에 남았다). 그래서 뒤에 두고 다중 일치는 보류한다.
+  수집 경로(`_ingest_instagram_raws`)와 백필(`repair_product_attribution`)이 **한 벌**을 쓴다.
+- **Important:** 사람이 채운 1층 스펙은 **오버레이가 이긴다**([ADR-0016](../docs/adr/0016-human-in-the-loop-spec-review.md)).
+  마스킹 자리는 `_upsert_spec` **한 곳**이다 — fixture 시드와 판매자 자동추출이 공유하는 단일
+  경로라 새 수집 경로가 생겨도 규칙이 안 갈라진다.
+  **Don't:** 그 마스킹을 지우지 말 것. 그 함수는 전 칸이 `COALESCE(EXCLUDED.x, specs.x)` 라
+  **들어오는 non-null 이 기존 값을 덮는다** — 사람이 채운 제품이 다른 캡션에서 다시 잡히는
+  순간 LLM 값이 이긴다. 프로필 액터가 최신 ~12글만 주므로 같은 제품이 여러 글에 걸쳐 다시
+  잡히는 건 **정상**이라, 이건 이론적 위험이 아니라 예정된 사고다.
+  **Don't:** 읽기 시점(`consolidated_for`·`list_products`·`/api/page`)에 얹지 말 것 — 읽는 곳이
+  넷을 넘고 하나만 빠뜨리면 **화면과 요약 프롬프트가 서로 다른 스펙을 본다.**
+  **Note:** 오버레이는 DB 가 아니라 `data/spec_overrides.json` 에 산다. `specs` 는 파생
+  테이블이라 `setup(reset=True)` 한 번에 손으로 채운 값이 날아간다 — 복원은 `setup` 꼬리의
+  `apply_spec_overrides()` 이고, 그게 이 파일이 커밋되는 이유다.
+  **Note:** `unknown` 은 **값을 만들지 않는다**(1급 규칙 유지). 큐에서만 빼고 DB 는 NULL 이며,
+  나중에 판매자가 캡션에 적어 LLM 이 채우면 그 값이 들어온다(= 마스킹하지 않는다).
+  **Note:** 사람이 **명시적으로 비운** 칸만 `_clear_overridden_blanks` 가 실제로 비운다 —
+  비움은 NULL 이라 COALESCE 를 못 통과한다. `unknown` 은 여기 안 걸린다.
+  **Note:** 고아(오버레이엔 있는데 `specs` 엔 없는 조합)는 `orphans()` 가 **카운트로 드러낸다** —
+  `resolve_product_name` 의 개명·병합으로 생기고, 조용히 버리면 사람의 노동이 흔적 없이 사라진다.
 - **Note:** `rawstore` 의 병합 순서 정본은 파일명이 아니라 봉투의 **`scraped_at`** 이다.
   개발 중 실제로 깨졌다: 충돌 때만 `-2` 접미사를 붙였더니 `...Z-2.json` 이 `...Z.json` 보다
   앞서 정렬돼(`-` < `.`) **최신 캡처가 옛 캡처에 밀렸다** — 캡션 수정이 조용히 무시되는 경로다.

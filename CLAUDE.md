@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria, human-in-the-loop spec review)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -199,6 +199,40 @@ something to correct for** — never average it; show it per source, plus the ga
     name-only entries are exactly the all-null shape `_specs_from_seller_post` drops as thin.
   Both collectors stay: the cheap ~12 window for a daily top-up, the deep sweep for the product list.
   **Not yet run against live data** — the sweep is paid and awaits a go.
+- **The 1층 spec blanks are now a human's job, and that judgment lives outside the DB** (2026-08-09,
+  [ADR-0016](docs/adr/0016-human-in-the-loop-spec-review.md)). The first-class rule (unmentioned →
+  null, never invent) has a necessary consequence: if the seller didn't write 재료·향·종류·질감 in
+  the caption, that `specs` column stays NULL **forever** — more LLM passes cannot fill it, because
+  it is **absence of input, not a limit of extraction**. Measured: 39 of 408 `specs` rows have at
+  least one of the four text columns NULL (베이퍼 12 · 모모찌 9 · 머머 7 · 진통제 5 · 지나 2 ·
+  푸딩 2 · 빈짱 1 · 봄 1), and 7 of those 39 (all 머머) also lack `source_permalink`, so nothing
+  embeds. The blank column differs per product, so the screen asks only for **that row's** blanks.
+  · **`slime_rag/spec_overrides.py`** is the pure policy layer (DB-free, CI-gated), and
+    `data/spec_overrides.json` is the committed overlay — same family as `data/product_aliases.json`.
+    It must not live in the DB: `specs` is a **derived table** that `setup(reset=True)` truncates,
+    so hand-filled values would vanish on one reset; the overlay is committed and restored by
+    `pipeline.apply_spec_overrides()` (wired into `setup`'s tail). Only typed values + the
+    overwritten value (`was`) go in the file — **no caption bytes** (ADR-0013 safe, same reason
+    `data/product_registry.json` commits).
+  · **The overlay wins in exactly one place — `pipeline._upsert_spec`.** That function is the single path
+    fixture seeding and seller auto-extraction share, and every column there is
+    `COALESCE(EXCLUDED.x, specs.x)` — i.e. **an incoming non-null overwrites**. Without masking, the
+    next collection run silently reverts human review, and since the profile actor returns only the
+    ~12 most recent posts, the same product being re-caught across posts is *normal*. **Don't** layer
+    the overlay at read time (`consolidated_for`·`list_products`·`/api/page`): there are more than
+    four readers and missing one makes the screen and the summary prompt see different specs.
+  · **`unknown` exists so the queue can reach 0** — it means "a human looked and can't tell". It
+    **creates no value** (the DB stays NULL); it only leaves the queue. This is the same concept as
+    the tombstone ledger deliberately *not* built elsewhere, with the opposite ruling: that one is an
+    unattended path re-processing ~19 threads/day, this is a **39-item finite queue a human walks**.
+  · Editable columns are the four plus `beads` and `source_permalink`; **only the four raise the
+    queue** (user decision — `beads='{}'` is 108 rows and mostly correctly empty). Existing values are
+    prefilled and **editable**, because the extractor has demonstrably mis-lifted 향료·재료어 before
+    (phantom-product repair).
+  · The screen (`web/src/screens/SpecReview.tsx`, route `/review`) is **outside the pixel-parity
+    contract** and local-only: `/api/admin/*` routes are **not registered** without `ADMIN_ENABLED=1`,
+    so they are 404, and CORS write methods follow the same gate. Verified live: queue 39, embed
+    available on 32, `/api/page` returns the typed value with no read-path change.
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
@@ -226,6 +260,9 @@ python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인
 python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
 python -m eval.test_rawstore && python -m eval.test_product_registry  # 원문 저장소 · 제품 후보 유도
+python -m eval.test_spec_overrides                             # 1층 스펙 사람 검수 오버레이(ADR-0016)
+python -c "from slime_rag import pipeline as p; print(len(p.spec_review_queue()))"   # 검수 대기 건수(무과금)
+ADMIN_ENABLED=1 uvicorn api.main:app --reload --port 8000      # 검수 도구를 켠 로컬 API (→ /review)
 python -c "from slime_rag import pipeline as p; print(p.collect_seller_feeds())"        # 1층 피드 전량 수집(dry_run 기본 · $0)
 python -c "from slime_rag import rawstore; print(rawstore.manifest())"                  # 원문 저장소 현황(무과금)
 python -c "from slime_rag import pipeline as p; print(p.derive_product_registry())"     # 제품 후보 레지스트리(LLM 0회)

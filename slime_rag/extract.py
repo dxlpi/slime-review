@@ -29,7 +29,7 @@ FEEL_VOCAB = ["말랑", "말캉", "쫀득", "퐁신", "폭닥", "크리미", "�
               "얄랑", "매트", "빳빳", "텐션감있는", "흐물거리는", "쳐지는", "흐름성있는"]
 TYPE_ENUM = ["폼볼", "촉감류(점토)", "디폼", "난사", "눈꽃", "지글리", "크런치",
              "빈백", "클라우드", "샤베트", "클리어", "버글리", "젤라또", "빨대", "라이스볼",
-             "수수깡", "자바칩", "스티로폼"]
+             "수수깡", "자바칩", "스티로폼", "납작블럭"]
 PROJECTION = ["강함", "적당", "약함"]
 PRESENCE = ["있음", "없음", "약간"]
 SENTIMENT = ["pos", "neu", "neg"]
@@ -301,8 +301,12 @@ LAYER1_SYSTEM = f"""\
   점토가 **주재료**일 때만 쓴다 — 여러 글루 나열 끝에 '점토'가 한 항목으로 끼어 있는 건
   대개 소량 첨가라 촉감류가 아니다('점토소량' 명시면 확실히 아니다).
   🧷 통제어휘는 두 갈래다(사용자 규칙 2026-08-09).
-    · **내장물형** — 폼볼·디폼·빈백·빨대·라이스볼·수수깡·자바칩·난사·스티로폼. 캡션 머리말의
-      '6미리 디폼 내장'·'자바칩 내장' 줄에 적히고 beads 에도 같은 말이 들어간다.
+    · **내장물형** — 폼볼·디폼·빈백·빨대·라이스볼·수수깡·자바칩·난사·스티로폼·납작블럭. 캡션
+      머리말의 '6미리 디폼 내장'·'자바칩 내장'·'납작블럭 40g내장' 줄에 적히고 beads 에도
+      같은 말이 들어간다. **'납작블록'(블'록')도 같은 종류어다** — 통제어휘 표기 '납작블럭'으로
+      적는다(마켓마다 표기가 갈린다: 머머·빈짱·예찬 '블럭' / 베이퍼·진통제 '블록').
+      ⚠️ 네모블럭·샌드블럭·원형블럭·하트블럭 등 **다른 블럭은 통제어휘에 없다** — 종류로
+      적지 말고 beads 에만 캡션 표기 그대로 넣는다.
     · **베이스 성격어** — 촉감류(점토)·클리어·크런치·버글리·지글리·샤베트·젤라또·클라우드·눈꽃.
       베이스 자체의 제형·투명도·소리다.
   **내장물이 우선이되, 성격어도 함께 성립하면 둘 다 적는다** — 성격어를 앞에 둔다.
@@ -521,7 +525,7 @@ def _fold_by_product(items: list[dict]) -> list[dict]:
 
 
 def repair_product_names(doc: dict, text: str, *, exclude=None,
-                         known_products=None) -> dict:
+                         known_products=None, known_fallback=None) -> dict:
     """추출된 `mentioned_product` 를 **캡션 해시태그**로 검증·복구한다(순수·무LLM).
 
     후기 분기에는 판매자 분기와 달리 제품 게이트가 없어서, 추출기가 캡션의 **스펙 줄**을
@@ -547,7 +551,9 @@ def repair_product_names(doc: dict, text: str, *, exclude=None,
       **아무것도 건드리지 않고** 그대로 돌려준다(AC7).
 
     exclude: 그 마켓의 상호·핸들·별칭(`market_tag_exclusions`). 안 빼면 `#슬라임지나` 가 제품이 된다.
-    known_products: 그 마켓의 1층 제품명 집합. ③ 타이브레이커에만 쓴다.
+    known_products: 그 마켓의 1층 제품명 집합(`specs`). ③ 타이브레이커에만 쓴다.
+    known_fallback: 같은 마켓의 **제품 후보 레지스트리**(`pipeline.load_product_registry`).
+      ③이 1층에서 한 건도 못 찾았을 때만 본다(③′) — 아래 `resolve_product_name` 참조.
     """
     if not product_hashtags(text, exclude=exclude):
         return doc                               # 해시태그 없는 소스(디시) → 무변경
@@ -557,18 +563,21 @@ def repair_product_names(doc: dict, text: str, *, exclude=None,
     #        순서에 의존하면 같은 입력이 항목 순서만 달라도 결과가 갈린다.
     taken = [r.get("mentioned_product") for r in items
              if resolve_product_name(r.get("mentioned_product"), text, exclude=exclude,
-                                     known_products=known_products)[1] == "keep"]
+                                     known_products=known_products,
+                                     known_fallback=known_fallback)[1] == "keep"]
     repaired: list[dict] = []
     for r in items:
         pick, why = resolve_product_name(r.get("mentioned_product"), text, exclude=exclude,
-                                         known_products=known_products, taken=taken)
+                                         known_products=known_products,
+                                         known_fallback=known_fallback, taken=taken)
         repaired.append(r if why == "keep" else {**r, "mentioned_product": pick})
     doc["reviews"] = _fold_by_product(repaired)
     return doc
 
 
 def resolve_product_name(name: str | None, text: str, *, exclude=None,
-                         known_products=None, taken=None) -> tuple[str | None, str]:
+                         known_products=None, known_fallback=None,
+                         taken=None) -> tuple[str | None, str]:
     """제품명 한 개에 대한 판정 — `(목표 제품명, 사유)`. 위 4갈래의 **단일 출처**다.
 
     백필(`pipeline.repair_product_attribution`)과 수집 경로가 이 한 벌을 공유한다. 규칙이 두
@@ -583,7 +592,20 @@ def resolve_product_name(name: str | None, text: str, *, exclude=None,
         '이건 다른 제품'이라는 신호다.
       (계획서 시뮬레이션도 이걸 놓쳤다 — 보존 확인 목록에 `빠코폼` 이 빠져 있었다.)
 
-    사유 문자열: `keep`(①) · `sole_tag`(②) · `l1_tiebreak`(③) · `hold_*`(④) · `no_tags`.
+    known_fallback: **2단 타이브레이크**(③′). 1층(`specs`)에서 일치가 **0건일 때만** 본다.
+      왜 2단인가: `specs` 는 캡션이 두꺼운 제품만 담는다(`_PRODUCTHOOD_FIELDS` 네 칸이 전부
+      null 이면 제품성 미달로 드롭). 반면 레지스트리는 판매자 피드 전량의 **해시태그**라
+      실측 408행 대 약 2,200후보다 — ③이 못 가리는 상황의 대부분은 '둘 다 1층에 없음'이지
+      '둘 다 1층에 있음'이 아니다.
+      ⛔ **합집합으로 만들지 말 것.** 한 집합으로 합치면 1층에서 정확히 하나이던 판정이
+        레지스트리 쪽 후보가 끼어들어 `hold_ambiguous` 로 **퇴화**할 수 있다. 2단은
+        1층 판정을 절대 못 뒤집는다 — 없던 판정만 더한다(단조).
+      ⚠️ 레지스트리는 사람이 승격한 목록이 아니라 **유도된 후보**라 잡음이 있다(실측: 늪지의
+        `액괴`·`워터글루`·`jigglyslime` — 광역어·재료어인데 마켓/종류 후보 임계값 아래라
+        products 에 남았다). 그래서 1층보다 **뒤**에 두고, 두 개 이상 걸리면 보류한다.
+
+    사유 문자열: `keep`(①) · `sole_tag`(②) · `l1_tiebreak`(③) · `registry_tiebreak`(③′) ·
+      `hold_*`(④) · `no_tags`.
     """
     tags = product_hashtags(text, exclude=exclude)
     if not tags:
@@ -607,6 +629,13 @@ def resolve_product_name(name: str | None, text: str, *, exclude=None,
     in_l1 = [t for t in free if _norm_tag(t) in known]
     if len(in_l1) == 1:
         return in_l1[0], "l1_tiebreak"           # ③
+    if not in_l1:
+        # ③′ 1층이 **한 건도** 못 짚었을 때만 레지스트리를 본다. `in_l1` 이 둘 이상이면
+        #    상위 집합인 레지스트리도 둘 이상이라 어차피 불발이고, 여기서 걸러 두면
+        #    '1층 판정을 못 뒤집는다'가 코드 모양으로 남는다.
+        in_reg = [t for t in free if _norm_tag(t) in {_norm_tag(p) for p in (known_fallback or ())}]
+        if len(in_reg) == 1:
+            return in_reg[0], "registry_tiebreak"
     # ④ 보류 — 지어내지도 흡수하지도 않는다(AC5)
     return None, ("hold_no_l1_match" if not in_l1 else "hold_ambiguous")
 

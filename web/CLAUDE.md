@@ -1,7 +1,7 @@
 # web/ — 프런트엔드 (Vite + React + TS)
 
 ## Purpose (이 모듈이 소유하는 것)
-검색 화면 하나. **표시만** 담당한다 — 평가 기준·링크·로고·발췌 **판단은 전부 백엔드**에 있고
+화면 둘 — 공개 검색 화면과 로컬 전용 1층 스펙 검수 도구. **표시만** 담당한다 — 평가 기준·링크·로고·발췌 **판단은 전부 백엔드**에 있고
 ([ADR-0011](../docs/adr/0011-six-criteria-summary-and-search-page.md) · `source_links` · ADR-0013),
 여기는 [`../api`](../api/CLAUDE.md) 가 준 걸 그린다. 삭제된 Streamlit UI 의 후임
 ([ADR-0012](../docs/adr/0012-remove-streamlit-frontend.md)).
@@ -9,8 +9,11 @@
 ## Key files
 | 파일 | 역할 |
 |---|---|
-| `src/screens/SlimeSearch.tsx` | 화면 전부. 디자인 HTML `Slime Search.dc.html` 의 **축자 이식**(인라인 style 값 무변경) |
+| `src/App.tsx` | 경로 분기 — `/review` 면 `SpecReview`, 아니면 `SlimeSearch`. **라우터 미설치**(의존성 추가 없이 `location.pathname`) |
+| `src/screens/SlimeSearch.tsx` | 공개 화면 전부. 디자인 HTML `Slime Search.dc.html` 의 **축자 이식**(인라인 style 값 무변경) |
+| `src/screens/SpecReview.tsx` | 🔒 1층 스펙 검수 도구(`/review`, 로컬 전용). **픽셀 대조 계약 밖** — 아래 참조 |
 | `src/data/api.ts` | 백엔드 연결. `mock.ts` 와 **같은 shape** 을 돌려주는 게 존재 이유 |
+| `src/data/admin.ts` | 🔒 관리 라우트 연결. 404 는 게이트가 꺼져 있다는 신호로 읽는다(에러 아님) |
 | `src/data/mock.ts` | 자리표시자 + 타입 원본(`Cell`·`SummaryRow`·`CRITERIA`) |
 | `src/components/kds/` | 디자인 번들에서 잘라낸 KDS 6개 — **편집 금지**, [README](src/components/kds/README.md) 참조 |
 | `src/styles/kds/` | KDS 토큰 **byte-for-byte 사본** — 여기를 고쳐서 색을 바꾸지 말 것 |
@@ -27,6 +30,16 @@ npm run build && npm run lint     # 타입체크·번들 · oxlint
   화면에서 계산하기 시작하면 표시 규칙이 백엔드와 갈라진다.
 
 ## Non-obvious (주의 / Gotcha)
+- **Important:** 🔒 **`SpecReview.tsx` 는 픽셀 대조 계약 밖이다**([ADR-0016](../docs/adr/0016-human-in-the-loop-spec-review.md)).
+  아래 항목(0.025% 픽셀 차이)은 `SlimeSearch.tsx` 에만 걸린다 — 검수 화면은 **디자인 원본이
+  없는 내부 도구**라 목업과 diff 할 대상이 애초에 없다. 같은 KDS 컴포넌트·토큰은 그대로
+  쓰지만(`components/kds/` 편집 금지 규칙은 여기도 적용) 인라인 값은 자유다.
+  **Note:** 이 화면은 `ADMIN_ENABLED=1` 로 띄운 로컬 API 에만 붙는다. 꺼져 있으면 `/api/admin/*`
+  가 404 이고, 화면은 에러가 아니라 **켜는 방법 안내**로 degrade 한다.
+  **Don't:** 여기에 값 추천·자동완성을 넣지 말 것 — 이 도구의 전제가 '**LLM 이 못 채운다**'이고
+  (미언급 → null, 1급 규칙), 추천을 넣으면 사람이 확인 버튼만 누르게 된다. 화면 문구
+  `게시물에서 확인되는 것만 적어요. 모르면 모름으로 표시해요` 와 [모름으로 표시] 버튼이
+  저장 버튼과 **같은 줄·같은 크기**인 건 그 이유다.
 - **Important:** `SlimeSearch.tsx` 의 인라인 style 값은 디자인 원본과 **한 글자도 다르지 않다**.
   측정치가 근거다 — 목업 대비 **0.025% 픽셀 차이**(8px 오프셋은 목업이 `body` 기본 margin 을
   리셋하지 않아서고, 우리는 리셋한다). 값을 '정리'하면 이 대조가 무너진다.

@@ -1,0 +1,422 @@
+{
+  "_comment": "1층 스펙 사람 검수 오버레이(ADR-0016). 캡션에 없어서 추출이 못 채운 칸을 사람이 게시물을 보고 채운 값. specs 는 파생 테이블이라 리셋되면 사라지므로 판단은 여기에 산다. was=덮기 전 값(추적용), unknown=사람이 보고도 모른다고 판정(큐에서 영구 제외, 값은 계속 null).",
+  "머머": {
+    "곰돌디핑프링글스": {
+      "official_texture": {
+        "value": "베이스는 딱 가볍고 산뜻한 크림소스st 크리미로 느껴져요. 몇 번 늘이면 바로 부풀면서 휘핑크림 같은 가벼운 크리미가 올라와요. 비즈가 작아서 10g이어도 꽤 넉넉히 올라가요. 감자칩 비즈의 직접적인 손맛이나 걀걀함은 안 느껴지지만, 확실히 베이스를 더 얇게 만들어주고 난사처럼 겹겹이 기포가 쌓이도록 도와줘요. 재미있게 만진 슬라임이라 추천해요.",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZtEbJnzi11/",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "아이스베리스무디": {
+      "official_texture": {
+        "value": "눈가루가 소량 들어간 솝퐁말이에요. 초반부터 가볍고 말캉 촉촉한 질감이고, 부풀수록 보송한 물수건 느낌이에요. 기포를 채워주실수록 두둥실 퐁신해져요. 부푼 후에도 촉촉하게 느껴지고 스치는 눈가루 느낌도 좋아요. 유연하게 시작해서 액티를 소량씩 조절해가며 만지면 와방방 부풀어요.",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZtiRnXOmtB/",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "위즈캔디샵": {
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZtI5EeTot0/",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "official_texture": {
+        "value": "지렁이비즈가 올라간 디폼이에요. 걀걀함보다는 우득뚜득하고 기다란 생김새가 손에 스치는 느낌이 커요. 초반엔 지렁이비즈 때문에 찢뜯김이 있어 플레잉이 어렵지만, 기포를 조금만 채우면 도톰하게 잡히면서 내용물이 잘 느껴지고 그 위로 택키의 크리미가 가득 올라와요. 재료가 무거운데도 잘 받쳐주는 베이스예요. 도톰크리미를 좋아하거나 새로운 질감을 만져보고 싶은 분께 추천해요.",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "첵스초코딸기빙수_딸기": {
+      "official_texture": {
+        "value": "수정액 같은 뽀독한 느낌 한 스푼에 녹진함도 살짝 느껴지는 질감이에요. 전체적으로 매트하고 부풀수록 꾸덕함도 살짝 올라와요. 6디폼의 간질함과 첵스초코빙수의 걀걀함이 합쳐져 재미있어요.",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZwpPp9O7rd/",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "치치시리얼": {
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZoF2_QTN1g/",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "official_texture": {
+        "value": "리본비즈의 자극은 디폼 > 리본비즈 > 별비즈 순으로 느껴지고, 쟈글한 6디폼과 합이 좋아요. 초반에 늘일 때는 응집되어 있는 쁠루모 쩰리에 수정액을 한 숟가락 넣은 느낌이에요. 얇고 요거트 같은 베이스 사이로 재료가 버무려지고, 부풀수록 녹진함이 돌며 크리미로 꽉 찬 질감이 올라와요. 부풀어도 얇게 겹겹이 기포층이 쌓이는 느낌이어서 쟈글함이 잘 느껴져요. 코팅감이 아주 좋아요.",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "크림꼬끄카롱": {
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZjRbt_q90G/",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "official_texture": {
+        "value": "얇실하고 크리미한 베이스에 재료가 가득 들어 있어 크런치함과 걀걀함이 아주 잘 느껴져요. 쁠루모의 약매트 몽글함과 플레인의 촉촉 크리미함이 조화롭게 어우러진 느낌이에요. 강철손인데도 플레잉 후에 시원하면서 손이 조금 얼얼했고, 부풀수록 유들한 코팅감도 소량 느껴져요.",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "키튼우유크림롤": {
+      "official_texture": {
+        "value": "8디폼과 잘 어울리는 뭉텅 생크림 질감이에요. 처음엔 뭉긋뭉긋한 촉촉한 막이 느껴지고, 쫀쫀 판판 뭉텅하다가 부풀수록 보송 와방 휘핑한 가벼운 크림처럼 부풀어요. 가볍고 디폼이 잘 느껴져서 재미있어요. 여러 가지 종류의 크리미함이 섞여 있어 호불호 없이 느껴질 질감이에요.",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "source_permalink": {
+        "value": "https://www.instagram.com/p/DZt_qeOuJuA/",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    }
+  },
+  "모모찌": {
+    "드리밍캣": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "미니모찌왁뿌": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "솜사탕모찌스타": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "여름바다_윤슬": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "여름바다_정원": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "여름바다_파도": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "와삭벌집핏자": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "칸타빌레2_베리피치": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "한여름꿈결의별": {
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    }
+  },
+  "베이퍼": {
+    "나홀로목장": {
+      "slime_type": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "눈송이뭉치": {
+      "slime_type": {
+        "value": "납작블럭",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "바질토마토블렌디드": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "본앤크림": {
+      "official_texture": {
+        "value": "판판 탄탄한 베이스에 쁠루모 크리미가 가득 들어나는 푸딩 베이스예요. 무게감은 크지 않고 보글보글하게 기포가 잘 차는 편이에요. 초반에 쁠루모 푸딩 특유의 텐션으로 인해 늘릴 때 심지가 느껴지는 질감이라 개인차에 따라 찢기는 것처럼 느껴지실 수 있어요. 기포를 채우면서 부드러워지는 편이에요.",
+        "was": "판판 탄탄한 베이스에 쁠루모 크리미가 가득 들어나는 푸딩 베이스예요. 초반에 쁠루모 푸딩 특유의 텐션으로 인해 늘릴 때 심지가 느껴지는 질감이라 개인차에 따라 찢기는 것처럼 느껴지실 수 있어요. 기포를 채우면서 부드러워지는 편이에요.",
+        "at": "2026-08-09"
+      }
+    },
+    "스노우딸기젤리": {
+      "scent": {
+        "value": "리치믹스",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "스치망고라이스": {
+      "base_combo": {
+        "value": "글루올 스쿨 아이올소량",
+        "was": null,
+        "at": "2026-08-09"
+      },
+      "scent": {
+        "value": "망고빙수",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "시나몬애플샌드": {
+      "slime_type": {
+        "value": "납작블럭",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "압착올리브100": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "와일드베리소프트콘": {
+      "slime_type": {
+        "value": "납작블럭",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "윈터브리즈스웨터": {
+      "scent": {
+        "value": "도손",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "클래식모카쿠키": {
+      "slime_type": {
+        "value": "디폼",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "허니스노우레몬티": {
+      "slime_type": {
+        "value": "폼볼",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "홍시크림치즈파이": {
+      "slime_type": {
+        "value": "디폼",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    }
+  },
+  "봄": {
+    "플라워가든퍼피": {
+      "base_combo": {
+        "value": "아마존 플레인 쁠루모 엘믹 컬글소량",
+        "was": "덮어쓰기시도",
+        "at": "2026-08-09"
+      },
+      "slime_type": {
+        "value": "빨대",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    }
+  },
+  "빈짱": {
+    "깡수박화채": {
+      "official_texture": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    }
+  },
+  "지나": {
+    "멋쟁이샐러드": {
+      "slime_type": {
+        "value": "빈백",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "요구르팅": {
+      "slime_type": {
+        "value": "폼볼",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    }
+  },
+  "진통제": {
+    "멍스테린": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "점성술폴더": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "청포도크림컵케이크": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "체리굿데이": {
+      "base_combo": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      },
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    },
+    "피쉬스철수세미": {
+      "scent": {
+        "value": null,
+        "was": null,
+        "at": "2026-08-09",
+        "unknown": true
+      }
+    }
+  },
+  "푸딩": {
+    "냠냠쿠르트": {
+      "slime_type": {
+        "value": "디폼",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    },
+    "슈가젤리샵": {
+      "official_texture": {
+        "value": "기존 푸딩네 클리어와 동일한 베이스예요. 통꾹은 조심해 주세요 — 행성 시리즈보다 통꾹이 더 힘들어요. 지렁이비즈에 젤리 모양의 걀걀 비즈들을 함께 올렸어요.",
+        "was": null,
+        "at": "2026-08-09"
+      }
+    }
+  }
+}

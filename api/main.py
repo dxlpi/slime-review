@@ -14,19 +14,31 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from slime_rag import pipeline, source_links
 from slime_rag.consolidated_view import CRITERION_SCOPE as CRITERION_SCOPE_OF
 
 app = FastAPI(title="Slime Search API", version="0.1.0")
 
+# 1층 스펙 사람 검수 도구(ADR-0016) — **기본이 꺼짐**이고 로컬 전용이다.
+# 왜 환경변수 게이트인가: ① 결과물(`data/spec_overrides.json`)이 git 추적 파일이라 배포 서버의
+# 임시 디스크에 쓰면 재배포 때 증발한다. ② 정적 프런트에 박은 토큰은 비밀이 아니다.
+# 검수자는 1명이고 대상은 39행이라, 인증을 만드는 것보다 배포에서 아예 빼는 게 정직하다.
+# ⚠️ 라우트는 등록 자체를 안 한다(핸들러 안에서 403 을 던지는 게 아니라). 켜지 않은 서버에서
+#    `/api/admin/*` 는 존재하지 않는 경로 = 404 다.
+ADMIN = os.getenv("ADMIN_ENABLED") == "1"
+
 # 개발 중 Vite 개발서버(5173)만 허용. 배포 시 실제 오리진으로 교체한다.
+# ⚠️ 쓰기 메서드는 검수 도구를 켰을 때만 연다 — 공개 배포는 GET-only 라는 성질을 유지한다.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"] if ADMIN else ["GET"],
     allow_headers=["*"],
 )
 
@@ -254,3 +266,34 @@ def page(market: str | None = Query(None), product: str | None = Query(None)) ->
         "igCount": len(ig),
         "dcCount": len(dc),
     }
+
+
+# ---------------------------------------------------------------- 1층 사람 검수(로컬 전용)
+class SpecOverrideIn(BaseModel):
+    """검수 화면이 보내는 한 건. `fields` 는 `{칸: 값}`, `unknown_fields` 는 '보고도 모름'.
+
+    칸 이름 검증은 여기서 하지 않는다 — `spec_overrides.OVERRIDABLE` 한 곳이 정본이고
+    `pipeline.save_spec_override` 가 그걸로 거른다(규칙이 두 벌이 되면 조용히 갈라진다).
+    """
+    market: str
+    product: str
+    fields: dict = {}
+    unknown_fields: list[str] = []
+    note: str | None = None
+
+
+if ADMIN:
+    @app.get("/api/admin/spec-queue")
+    def spec_queue() -> list[dict]:
+        """사람이 봐야 하는 1층 스펙 행 목록(빈 칸 · 임베드 URL 포함)."""
+        return pipeline.spec_review_queue()
+
+    @app.post("/api/admin/spec-override")
+    def spec_override(body: SpecOverrideIn) -> dict:
+        """검수 1건 저장 → 오버레이 파일 + `specs` 그 한 행 + 다음 항목."""
+        try:
+            return pipeline.save_spec_override(
+                body.market, body.product, body.fields,
+                unknown_fields=tuple(body.unknown_fields), note=body.note)
+        except ValueError as e:
+            raise HTTPException(400, str(e))

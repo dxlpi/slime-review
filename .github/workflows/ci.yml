@@ -51,6 +51,7 @@ jobs:
           python -m eval.test_extract_thread
           python -m eval.test_source_links
           python -m eval.test_post_columns
+          python -m eval.test_spec_overrides
 
       - name: Eval pass-rate gate
         run: python -m evals.run --min 1.0

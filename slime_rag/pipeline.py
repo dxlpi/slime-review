@@ -846,7 +846,7 @@ def _raw_seller_posts(targets: list[tuple[str, str]], *, count_only: bool = Fals
 def ingest_seller_profiles(markets: list[str] | None = None, *,
                            only_missing: bool = False, skip_seen: bool = True,
                            limit_per_market: int = 12, from_raw: bool = False,
-                           dry_run: bool = True) -> dict:
+                           commit_every: int = 25, dry_run: bool = True) -> dict:
     """마켓 **본인 계정 피드** → 1층 공식 스펙. ADR-0003 이 막힌 자리의 우회 경로다.
 
     `business_discovery` 는 App Review 벽이지만(ADR-0003) Apify `instagram-profile-scraper`
@@ -876,6 +876,20 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
     from_raw=True: Apify 를 부르지 않고 `collect_seller_feeds` 가 남긴 **디스크 원문**을 읽는다.
       추출 규칙을 고친 뒤 다시 돌리는 정규 경로다 — 드는 값은 LLM 뿐이고 Apify 는 0원이다.
       창도 더 넓다(피드 전량 vs 최신 ~12). `skip_seen=False` 와 같이 쓰면 강제 재추출이 된다.
+    commit_every=25: 유료 처리 **N건마다 커밋**한다(0/None 이면 끝에서 한 번 — 옛 동작).
+      ⚠️ 이 런은 **원자적이지 않다.** 일부러 그렇다: `from_raw=True` 의 실제 규모는 게시물
+        1,837건 · `extract_spec` 1,837콜(약 $3.6, 2026-08-09 실측)이라, 커밋이 루프 끝
+        한 곳뿐이면 **1,800번째에서 죽을 때 앞의 1,800건이 통째로 롤백**된다. 실제로
+        크레딧 소진 429 로 죽어 봤고(그땐 첫 콜이라 손해가 0이었다), 같은 교훈이
+        `collect_seller_feeds` 에는 이미 반영돼 있다 — 저건 저장이 `_run` 안이라
+        9번째 마켓의 실패가 1~8을 못 지운다. 여기 커밋 주기가 그 대응물이다.
+      원자성을 잃어도 되는 근거는 **재실행이 이어받는다**는 것이다: `specs` 는
+      `UNIQUE(market, product)` upsert 라 부분 적재가 중복 행을 만들지 않고, 커밋된
+      게시물은 `source_permalink` 가 남아 다음 런의 `skip_seen` 컷이 건너뛴다.
+      ⚠️ 중간에 죽으면 **반환 dict(카운터)는 사라지지만 행은 남는다.** 그 런에 무슨 값이
+        나갔는지는 반환값이 아니라 `llm_ops.LEDGER` 가 정본이다.
+      ⚠️ 마켓 경계에서만 커밋하는 걸로 바꾸지 말 것 — 이 저장소의 실제 분포는 마켓당
+        수백 건이라(늪지 298 · 연찌 229 · 머머 194) 경계 하나가 곧 $0.5 짜리 유실 창이다.
     dry_run=True(기본): 네트워크·LLM·DB 미접촉. 대상과 예상비용만 돌려준다.
     ⚠️ dry_run=False 는 **유료**다 — Apify 프로필 요금 + 캡션 1건당 `extract_spec` LLM 호출.
       (`from_raw=True` 면 Apify 몫은 빠지고 LLM 몫만 남는다.)
@@ -907,6 +921,7 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
         raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
     llm = LLM()
     n_spec = n_skip = n_nomarket = n_thin = n_seen = 0
+    n_paid = n_committed = 0                    # 유료로 처리한 게시물 수 / 그중 커밋된 수
     with connect() as conn:
         # 기보유 컷의 판정 기준은 `specs`(제품)가 아니라 **이미 스펙을 만든 게시물 URL** 이다 —
         # 같은 게시물이 다시 와도 새 제품이 나올 리 없고, 제품 기준으로 보면 한 글의 여러 제품 중
@@ -915,24 +930,51 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
             "SELECT DISTINCT source_permalink FROM specs WHERE source_permalink IS NOT NULL"
         ).fetchall()} if skip_seen else set()
         with conn.cursor() as cur:
-            for sp in raws:
-                market = by_handle.get((sp.meta or {}).get("owner_username"))
-                if not market:                      # 액터가 리다이렉트된 계정을 줄 수 있다
-                    n_nomarket += 1
-                    continue
-                if sp.url in seen_urls:             # 유료 `extract_spec` 앞에서 자른다
-                    n_seen += 1
-                    continue
-                n, skipped, thin = _specs_from_seller_post(cur, market, sp.text, sp.url, llm)
-                n_spec += n
-                n_skip += int(skipped)
-                n_thin += thin
+            try:
+                for sp in raws:
+                    market = by_handle.get((sp.meta or {}).get("owner_username"))
+                    if not market:                  # 액터가 리다이렉트된 계정을 줄 수 있다
+                        n_nomarket += 1
+                        continue
+                    if sp.url in seen_urls:         # 유료 `extract_spec` 앞에서 자른다
+                        n_seen += 1
+                        continue
+                    n, skipped, thin = _specs_from_seller_post(cur, market, sp.text, sp.url, llm)
+                    n_spec += n
+                    n_skip += int(skipped)
+                    n_thin += thin
+                    n_paid += 1
+                    # 주기를 세는 단위는 `raws` 순회 위치가 아니라 **값이 나간 건수**다 —
+                    # 스킵분까지 세면 기보유가 많은 증분 런에서 주기가 실제 유실 창과
+                    # 무관해진다(빈 커밋만 자주 나가고 정작 유료 구간은 길게 열려 있다).
+                    if commit_every and n_paid % commit_every == 0:
+                        conn.commit()
+                        n_committed = n_paid
+            except BaseException:
+                # 여기까지 산 결과는 남기고 죽는다. 커밋을 안 하면 `with connect()` 의
+                # __exit__ 이 롤백하므로 **이미 지불한 호출의 결과가 통째로 사라진다.**
+                # 커밋 자체가 실패해도(트랜잭션이 이미 abort 상태 등) 원래 예외를 가리지
+                # 않는다 — 진단해야 할 건 중단 사유지 정리 실패가 아니다.
+                try:
+                    conn.commit()
+                    n_committed = n_paid
+                except Exception:                   # noqa: BLE001 - 원인 예외 보존이 우선
+                    log.exception("중단 시점 커밋 실패 — 미커밋 %d건은 재실행에서 다시 처리된다",
+                                  n_paid - n_committed)
+                log.warning("ingest_seller_profiles 중단: 유료 처리 %d건 중 %d건 커밋 · "
+                            "재실행하면 skip_seen 컷이 커밋분을 건너뛴다", n_paid, n_committed)
+                raise
         conn.commit()
+        n_committed = n_paid
     if n_seen:
         log.info("기보유 판매자 게시물 %d건 스킵 → extract_spec 호출 %d회 절감", n_seen, n_seen)
     out.update({"collected_posts": len(raws), "specs_upserted": n_spec,
                 "skipped_no_hashtag": n_skip, "skipped_unknown_handle": n_nomarket,
                 "skipped_thin_spec": n_thin,
+                # 유료 처리분과 그중 커밋분. 정상 종료면 같은 값이고, 다르면 그 차이가
+                # 곧 유실 창이다 — 중단은 예외로 드러나지만 크기는 이 둘로만 읽힌다.
+                "paid_posts": n_paid, "committed_posts": n_committed,
+                "commit_every": commit_every,
                 # 게시물 1건 = `extract_spec` 1콜이라 스킵 수가 곧 절감 호출 수다.
                 "skipped_seen": n_seen, "llm_calls_saved_by_dedup": n_seen,
                 "llm": {k: summary()[k] for k in ("calls", "input_tokens", "cached_tokens")}})

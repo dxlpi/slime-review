@@ -143,10 +143,116 @@ def test_dry_run_touches_nothing_and_reports_cost():
     print(f"✓ dry_run 무접촉 · 예상비용 ${out['apify_cost_usd']} 보고 OK")
 
 
+class _Raw:
+    """`_raw_seller_posts` 가 돌려주는 `RawReview` 의 최소 대역."""
+    def __init__(self, url, handle):
+        self.url, self.text, self.meta = url, "#빠코볼 캡션", {"owner_username": handle}
+
+
+class _CommitLogConn:
+    """커밋 시점마다 '그때까지 upsert 된 행 수'를 적어 두는 커넥션 대역."""
+    def __init__(self, seen=()):
+        self.seen, self.upserts, self.commits = list(seen), 0, []
+
+    def execute(self, *_a, **_k):
+        return self
+
+    def fetchall(self):
+        return [(u,) for u in self.seen]
+
+    def cursor(self):
+        return self
+
+    def commit(self):
+        self.commits.append(self.upserts)
+
+    def __enter__(self): return self
+    def __exit__(self, *exc): return False
+
+
+def _run_ingest(conn, raws, *, boom_at=None, **kw):
+    """LLM·네트워크 없이 `ingest_seller_profiles` 본체만 돌린다."""
+    def _fake_specs(cur, market, text, url, llm):
+        if boom_at is not None and conn.upserts == boom_at:
+            raise RuntimeError("크레딧 소진 429 재현")
+        conn.upserts += 1
+        return 1, False, 0
+
+    saved = (pipeline.connect, pipeline._raw_seller_posts,
+             pipeline._specs_from_seller_post, pipeline.LLM)
+    pipeline.connect = lambda: conn
+    pipeline._raw_seller_posts = lambda *_a, **_k: raws
+    pipeline._specs_from_seller_post = _fake_specs
+    pipeline.LLM = lambda *_a, **_k: object()
+    try:
+        return _with_kb(_MARKETS, lambda: pipeline.ingest_seller_profiles(
+            from_raw=True, dry_run=False, **kw))
+    finally:
+        (pipeline.connect, pipeline._raw_seller_posts,
+         pipeline._specs_from_seller_post, pipeline.LLM) = saved
+
+
+def test_long_run_commits_periodically_not_only_at_the_end():
+    """유료 처리 N건마다 커밋한다 — 끝에서 한 번이면 런 전체가 유실 창이다.
+
+    실측 규모가 게시물 1,837건 · `extract_spec` 1,837콜(약 $3.6)이라, 커밋이 한 곳뿐이면
+    막바지 실패 하나가 이미 지불한 호출 전부를 롤백시킨다.
+    """
+    raws = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(10)]
+    conn = _CommitLogConn()
+    out = _run_ingest(conn, raws, commit_every=3)
+    assert conn.commits[:3] == [3, 6, 9], \
+        f"3건마다 커밋되지 않았다, 실제 커밋 시점 {conn.commits}"
+    assert conn.commits[-1] == 10, "마지막 잔여분이 커밋되지 않았다"
+    assert out["paid_posts"] == out["committed_posts"] == 10, \
+        f"정상 종료면 유료 처리분 전부가 커밋분이어야 한다: {out}"
+    print(f"✓ 유료 {out['paid_posts']}건 · 커밋 시점 {conn.commits} OK")
+
+
+def test_crash_midrun_keeps_what_was_already_paid_for():
+    """중단돼도 **이미 값을 치른 결과는 남는다** — 이게 이 주기의 존재 이유다.
+
+    ⚠️ 되돌리는 방식은 예외를 그냥 전파시키는 것이다. 그러면 `with connect()` 의 __exit__
+      이 롤백해서, 커밋 주기를 넣어 놓고도 마지막 주기 이후분이 아니라 **주기와 무관하게
+      직전 커밋 이후 전부**가 날아간다. 크레딧 소진 429 로 실제 죽어 본 자리다.
+    """
+    raws = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(10)]
+    conn = _CommitLogConn()
+    try:
+        _run_ingest(conn, raws, commit_every=100, boom_at=7)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("중단 예외가 삼켜졌다 — 실패가 성공처럼 보인다")
+    assert conn.commits == [7], \
+        f"중단 시점에 7건이 커밋됐어야 한다(주기 100 이라 아직 한 번도 안 커밋), 실제 {conn.commits}"
+    print("✓ 중단 시 기지불분 7건 커밋 보존 OK")
+
+
+def test_commit_cycle_counts_paid_posts_not_skipped_ones():
+    """주기의 단위는 순회 위치가 아니라 **값이 나간 건수**다.
+
+    기보유가 많은 증분 런에서 스킵분까지 세면 빈 커밋만 자주 나가고 정작 유료 구간은
+    길게 열린 채로 남는다 — 주기가 실제 유실 창과 무관해진다.
+    """
+    raws = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(9)]
+    seen = [r.url for r in raws[:6]]                 # 앞 6건은 이미 스펙을 만든 게시물
+    conn = _CommitLogConn(seen=seen)
+    out = _run_ingest(conn, raws, commit_every=3)
+    assert out["skipped_seen"] == 6 and out["paid_posts"] == 3, \
+        f"스킵 6 · 유료 3 이어야 한다: {out}"
+    assert conn.commits == [3, 3], \
+        f"유료 3건째에 한 번 + 종료 시 한 번이어야 한다, 실제 {conn.commits}"
+    print("✓ 주기 단위 = 유료 처리분(스킵 미계수) OK")
+
+
 if __name__ == "__main__":
     test_upsert_never_overwrites_a_stored_value_with_null()
     test_upsert_keeps_stored_beads_when_new_extraction_has_none()
     test_default_targets_include_markets_that_already_have_specs()
     test_only_missing_still_available_as_an_explicit_option()
     test_dry_run_touches_nothing_and_reports_cost()
+    test_long_run_commits_periodically_not_only_at_the_end()
+    test_crash_midrun_keeps_what_was_already_paid_for()
+    test_commit_cycle_counts_paid_posts_not_skipped_ones()
     print("\n1층 수집 경로 오프라인 테스트 통과 ✅")

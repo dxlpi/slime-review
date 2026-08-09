@@ -24,3 +24,6 @@ data/dcinside_sample_raw.json
 data/apify_post_*_raw.json
 data/apify_posts_*_raw.json
 data/apify_profile_*_raw.json
+# 수집 원문 저장소(slime_rag/rawstore.py) — 같은 규칙. 파생물인 product_registry.json 은
+# 이름·건수·날짜·URL 만이라 커밋 대상이다(캡션 본문 없음).
+data/raw/

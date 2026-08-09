@@ -199,6 +199,25 @@ something to correct for** — never average it; show it per source, plus the ga
     name-only entries are exactly the all-null shape `_specs_from_seller_post` drops as thin.
   Both collectors stay: the cheap ~12 window for a daily top-up, the deep sweep for the product list.
   **Not yet run against live data** — the sweep is paid and awaits a go.
+- **dcinside now has the same raw-first boundary** (2026-08-09, kind `dc_thread`). It was the last
+  path without one, on the reasoning that its collection is free (direct HTTP, not an actor). That
+  reasoning was wrong in three places: ① the **paid** step here is extraction, so fixing an extraction
+  rule meant re-walking HTTP/robots/delays before reaching the LLM — exactly the step Instagram skips
+  with `from_raw` · ② **the gallery mutates**: a deleted thread cannot be re-fetched, so "just collect
+  it again" is not a rollback story · ③ re-collection still spends politeness budget.
+  `DCInsideSource` saves each thread's **unparsed** HTML + comment-AJAX JSON keyed by **thread number**
+  (not by keyword — a thread is both the unit that costs and the unit that disappears; the anchor
+  survives in the envelope's `requested.keyword`, which is what re-processing selects on). Order is
+  **fetch → save → build**, so a broken selector cannot cost the run's HTTP. Live and disk paths share
+  `_build_candidates` alone, the same rule that makes Instagram re-processing reuse
+  `_post_to_seller_review`. Re-processing is `pipeline.ingest_dcinside(from_raw=True)` — **0 HTTP**,
+  LLM only; the watermark is absent there (nothing to save) and `revisit_threads` becomes a disk
+  selector. Verified live on one thread: 1 post + 9 comments captured, re-parsed off disk into the
+  identical 10 candidates with no network. Gate: `eval/test_dcinside_rawstore.py`.
+  ⚠️ **343KB per thread** measured (mostly HTML) — ~19MB for the 56 threads already in the DB, ~340MB
+  for a 1,000-thread sweep. Gitignored (ADR-0013), but check disk before a full sweep.
+  ⚠️ The store is **empty except that one probe thread** — everything collected before today was a
+  one-pass scrape with no snapshot, so the existing 222 `amos` rows have no raw behind them.
 - **The 1층 spec blanks are now a human's job, and that judgment lives outside the DB** (2026-08-09,
   [ADR-0016](docs/adr/0016-human-in-the-loop-spec-review.md)). The first-class rule (unmentioned →
   null, never invent) has a necessary consequence: if the seller didn't write 재료·향·종류·질감 in
@@ -260,6 +279,7 @@ python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인
 python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
 python -m eval.test_rawstore && python -m eval.test_product_registry  # 원문 저장소 · 제품 후보 유도
+python -m eval.test_dcinside_rawstore                          # 디시 스레드 원문 저장·재처리(HTTP 0회)
 python -m eval.test_spec_overrides                             # 1층 스펙 사람 검수 오버레이(ADR-0016)
 python -c "from slime_rag import pipeline as p; print(len(p.spec_review_queue()))"   # 검수 대기 건수(무과금)
 ADMIN_ENABLED=1 uvicorn api.main:app --reload --port 8000      # 검수 도구를 켠 로컬 API (→ /review)

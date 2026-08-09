@@ -217,6 +217,16 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
   갈려 `bias.partition` 이 소스마다 다른 값을 받는다.
   **Don't:** 저장을 호출부로 올리지 말 것(수집기 `_run` 안이 제자리다) — 호출부가 예외로 죽는
   순간 방금 산 응답이 사라진다.
+- **Important:** **디시도 같은 경계를 갖는다**(2026-08-09, kind `dc_thread` ·
+  `ingest_dcinside(from_raw=True)`). 여기선 수집이 무과금(직접 HTTP)이라 오래 예외였는데,
+  그래서 오히려 경계가 더 필요했다 — 이 경로의 유료 단계가 **추출**이라, 추출 규칙을 고칠 때마다
+  HTTP·robots·딜레이를 다시 밟고 나서야 LLM 에 닿았다. 그리고 **갤러리는 변한다**: 지워진 글은
+  재수집으로 못 되찾으므로 '공짜니 다시 받으면 된다'가 성립하지 않는다.
+  라이브·재처리 공유 지점은 `DCInsideSource._build_candidates` 한 벌이다(인스타의
+  `_post_to_seller_review` 와 같은 자리).
+  **Note:** `from_raw=True` 면 워터마크가 없다(`min_thread_no=None`) — HTTP 를 안 쓰니 아낄 게
+  없다. 대신 `revisit_threads` 가 '다시 받을 글번호'가 아니라 **디스크에서 고를 글번호**로 읽힌다.
+  **Note:** 저장 단위가 스레드라 실측 **343KB/스레드**다(HTML 이 대부분). 전량 스윕 전에 디스크 확인.
 - **Important:** `ingest_seller_profiles` 는 **원자적이지 않다**(`commit_every=25`, 2026-08-09).
   `from_raw=True` 의 실제 규모가 게시물 1,837건 · `extract_spec` 1,837콜(약 $3.6)이라, 커밋이
   루프 끝 한 곳뿐이면 막바지 실패 하나가 이미 지불한 호출을 통째로 롤백한다 — 위 항목이 Apify

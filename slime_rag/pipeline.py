@@ -1132,7 +1132,8 @@ WATERMARK_MARGIN = 200
 
 def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | None = None,
                     limit: int = 30, comment_pages: int = 1, dry_run: bool = False, *,
-                    incremental: bool = True, revisit_threads: list[int] | None = None) -> dict:
+                    incremental: bool = True, revisit_threads: list[int] | None = None,
+                    from_raw: bool = False) -> dict:
     """
     디시 실수집 → 관련성 게이트 → **스레드 배치 추출** → 색인 (계획 C-4).
 
@@ -1153,6 +1154,15 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     revisit_threads: 워터마크 아래라도 다시 볼 글번호(선택). **새 댓글은 옛 글에 달리므로
       워터마크로는 안 잡힌다** — 자동 선정은 하지 않고 호출부가 명시한다. 검색 목록에 없어도
       닿도록 수집기가 이 글번호들을 **직접 조회**한다.
+
+    `from_raw=True`: 갤러리를 다시 긁지 않고 `rawstore`(kind `dc_thread`)에 쌓인 스레드
+      원문으로 재처리한다(**HTTP 0회**, LLM 만 든다). 인스타의 `ingest_hashtag(from_raw=True)`
+      와 같은 자리다 — 이 경로의 유료 단계는 수집이 아니라 **추출**이라, 추출 규칙을 고칠 때
+      값이 나가는 건 LLM 뿐이어야 한다. 게다가 갤러리는 변한다(글 삭제·댓글 추가): 디스크
+      스냅샷은 그 시점의 원문이라 재수집으로는 못 되찾는 것을 갖고 있다.
+      ⚠️ 이 모드에선 **워터마크가 없다**(HTTP 를 안 쓰니 아낄 것도 없다) — `min_thread_no` 는
+        None 으로 보고된다. 대신 `revisit_threads` 는 '다시 받을 글번호'가 아니라
+        **디스크에서 고를 글번호**로 읽힌다(선택 안 하면 앵커로 닿은 스레드 전량).
     """
     from . import extract
     from .sources import DCInsideSource, expand_queries
@@ -1163,7 +1173,7 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     # 워터마크는 **앵커별**이다 — 전체 최댓값을 쓰면 처음 보는 제품의 과거 글이 통째로 잘린다.
     anchors = [slime, *(aliases or [])]
     watermark = None
-    if incremental:
+    if incremental and not from_raw:
         with connect() as conn:
             top = _max_thread_no(conn, anchors)
         watermark = None if top is None else top - WATERMARK_MARGIN
@@ -1171,11 +1181,18 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
             log.info("워터마크 없음(앵커 %s 의 색인 이력 없음) → 전량 수집", anchors)
     # `collect_all` 을 쓰지 않는다 — 소스별 인자를 넘길 자리가 없고, 단일 소스 경로에서 수집
     # 예외를 삼키면 '조용히 0건'이 된다(그건 오류가 아니라 결과처럼 보인다).
-    raws = list(src.collect(queries, limit=limit, target=target,
-                            min_thread_no=watermark, revisit_threads=revisit_threads))
+    if from_raw:
+        # 네트워크 경계만 갈아 끼운다 — 게이트·후보 생성·하류는 라이브와 **같은 코드**다
+        # (`_build_candidates` 한 벌). 여기서 저장 dict 를 직접 풀면 `meta` 모양이 갈려
+        # `extract.thread_key` 와 `source_links.build_source_ref` 가 소스마다 다른 값을 받는다.
+        raws = list(src.collect_from_raw(queries, limit=limit, target=target,
+                                         threads=revisit_threads))
+    else:
+        raws = list(src.collect(queries, limit=limit, target=target,
+                                min_thread_no=watermark, revisit_threads=revisit_threads))
     n_post = sum(1 for r in raws if r.meta.get("type") == "post")
     counts = {"collected": len(raws), "posts": n_post, "comments": len(raws) - n_post,
-              "queries": queries, "min_thread_no": watermark,
+              "queries": queries, "min_thread_no": watermark, "from_raw": from_raw,
               # 워터마크가 무엇을 기준으로 잡혔는지 — '새 글 없음'과 '옛 글을 안 봤음'을 가른다.
               "watermark_anchors": anchors,
               # 예산 초과로 **처리 안 된** 후보 수. 기보유 컷은 수집 뒤에 도는지라 게이트 예산은

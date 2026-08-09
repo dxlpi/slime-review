@@ -296,7 +296,16 @@ def test_posturl_keeps_hashtag_only_caption():
 FEED_SAMPLE = Path(settings.kb_demo_path).parent / "apify_posts_backfill_raw.json"
 
 
-def _feed_items() -> list[dict]:
+def _feed_items() -> list[dict] | None:
+    """실 payload 32건. **없으면 None** — 호출부가 눈에 보이게 스킵한다.
+
+    ⚠️ 이 파일은 `.gitignore` 의 `data/apify_posts_*_raw.json` 에 걸려 **클론엔 없다**
+      (수집 바이트 미커밋 — ADR-0013). 작성자 머신에선 열리고 CI 에선 `FileNotFoundError` 로
+      죽는 구조라, 로컬 통과가 CI 통과를 뜻하지 않았다(실제로 그렇게 깨졌다).
+      **Don't:** 통과시키려고 샘플을 커밋하지 말 것 — 캡션 본문이 들어 있다.
+    """
+    if not FEED_SAMPLE.exists():
+        return None
     with open(FEED_SAMPLE, encoding="utf-8") as f:
         return json.load(f)["items"]
 
@@ -312,7 +321,11 @@ def _feed_source_with_sample(items=None):
 
 def test_feed_maps_real_actor_payload():
     """실제 instagram-scraper 아이템 → 판매자 RawReview 매핑."""
-    src = _feed_source_with_sample()
+    items = _feed_items()
+    if items is None:
+        print(f"· 피드 실 payload 매핑 skip ({FEED_SAMPLE.name} 없음 — gitignore)")
+        return
+    src = _feed_source_with_sample(items)
     reviews = list(src.collect(["slime_gina_"], limit=200))
     assert reviews, "실 payload 에서 한 건도 매핑되지 않았다"
     r = reviews[0]
@@ -326,7 +339,11 @@ def test_feed_maps_real_actor_payload():
 
 def test_feed_never_labels_review_class():
     """판매자 글에 `review_class` 를 달면 마켓 본인 글이 '홍보성 후기'로 새고 1층이 끊긴다."""
-    src = _feed_source_with_sample()
+    items = _feed_items()
+    if items is None:
+        print(f"· 피드 review_class 미부착 skip ({FEED_SAMPLE.name} 없음 — gitignore)")
+        return
+    src = _feed_source_with_sample(items)
     for r in src.collect(["slime_gina_"], limit=200):
         assert "review_class" not in r.meta, "1층 게시물에 홍보성 라벨이 붙었다"
         assert "promo_marker" not in r.meta

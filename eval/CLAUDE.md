@@ -46,6 +46,13 @@ python -m evals.run               # 추출/개체연결 pass-rate 지표 (→ ..
 - **Important:** 반드시 repo 루트에서 `python -m eval.<name>` 로 실행 — 파일 직접 실행은 `slime_rag` import 실패.
 - **Note:** 여기 테스트는 전부 오프라인(결정적). 라이브 수집·LLM 호출은 골드셋 밖.
 - **Don't:** 유료 Apify/OpenAI 를 테스트에서 실제 호출하지 말 것 — 어댑터 매핑만 검증.
+- **Important:** **gitignore 된 파일에 의존하는 테스트는 로컬에서만 통과한다.** `test_apify_source`
+  의 피드 실 payload(`data/apify_posts_backfill_raw.json`)가 `data/apify_posts_*_raw.json` 에
+  걸려 클론엔 없고, CI 가 `FileNotFoundError` 로 죽었다(2026-08-09). 이제 없으면 그 두 케이스만
+  **눈에 보이게 스킵**한다. **Don't:** 통과시키려고 샘플을 커밋하지 말 것 — 캡션 본문이 들어 있다.
+  같은 유형이 문서에도 있었다(`CLAUDE.md` → `.omc/plans/…`, 같은 날 같은 이유로 CI 적색).
+  **로컬 전량 통과는 CI 통과의 근거가 아니다** — 확인하려면 추적 파일만으로 돌려야 한다:
+  `git ls-files -z | tar -czf - --null -T - | tar -xzf - -C <tmp>` 후 그 트리에서 CI 스텝 실행.
 - **예외:** `test_extract_hearsay`·`test_extract_thread` 는 프롬프트 준수를 실호출로만 확인할 수 있는
   부분이 있어 `OPENAI_API_KEY` 가 있을 때만 그 케이스를 돈다(없으면 skip, 나머지는 오프라인).
   전언 차단을 프롬프트에만 맡기면 같은 입력에 4번 다른 답이 나온다는 걸 실측했기 때문에,

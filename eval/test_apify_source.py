@@ -395,6 +395,77 @@ def test_feed_token_unset_is_resilient():
     print("✓ 피드 소스: 토큰없음 회복력 OK")
 
 
+def test_hashtag_saves_raw_split_by_tag():
+    """해시태그 런도 **가공 전에** 원문을 남긴다 — 태그별 키로.
+
+    회귀 대상은 실측된 유실이다: 이 경로만 저장이 없어서, 매핑 직후 첫 LLM(홍보성 캐스케이드)이
+    죽으면(OpenAI 크레딧 소진 429) 방금 산 결과가 통째로 사라졌다.
+    태그별로 가르는 이유는 **0건이 태그 단위로 보여야** 하기 때문이다(`#깡수박화채` 실측).
+    """
+    import tempfile
+    from slime_rag import rawstore
+    from slime_rag.sources import ApifyHashtagSource
+
+    items = [
+        {"shortCode": "A1", "caption": "빠코볼 최고예요 진짜 말랑", "hashtags": ["빠코볼"],
+         "timestamp": "2026-08-01T00:00:00.000Z"},
+        {"shortCode": "A2", "caption": "빠코볼이랑 키위스쿱 비교해봤어요 둘 다 좋음",
+         "hashtags": ["빠코볼", "키위스쿱"], "timestamp": "2026-08-02T00:00:00.000Z"},
+        {"shortCode": "A3", "caption": "이건 요청 안 한 태그만 달린 글이라 관련글로 끼워온 것",
+         "hashtags": ["전혀다른태그"], "timestamp": "2026-08-03T00:00:00.000Z"},
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        src = ApifyHashtagSource(token="dummy", results_per_hashtag=10)
+        src.last_usage_usd = 0.03            # 런 실사용액 — 건수 비례로 갈려야 한다
+        _real_dir = rawstore.run_dir
+        rawstore.run_dir = lambda kind, key, root=None: _real_dir(kind, key, root=root or Path(d))
+        try:
+            src._save_raw(items, ["빠코볼", "키위스쿱", "깡수박화채"])
+        finally:
+            rawstore.run_dir = _real_dir
+
+        got = {k: len(rawstore.latest_items("ig_hashtag", k, root=root))
+               for k in rawstore.iter_keys("ig_hashtag", root=root)}
+
+    assert got.get("빠코볼") == 2, f"태그에 걸린 글이 다 안 담겼다: {got}"
+    assert got.get("키위스쿱") == 1, f"비교글이 양쪽 태그에 안 남았다: {got}"
+    # 0건 태그도 **파일이 남는다** — '안 돌렸다'와 '돌렸는데 없다'는 다음 판단이 정반대다.
+    assert "깡수박화채" in got and got["깡수박화채"] == 0, f"0건 태그 기록이 없다: {got}"
+    # 요청 태그에 안 걸린 글도 버리지 않는다(무음 드롭 금지).
+    assert got.get("_unmatched") == 1, f"미매칭 글이 사라졌다: {got}"
+    print("✓ 해시태그 소스: 가공 전 원문 저장 · 태그별 분할 · 0건/미매칭 보존 OK")
+
+
+def test_hashtag_raw_usage_is_split_not_duplicated():
+    """비용은 **건수 비례로 나눈다.** 런 총액을 봉투마다 적으면 합계가 태그 수만큼 부푼다.
+
+    나눗셈이 정확한 근거: 액터가 PAY_PER_EVENT 단일 이벤트(`result`)라 런 안에서 결과 1건의
+    값이 같다(2026-08-09 액터 API 확인).
+    """
+    import tempfile
+    from slime_rag import rawstore
+    from slime_rag.sources import ApifyHashtagSource
+
+    items = [{"shortCode": f"B{i}", "caption": f"후기 본문 {i} 말랑하고 좋아요",
+              "hashtags": ["빠코볼"], "timestamp": "2026-08-01T00:00:00.000Z"} for i in range(4)]
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        src = ApifyHashtagSource(token="dummy", results_per_hashtag=10)
+        src.last_usage_usd = 0.01
+        _real_dir = rawstore.run_dir
+        rawstore.run_dir = lambda kind, key, root=None: _real_dir(kind, key, root=root or Path(d))
+        try:
+            src._save_raw(items, ["빠코볼", "키위스쿱"])
+        finally:
+            rawstore.run_dir = _real_dir
+        total = sum(doc.get("usage_total_usd") or 0
+                    for k in rawstore.iter_keys("ig_hashtag", root=root)
+                    for doc in rawstore.load_runs("ig_hashtag", k, root=root))
+    assert abs(total - 0.01) < 1e-9, f"봉투 합계가 런 실사용액과 다르다: {total}"
+    print("✓ 해시태그 소스: 실사용액이 봉투에 건수 비례로 갈린다(합계 보존) OK")
+
+
 def test_feed_shares_mapping_with_profile_source():
     """두 액터가 **같은 매퍼**를 쓴다 — 갈리면 하류가 소스마다 다른 meta 를 받는다."""
     from slime_rag.sources.apify import _post_to_seller_review
@@ -431,4 +502,6 @@ if __name__ == "__main__":
     test_feed_requests_one_actor_call_per_handle()
     test_feed_token_unset_is_resilient()
     test_feed_shares_mapping_with_profile_source()
+    test_hashtag_saves_raw_split_by_tag()
+    test_hashtag_raw_usage_is_split_not_duplicated()
     print("\n모든 오프라인 테스트 통과 ✅")

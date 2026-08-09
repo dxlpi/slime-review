@@ -365,7 +365,7 @@ def save_spec_override(market: str, product: str, fields: dict | None = None, *,
 
 
 # ---------------------------------------------------------------- 해시태그 인제스트(2층 라이브 글루)
-def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
+def ingest_hashtag(keywords: list[str], *, limit: int = 30, from_raw: bool = False) -> dict:
     """
     인스타 해시태그 라이브 수집 → 편향 분리 → 판매자는 1층 specs 로, 실사용/홍보성은 2층 색인.
 
@@ -378,13 +378,34 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     반환: 관측성 카운트(수집/판매자→스펙/홍보성/실사용/조인).
 
     APIFY_TOKEN 없으면 수집 0 → 모든 카운트 0(회복력). 색인은 DB(compose 55432)+BGE-M3 필요.
+
+    `from_raw=True`: 액터를 부르지 않고 `rawstore` 에 쌓인 원문으로 재처리한다(**Apify $0**,
+      LLM 만 든다). `keywords` 를 주면 그 태그 키만, 비우면 전량이다.
+      존재 이유는 실측된 실패다 — 수집 직후 첫 LLM(홍보성 캐스케이드)에서 죽으면
+      (OpenAI 크레딧 소진 429) 방금 산 결과가 통째로 사라졌다. 이제 수집과 처리를
+      **따로 돌릴 수 있다**: 크레딧이 없어도 스크랩은 해 두고, 채운 뒤 이 경로로 처리한다.
+
+    ⚠️ `limit` 은 스크랩 건수가 아니라 **관련성 게이트 예산**이다(`RelevanceGate.budget`).
+      기본 30 으로 태그 80개를 돌리면 800건을 사고 30건만 처리한 뒤 나머지는 `unprocessed`
+      로 샌다 — 창을 넓힐 땐 이 값도 같이 올릴 것.
     """
     from .sources import ApifyHashtagSource
 
     src = ApifyHashtagSource(token=settings.apify_token,
                              results_per_hashtag=settings.apify_results_per_hashtag)
+    if from_raw:
+        # 디스크에 쌓인 원문으로 **Apify 0원** 재처리. 네트워크 경계(`_run`)만 갈아 끼우고
+        # 그 뒤(매핑·중복접기·저품질 드롭·관련성 게이트)는 라이브 경로와 **같은 코드**가 돈다 —
+        # 오프라인 테스트가 쓰는 주입점 그대로다. 여기서 dict 를 직접 풀면 `meta` 모양이 갈려
+        # `bias.partition` 이 소스마다 다른 값을 받는다(`ingest_seller_profiles` 와 같은 규칙).
+        # 게이트는 로컬 BGE-M3 라 재적용이 무료이고, 재적용해야 라이브 런과 결과가 같다.
+        from . import rawstore
+        items = rawstore.latest_items(src.raw_kind) if not keywords else [
+            it for kw in keywords for it in rawstore.latest_items(src.raw_kind, kw)]
+        src._run = lambda _tags, _items=items: _items
+        log.info("원문 재처리: %s %d건 (Apify $0)", src.raw_kind, len(items))
     return _ingest_instagram_raws(list(src.collect(keywords, limit=limit)),
-                                  label="ingest_hashtag")
+                                  label="ingest_hashtag" + ("(raw)" if from_raw else ""))
 
 
 def _ingest_instagram_raws(raws: list, *, label: str) -> dict:

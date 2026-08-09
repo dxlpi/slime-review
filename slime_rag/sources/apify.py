@@ -13,6 +13,17 @@ from typing import Iterator, Optional
 from .base import RawReview, Source, RelevanceGate, is_low_quality, toxic_via_llm, log
 
 
+def _norm_hashtag(t: str) -> str:
+    """해시태그 비교용 정규화 — 공백·`_`·`.` 제거 + 소문자 + 선행 `#` 제거.
+
+    `extract._norm_tag` 과 **같은 규칙**이다(거기 주석: 캡션 태그는 `#SlimeGina` 처럼 붙여
+    쓴다). 여기서 따로 두는 건 수집 레이어가 추출 레이어를 import 하지 않기 위해서다 —
+    규칙이 갈리면 요청한 태그와 캡션의 같은 태그가 서로 다른 것으로 읽혀 봉투가 `_unmatched`
+    로 샌다. 규칙을 바꾸면 양쪽을 함께 바꿀 것.
+    """
+    return re.sub(r"[\s_.]+", "", (t or "").lstrip("#")).lower()
+
+
 # ---------------------------------------------------------------- 아이템 → RawReview (액터 공용)
 def _item_to_review(item: dict, *, platform: str, classify_fn=None,
                     hashtag: str | None = None) -> Optional[RawReview]:
@@ -129,16 +140,29 @@ class ApifyHashtagSource(Source):
     (data/apify_hashtag_sample.json, eval/test_apify_source.py).
     """
     platform = "instagram"
-    COST_PER_1000 = 1.90   # USD, pay-per-result (2026-07-14 확인)
+    # ⚠️ 이 상수는 **로그용 추정치**일 뿐이다. 정본은 run 이 돌려주는 `usageTotalUsd` 이고
+    #   봉투(`rawstore`)에 그대로 남긴다 — `ApifyProfileFeedSource` 가 세운 선례.
+    #   액터는 PAY_PER_EVENT(단일 이벤트 `result`, '데이터셋에 쓰인 결과 1건')이고 요금이
+    #   **계정 티어별로 다르다**(FREE $0.0026 / BRONZE $0.0023 / … / DIAMOND $0.0014,
+    #   2026-08-09 액터 API 확인). 그래서 상수 하나로는 원리적으로 못 맞춘다.
+    #   실측(2026-08-09, 이 계정 · 이 액터): 프로브 264건에 $0.5635 → **$2.13/1000**
+    #   (= SILVER 티어 $0.0021). 1.90 은 어느 티어와도 맞지 않던 값이라 실측치로 고친다.
+    #   ⚠️ 액터마다 다르다 — 같은 날 피드 액터는 2,302건 $5.5984 로 $2.43/1000 이었다.
+    #   ⚠️ **요청량이 아니라 반환량에 과금된다** — `resultsLimit` 을 100 으로 올려도 15건만
+    #     오면 15건 값만 낸다. 창을 넓히는 비용은 '안 오면 0'이다.
+    COST_PER_1000 = 2.13
 
     def __init__(self, token: str | None = None, hashtags: list[str] | None = None,
                  actor: str = "apify/instagram-hashtag-scraper",
                  results_per_hashtag: int = 30, classify_fn=None,
+                 raw_kind: str = "ig_hashtag",
                  hashtags_path: Optional[str] = None):
         self.token = token
         self.actor = actor
         self.results_per_hashtag = results_per_hashtag
         self.classify_fn = classify_fn
+        self.raw_kind = raw_kind
+        self.last_usage_usd: float | None = None
         # 큐레이션 태그: 명시 인자 > hashtags_path 파일 > config 기본 경로
         self.hashtags = hashtags if hashtags is not None else self._load_hashtags(hashtags_path)
 
@@ -196,7 +220,16 @@ class ApifyHashtagSource(Source):
 
     # -------- 네트워크 경계(테스트 주입점) --------
     def _run(self, hashtags: list[str]) -> list[dict]:
-        """Apify actor 실행 → 데이터셋 아이템(raw dict) 리스트. 실패/토큰없음이면 []."""
+        """Apify actor 실행 → 데이터셋 아이템(raw dict) 리스트. 실패/토큰없음이면 [].
+
+        ⚠️ **가공 전에 원문을 디스크에 남긴다**(`rawstore`, ADR-0013). 이 경로는 오래
+          예외였다: 판매자 피드는 `_run` 안에서 저장하는데 해시태그는 액터 응답이
+          `RawReview` → LLM → DB 한 패스로만 흘러 **어디에도 안 남았다**. 그래서 다음 단계가
+          죽으면(실측: OpenAI 크레딧 소진 429 — 첫 LLM 이 홍보성 캐스케이드라 매핑 직후다)
+          방금 산 결과가 통째로 사라진다. 저장이 여기 있어야 재처리가 **Apify 0원**이 된다.
+        **Don't:** 저장을 `collect` 로 올리지 말 것 — 게이트가 예외를 내는 순간 같은 구멍이다.
+        """
+        self.last_usage_usd = None
         if not self.token:
             log.info("APIFY_TOKEN 미설정 → 해시태그 수집 스킵")
             return []
@@ -216,15 +249,64 @@ class ApifyHashtagSource(Source):
             # v3: .call() 은 pydantic Run 모델(run.default_dataset_id).
             # v1: dict({"defaultDatasetId": ...}). 둘 다 지원.
             ds_id = getattr(run, "default_dataset_id", None)
-            if ds_id is None and isinstance(run, dict):
-                ds_id = run.get("defaultDatasetId")
+            usd = getattr(run, "usage_total_usd", None)
+            if isinstance(run, dict):
+                ds_id = ds_id or run.get("defaultDatasetId")
+                usd = usd if usd is not None else run.get("usageTotalUsd")
             if not ds_id:
                 log.warning("Apify run 에 dataset id 없음: %r", run)
                 return []
-            return list(client.dataset(ds_id).iterate_items())
+            items = list(client.dataset(ds_id).iterate_items())
+            self.last_usage_usd = usd if isinstance(usd, (int, float)) else None
         except Exception as e:                       # 네트워크/플랜/쿼터 실패 → 회복력 있게 스킵
             log.warning("Apify 수집 실패: %s", e)
             return []
+        # ---- 가공 **전** 저장. 이 줄보다 앞에서 items 를 건드리지 않는다. ----
+        self._save_raw(items, hashtags)
+        return items
+
+    def _save_raw(self, items: list[dict], hashtags: list[str]) -> None:
+        """런 결과를 **요청 태그별로** 갈라 저장한다. 실패해도 유료 결과를 버리지 않는다.
+
+        왜 태그별인가(런 한 덩어리가 아니라):
+          · **0건이 태그 단위로 보여야 한다.** 실측으로 `#깡수박화채` 는 두 번 연속 0건인데
+            같은 런의 `#빈짱슬라임` 은 5건이었다. 한 봉투로 뭉치면 '이 태그는 액터가 못 찾는다'
+            라는 사실이 사라지고 `ingest_post_urls` 로 보낼 대상을 못 고른다.
+          · **워터마크가 앵커별이어야 한다**(`rawstore.newest_timestamp`). 디시 워터마크를
+            갤러리 전체 최댓값으로 두면 처음 수집하는 제품의 과거가 통째로 잘리는 것과 같은
+            실패다 — 런 단위 키는 그 실패를 해시태그 쪽에 그대로 만든다.
+        비용은 **건수 비례로 나눈다.** 근사가 아니라 정확하다 — 액터가 PAY_PER_EVENT 단일
+        이벤트(`result`)라 결과 1건의 값이 런 안에서 동일하다. 나누지 않고 런 총액을 봉투마다
+        적으면 합계가 태그 수만큼 부풀고, 그 숫자로 다음 런 예산을 잡게 된다.
+        """
+        from .. import rawstore
+
+        buckets: dict[str, list[dict]] = {t: [] for t in hashtags}
+        norm = {_norm_hashtag(t): t for t in hashtags}
+        unmatched: list[dict] = []
+        for item in items:
+            hit = [norm[_norm_hashtag(t)] for t in (item.get("hashtags") or [])
+                   if _norm_hashtag(t) in norm]
+            if not hit:
+                # 요청 태그가 캡션 태그 목록에 없다 — 액터가 관련 글로 끼워 준 경우다.
+                # 버리지 않고 별도 키로 남긴다(무음 드롭 금지). 재처리는 이 키도 읽는다.
+                unmatched.append(item)
+                continue
+            for t in hit:                    # 비교글은 여러 태그에 걸린다 — 양쪽에 남긴다
+                buckets[t].append(item)
+        unit = (self.last_usage_usd / len(items)) if (items and self.last_usage_usd) else None
+        for tag, rows in list(buckets.items()) + ([("_unmatched", unmatched)] if unmatched else []):
+            try:
+                rawstore.save_run(
+                    rows, actor=self.actor, kind=self.raw_kind, key=tag,
+                    requested={"resultsLimit": self.results_per_hashtag,
+                               "hashtags_in_run": hashtags},
+                    usage_usd=(unit * len(rows)) if unit is not None else None)
+            except OSError as e:             # 디스크 실패로 유료 결과를 버리진 않는다
+                log.error("원문 저장 실패 (#%s) — 메모리 결과는 계속 사용: %s", tag, e)
+        empty = [t for t, rows in buckets.items() if not rows]
+        if empty:                            # 조용한 0건 금지 — URL 경로로 보낼 후보다
+            log.info("해시태그 0건: %s", ", ".join("#" + t for t in empty))
 
     # -------- 아이템 → RawReview --------
     def _to_review(self, item: dict, hashtag: str | None = None) -> Optional[RawReview]:
@@ -235,10 +317,14 @@ class ApifyHashtagSource(Source):
                 target: dict | None = None) -> Iterator[RawReview]:
         hashtags = self._resolve_hashtags(keywords)
         items = self._run(hashtags)
-        # 관측성: 요청 태그 수 / 반환 건수 / 예상비용(무음 상한 금지)
-        cost = len(items) / 1000 * self.COST_PER_1000
-        log.info("Apify 해시태그 %d개 요청 → %d건 반환 (예상비용 $%.4f)",
-                 len(hashtags), len(items), cost)
+        # 관측성: 요청 태그 수 / 반환 건수 / 비용(무음 상한 금지).
+        # 실사용액이 있으면 그걸 쓴다 — 상수는 티어를 모르는 추정치다(COST_PER_1000 주석).
+        if isinstance(self.last_usage_usd, (int, float)):
+            log.info("Apify 해시태그 %d개 요청 → %d건 반환 (실사용 $%.4f)",
+                     len(hashtags), len(items), self.last_usage_usd)
+        else:
+            log.info("Apify 해시태그 %d개 요청 → %d건 반환 (추정 $%.4f)",
+                     len(hashtags), len(items), len(items) / 1000 * self.COST_PER_1000)
         # 매핑(중복접기 + 저품질 드롭) — 관련성 게이트 이전 상태.
         seen, mapped = set(), []
         for item in items:

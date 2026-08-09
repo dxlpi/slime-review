@@ -6,10 +6,20 @@
 댓글 식별자 — 2026-08-06 라이브 검증: 고유 id 키는 `no`, 스레드번호는 `parent`(대댓글 부모는 `c_no`).
 **점프 앵커는 없음**: 댓글이 AJAX 렌더라 서버 HTML 에 댓글 id·`comment_li`·`#comment` 가 전무 →
 원문 링크는 앵커 없이 스레드 URL 로 간다(`source_links` 참조). id 는 옵션으로 보존만.
+
+[결정 2026-08-09] **이 경로도 가공 전에 원문을 남긴다**(`rawstore`, kind `dc_thread`).
+오래 인스타 경로만 저장소를 가졌다 — 디시는 액터가 아니라 직접 HTTP 라 '당장 나가는 돈'이
+없어서 밀렸다. 그런데 이 경로의 유료 단계는 수집이 아니라 **추출**이고, 저장이 없으면
+추출 규칙을 고칠 때마다 HTTP 부터 다시 밟아야 한다(인스타가 `from_raw=True` 로 건너뛰는 그 단계).
+게다가 갤러리는 변한다 — 글이 지워지고 댓글이 붙는다. 그래서 '공짜니 다시 받으면 된다'가
+성립하지 않는다: 지워진 글은 재수집으로 못 되찾는다.
+저장 단위는 **스레드 하나**이고 저장 시점은 **응답 직후**다(`_candidates_for` 안) — 값이 나가는
+단위가 스레드이므로, 키워드 루프 끝에 몰아 저장하면 중간에 죽을 때 이미 받은 스레드가 통째로 날아간다.
 """
 
 from __future__ import annotations
-from typing import Iterator
+from typing import Iterator, Optional
+from pathlib import Path
 from urllib.parse import urlencode
 import re
 
@@ -37,7 +47,10 @@ class DCInsideSource(Source):
                  classify_fn=None,
                  include_comments: bool = True,    # 이 갤은 후기가 댓글에 많음
                  comment_pages: int = 1,
-                 gall_type: str = "M"):            # [ADJUST] 마이너갤=M (라이브 검증)
+                 gall_type: str = "M",             # [ADJUST] 마이너갤=M (라이브 검증)
+                 raw_kind: str = "dc_thread",
+                 save_raw: bool = True,
+                 raw_root: Optional[Path] = None):
         self.gid = gallery_id
         self.board = "mgallery/board" if is_minor else "board"
         self.throttle = Throttle(min_interval)
@@ -45,6 +58,11 @@ class DCInsideSource(Source):
         self.include_comments = include_comments
         self.comment_pages = comment_pages
         self.gall_type = gall_type
+        self.raw_kind = raw_kind
+        # `save_raw=False` 는 테스트·스모크용이다. 라이브 수집에서 끄지 말 것 — 지워진 글은
+        # 재수집으로 못 되찾으므로, 안 남긴 스레드는 영구 유실이다.
+        self.save_raw = save_raw
+        self.raw_root = raw_root          # 테스트가 임시 디렉터리를 주입하는 자리(기본 settings.raw_dir)
         self.last_gate = None                 # 마지막 collect 의 관련성 게이트(호출부 관측성)
         self.s = requests.Session()
         self.s.headers.update({"User-Agent": user_agent})
@@ -152,7 +170,17 @@ class DCInsideSource(Source):
                         "ip": c.get("ip"), "date": c.get("reg_date")})
         return out
 
-    def _fetch_comments(self, no: str, referer: str, token: str) -> list[dict]:
+    def _fetch_comment_payloads(self, no: str, referer: str, token: str) -> list[dict]:
+        """댓글 AJAX 응답을 **파싱 전 JSON 그대로** 페이지 순서로 돌려준다.
+
+        `_parse_comments` 를 여기서 적용하지 않는 이유가 `rawstore` 의 존재 이유와 같다 —
+        디시콘/빈 댓글 제외는 **처리 규칙**이고, 규칙이 바뀌면 원문에서 다시 뽑아야 한다.
+        파싱한 결과만 남기면 그 재처리가 다시 HTTP 부터 시작된다.
+
+        ⚠️ 텍스트 댓글이 0인 페이지도 **저장은 하고** 거기서 페이징을 끊는다. 저장을 건너뛰면
+          '그 페이지를 안 받았다'와 '받았는데 디시콘뿐이었다'가 구분되지 않는다 — 봉투가
+          0건 런도 남기는 것과 같은 이유다.
+        """
         out, headers = [], {"X-Requested-With": "XMLHttpRequest", "Referer": referer}
         for cpage in range(1, self.comment_pages + 1):
             data = {"id": self.gid, "no": no, "cmt_id": self.gid, "cmt_no": no,
@@ -160,14 +188,26 @@ class DCInsideSource(Source):
             self.throttle.wait()
             try:
                 r = self.s.post(self.COMMENT_URL, data=data, headers=headers, timeout=10)
-                page = self._parse_comments(r.json())
+                payload = r.json()
             except Exception as e:
                 log.warning("댓글 로드 실패(no=%s): %s", no, e)
                 break
-            if not page:
+            out.append(payload)
+            if not self._parse_comments(payload):
                 break
-            out.extend(page)
         return out
+
+    def _comments_from_payloads(self, payloads: list[dict]) -> list[dict]:
+        """페이지별 원문 JSON → 텍스트 댓글 평탄 목록. 라이브·재처리가 **공유**하는 유일한 경로."""
+        out: list[dict] = []
+        for payload in payloads:
+            out.extend(self._parse_comments(payload))
+        return out
+
+    def _fetch_comments(self, no: str, referer: str, token: str) -> list[dict]:
+        """수집 + 파싱 한 번에(호환 유지 — `evals/seed_dcinside_relevance.py`). 저장은 안 한다."""
+        return self._comments_from_payloads(
+            self._fetch_comment_payloads(no, referer, token))
 
     def collect(self, keywords: list[str], limit: int = 100,
                 max_pages: int = 5, target: dict | None = None,
@@ -251,15 +291,78 @@ class DCInsideSource(Source):
                     yield from gate.filter(self._candidates_for(purl, kw))
         gate.finish()
 
+    # ---- 원문 스냅샷 ----
+    RAW_NOTE = ("디시 스레드 원문 스냅샷 — 파싱 전 HTML + 댓글 AJAX JSON 그대로. "
+                "재처리는 이 파일에서 하고 갤러리를 다시 긁지 않는다(slime_rag/sources/dcinside.py).")
+
+    def _save_raw(self, purl: str, kw: str, phtml: str, payloads: list[dict]) -> None:
+        """스레드 1건의 원문을 디스크에 남긴다 — **처리 이전, 응답 직후**.
+
+        키는 **글번호**다(인스타 해시태그 경로가 요청 태그를 키로 쓰는 것과 다르다).
+        여기선 값이 나가는 단위도, 사이트에서 사라질 수 있는 단위도 스레드이기 때문이다.
+        요청 키워드는 봉투의 `requested.keyword` 로 남으므로 '어느 앵커로 닿았나'는 보존된다
+        (재처리 선택이 그 값을 읽는다). 대신 '이 키워드는 0건'이라는 사실은 이 저장소가 아니라
+        수집 로그·게이트 카운터가 갖는다 — 목록 단계의 사실이라 스레드 봉투에는 담을 자리가 없다.
+
+        ⚠️ 저장 실패로 수집을 중단하지 않는다. 이미 받아 둔 응답은 메모리에서 계속 쓴다
+          (인스타 경로와 같은 규칙) — 디스크 문제로 이번 런의 처리까지 잃을 이유는 없다.
+        ⚠️ 봉투의 `usage_total_usd` 는 **None** 이다. 이 경로는 액터가 아니라 직접 HTTP 라
+          건당 청구가 없다 — 0.0 으로 적으면 '공짜'가 아니라 '측정해서 0'처럼 읽힌다.
+        """
+        if not self.save_raw:
+            return
+        from .. import rawstore
+
+        m = self._NO_RE.search(purl)
+        if m is None:
+            # 글번호 없는 URL 은 `_parse_list` 가 안 내보내지만(숫자 no 만 통과) 재방문 인자로는
+            # 들어올 수 있다. 조용히 안 남기지 않는다 — 남기되 키를 분리하고 경고한다.
+            log.warning("글번호를 못 읽어 스레드 키를 분리한다: %s", purl)
+        no = m.group(1) if m else "_no_thread_no"
+        items: list[dict] = [{"id": f"{no}:post", "type": "post", "thread_no": no,
+                              "url": purl, "html": phtml}]
+        for i, payload in enumerate(payloads, start=1):
+            items.append({"id": f"{no}:cmt:{i}", "type": "comments", "thread_no": no,
+                          "comment_page": i, "payload": payload})
+        try:
+            rawstore.save_run(items, actor=f"dcinside:{self.gid}", kind=self.raw_kind, key=no,
+                              requested={"url": purl, "keyword": kw, "gallery": self.gid,
+                                         "comment_pages": self.comment_pages},
+                              usage_usd=None, note=self.RAW_NOTE, root=self.raw_root)
+        except OSError as e:
+            log.error("원문 저장 실패(no=%s) — 메모리 결과는 계속 사용: %s", no, e)
+
     def _candidates_for(self, purl: str, kw: str) -> list[RawReview]:
         """글 1건 → 관련성 게이트에 넣을 후보 배치(본문 + 댓글). 상세·댓글 HTTP 가 여기서 난다.
 
         글 단위로 배치를 잡는 건 상한 도달 시 다음 글의 댓글 요청을 아끼기 위한
         책임 수집(D9) 균형점이다 — 페이지 전체를 모으면 그 절약이 사라진다.
+
+        순서가 규칙이다: **받기 → 저장 → 만들기.** 파싱(`_build_candidates`)이 예외로 죽어도
+        방금 받은 원문은 디스크에 남아 있어야 한다 — 저장을 뒤로 미루면 셀렉터 하나 깨진 날
+        그 런의 HTTP 가 통째로 헛일이 된다.
         """
         phtml = get(self.s, purl, self.throttle)
         if not phtml:
             return []
+        payloads: list[dict] = []
+        if self.include_comments:
+            token = self._extract_token(phtml)
+            m = self._NO_RE.search(purl)
+            if token and m:
+                payloads = self._fetch_comment_payloads(m.group(1), purl, token)
+        self._save_raw(purl, kw, phtml, payloads)
+        return self._build_candidates(purl, kw, phtml, payloads)
+
+    def _build_candidates(self, purl: str, kw: str, phtml: str,
+                          payloads: list[dict]) -> list[RawReview]:
+        """원문(HTML + 댓글 JSON) → `RawReview` 후보. **네트워크를 모른다.**
+
+        라이브 수집과 디스크 재처리가 **이 함수 한 벌**을 공유한다. 재처리 쪽에서 dict 를 따로
+        풀면 `meta` 모양이 갈려 하류(`extract.thread_key`·`source_links.build_source_ref`·
+        `index.post_columns`)가 소스마다 다른 값을 받는다 — 인스타 재처리가
+        `_post_to_seller_review` 를 공유하는 것과 같은 규칙이다.
+        """
         title, body, date, pmeta = self._parse_post(phtml)
         text = self._clean(f"{title or ''}\n{body or ''}")
         candidates: list[RawReview] = []
@@ -273,10 +376,9 @@ class DCInsideSource(Source):
             ))
         # --- 댓글(후기 다수) ---
         if self.include_comments:
-            token = self._extract_token(phtml)
             m = self._NO_RE.search(purl)
-            if token and m:
-                for i, c in enumerate(self._fetch_comments(m.group(1), purl, token)):
+            if m:
+                for i, c in enumerate(self._comments_from_payloads(payloads)):
                     ctext = self._clean(c["text"])
                     if is_low_quality(ctext):
                         continue
@@ -299,3 +401,72 @@ class DCInsideSource(Source):
                               "toxic": toxic_via_llm(ctext, self.classify_fn)},
                     ))
         return candidates
+
+    # ---- 디스크 재처리 (HTTP 0회) ----
+    def _raw_threads(self, keywords: list[str] | None = None,
+                     threads: list[str] | None = None) -> Iterator[tuple[str, dict, list[dict], list[str]]]:
+        """저장된 스레드를 `(글번호, 글 아이템, 댓글 payload 목록, 닿은 키워드)` 로 돌려준다.
+
+        런 병합 규칙은 `rawstore.latest_items` 와 같다 — 같은 `id` 는 **나중 캡처가 이긴다**.
+        재방문으로 댓글이 늘어난 스레드는 최신 캡처가 더 두껍기 때문이다.
+        ⚠️ 댓글 페이지는 **id 가 페이지 번호를 포함**한다(`<no>:cmt:<page>`). 나중 런이 더 얕게
+          돌면(`comment_pages` 를 줄이면) 옛 런의 뒷페이지가 그대로 남아 섞일 수 있다 —
+          유실보다 낫다는 판단이고, 중복 댓글은 하류의 `comment_no` 키(`pipeline.dc_post_id`)와
+          `UNIQUE(source, post_id, product)` 가 접는다.
+        """
+        from .. import rawstore
+
+        want_kw = {k for k in (keywords or []) if k}
+        want_no = {str(t) for t in (threads or [])}
+        for key in rawstore.iter_keys(self.raw_kind, root=self.raw_root):
+            if want_no and key not in want_no:
+                continue
+            merged: dict[str, dict] = {}
+            kws: list[str] = []
+            for doc in rawstore.load_runs(self.raw_kind, key, root=self.raw_root):
+                kw = (doc.get("requested") or {}).get("keyword")
+                if kw and kw not in kws:
+                    kws.append(kw)
+                for it in (doc.get("items") or []):
+                    iid = it.get("id")
+                    if iid:
+                        merged[iid] = it
+            # 키워드 필터는 **닿은 앵커** 기준이다. 저장 키가 글번호라 키워드는 봉투에만 있고,
+            # 한 스레드가 여러 키워드로 닿았으면 그중 하나만 겹쳐도 대상이다.
+            if want_kw and not (want_kw & set(kws)):
+                continue
+            post = next((it for it in merged.values() if it.get("type") == "post"), None)
+            if not post or not post.get("html"):
+                log.warning("원문에 글 HTML 이 없다 — 건너뜀(no=%s)", key)
+                continue
+            payloads = [it["payload"] for it in
+                        sorted((it for it in merged.values()
+                                if it.get("type") == "comments" and it.get("payload") is not None),
+                               key=lambda x: x.get("comment_page") or 0)]
+            yield key, post, payloads, kws
+
+    def collect_from_raw(self, keywords: list[str], limit: int = 100,
+                         target: dict | None = None,
+                         threads: list[str] | None = None) -> Iterator[RawReview]:
+        """`collect` 의 디스크 쌍둥이 — **HTTP 0회**. 게이트·후보 생성은 같은 코드가 돈다.
+
+        `keywords` 는 검색어가 아니라 **필터**다: 그 앵커로 닿아 저장된 스레드만 고른다
+        (빈 목록이면 저장소 전량). 관련성 게이트는 로컬 임베딩이라 재적용이 무료이고,
+        재적용해야 라이브 런과 같은 후보 집합이 나온다.
+        """
+        gate = RelevanceGate(self.platform, target, keywords, limit, log)
+        self.last_gate = gate
+        n = 0
+        for key, post, payloads, kws in self._raw_threads(keywords, threads):
+            if gate.should_stop():
+                gate.finish()
+                log.info("원문 재처리: 스레드 %d건 처리 후 게이트 예산 소진", n)
+                return
+            purl = post.get("url") or f"{self.BASE}/{self.board}/view/?id={self.gid}&no={key}"
+            # 키워드는 `meta["keyword"]` 로 하류까지 간다 — 저장 당시 닿은 앵커를 쓴다
+            # (여러 개면 첫 번째). 없으면 요청 필터의 첫 값, 그것도 없으면 빈 문자열.
+            kw = kws[0] if kws else (keywords[0] if keywords else "")
+            n += 1
+            yield from gate.filter(self._build_candidates(purl, kw, post["html"], payloads))
+        gate.finish()
+        log.info("원문 재처리: 스레드 %d건 (HTTP 0회)", n)

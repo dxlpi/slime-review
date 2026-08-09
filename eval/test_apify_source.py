@@ -395,6 +395,48 @@ def test_feed_token_unset_is_resilient():
     print("✓ 피드 소스: 토큰없음 회복력 OK")
 
 
+def test_run_usage_waits_for_settlement():
+    """`.call()` 반환값의 사용액은 **정산 전**일 수 있다 — 재조회해서 확정값을 쓴다.
+
+    실측 회귀(2026-08-09 해시태그 스윕): 첫 배치가 53건인데 $0.00 으로 기록됐고 마지막
+    배치 값은 앞 배치들의 합계였다. 봉투 합계 $1.62 대 계정 실제 $1.95 — **17% 과소**.
+    비용 기록이 낮으면 다음 런 예산을 그 숫자로 잡는다.
+    """
+    from slime_rag.sources.apify import finalized_usage_usd
+
+    calls = {"n": 0}
+
+    class _Run:
+        def get(self):
+            calls["n"] += 1
+            return {"id": "r1", "usageTotalUsd": 0 if calls["n"] < 2 else 0.42}
+
+    class _Client:
+        def run(self, rid):
+            assert rid == "r1"
+            return _Run()
+
+    stale = {"id": "r1", "usageTotalUsd": 0}          # 정산 전
+    got = finalized_usage_usd(_Client(), stale, tries=3, delay=0)
+    assert got == 0.42, f"정산된 값을 못 집었다: {got}"
+    assert calls["n"] == 2, f"불필요한 재조회: {calls['n']}"
+
+    # 이미 확정된 값이면 재조회하지 않는다(런마다 초 단위 지연이 붙으면 안 된다).
+    calls["n"] = 0
+    assert finalized_usage_usd(_Client(), {"id": "r1", "usageTotalUsd": 1.5}, delay=0) == 1.5
+    assert calls["n"] == 0, "확정값인데 다시 조회했다"
+
+    # 끝내 정산이 안 되면 None — 상수 추정치로 떨어지되 **실측인 척하지 않는다**.
+    class _NeverClient:
+        def run(self, rid):
+            class _R:
+                def get(self_inner):
+                    return {"id": rid, "usageTotalUsd": 0}
+            return _R()
+    assert not finalized_usage_usd(_NeverClient(), {"id": "r1"}, tries=2, delay=0)
+    print("✓ 런 사용액: 정산 대기 후 확정값 · 확정이면 무재조회 · 실패는 None OK")
+
+
 def test_hashtag_saves_raw_split_by_tag():
     """해시태그 런도 **가공 전에** 원문을 남긴다 — 태그별 키로.
 
@@ -502,6 +544,7 @@ if __name__ == "__main__":
     test_feed_requests_one_actor_call_per_handle()
     test_feed_token_unset_is_resilient()
     test_feed_shares_mapping_with_profile_source()
+    test_run_usage_waits_for_settlement()
     test_hashtag_saves_raw_split_by_tag()
     test_hashtag_raw_usage_is_split_not_duplicated()
     print("\n모든 오프라인 테스트 통과 ✅")

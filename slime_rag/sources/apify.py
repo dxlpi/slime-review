@@ -8,9 +8,61 @@ scraped=True). `_run` 이 유일한 네트워크 경계 → 샘플 주입으로 
 
 from __future__ import annotations
 import re
+import time
 from typing import Iterator, Optional
 
 from .base import RawReview, Source, RelevanceGate, is_low_quality, toxic_via_llm, log
+
+
+# ---------------------------------------------------------------- 런 실사용액(정산 대기)
+def _run_id(run) -> Optional[str]:
+    """`.call()` 반환값에서 run id — v3 는 pydantic 모델, v1 은 dict."""
+    rid = getattr(run, "id", None)
+    if rid is None and isinstance(run, dict):
+        rid = run.get("id")
+    return rid
+
+
+def _usage_usd(run) -> Optional[float]:
+    """런 객체에서 `usageTotalUsd` 한 번 읽기(정산 전이면 None/0)."""
+    usd = getattr(run, "usage_total_usd", None)
+    if isinstance(run, dict):
+        usd = usd if usd is not None else run.get("usageTotalUsd")
+    return usd if isinstance(usd, (int, float)) else None
+
+
+def finalized_usage_usd(client, run, *, tries: int = 4, delay: float = 1.0) -> Optional[float]:
+    """런의 **정산이 끝난** 실사용액. 없으면 None.
+
+    ⛔ `.call()` 이 돌려준 객체의 값을 그대로 쓰지 말 것 — 런은 끝났어도 과금 집계는 아직
+      안 끝나 있을 수 있다. **실측(2026-08-09, 해시태그 스윕 4배치)**: 첫 배치가 53건을
+      가져왔는데 `$0.00` 으로 기록됐고, 마지막 배치의 값은 앞 두 배치의 **합계**와 같았다.
+      그대로 봉투에 적으면 비용 기록이 실제보다 낮다 — 계정 API 대조로 봉투 합계 $1.62 대
+      실제 $1.95(**17% 과소**). 비용 기록이 낮으면 다음 런 예산을 그 숫자로 잡는다.
+    그래서 run 을 **다시 조회**해 값이 잡힐 때까지 짧게 기다린다. 끝내 없으면 None 이고,
+    호출부는 상수 추정치로 **떨어지되 그렇다고 로그에 적는다**(추정과 실측을 섞지 않는다).
+
+    ⚠️ 정말로 0원인 런(0건)은 `tries` 를 다 쓴다 — 최대 `tries*delay` 초. 그 대가로
+      '아직 정산 전'과 '진짜 0원'을 구분한다.
+    """
+    usd = _usage_usd(run)
+    if usd:                                   # 0 도 '아직'일 수 있어 truthy 로 본다
+        return usd
+    rid = _run_id(run)
+    if not (rid and client):
+        return usd
+    for _ in range(tries):
+        time.sleep(delay)
+        try:
+            fresh = client.run(rid).get()
+        except Exception as e:                # 조회 실패로 수집을 죽이지 않는다
+            log.warning("run 사용액 재조회 실패(%s): %s", rid, e)
+            return usd
+        got = _usage_usd(fresh)
+        if got:
+            return got
+    log.info("run %s 사용액이 정산되지 않음 — 비용 미기록", rid)
+    return usd
 
 
 def _norm_hashtag(t: str) -> str:
@@ -249,15 +301,13 @@ class ApifyHashtagSource(Source):
             # v3: .call() 은 pydantic Run 모델(run.default_dataset_id).
             # v1: dict({"defaultDatasetId": ...}). 둘 다 지원.
             ds_id = getattr(run, "default_dataset_id", None)
-            usd = getattr(run, "usage_total_usd", None)
             if isinstance(run, dict):
                 ds_id = ds_id or run.get("defaultDatasetId")
-                usd = usd if usd is not None else run.get("usageTotalUsd")
             if not ds_id:
                 log.warning("Apify run 에 dataset id 없음: %r", run)
                 return []
             items = list(client.dataset(ds_id).iterate_items())
-            self.last_usage_usd = usd if isinstance(usd, (int, float)) else None
+            self.last_usage_usd = finalized_usage_usd(client, run)
         except Exception as e:                       # 네트워크/플랜/쿼터 실패 → 회복력 있게 스킵
             log.warning("Apify 수집 실패: %s", e)
             return []
@@ -397,10 +447,9 @@ class ApifyPostUrlSource(Source):
                 "addParentData": False,
             })
             ds_id = getattr(run, "default_dataset_id", None)
-            usd = getattr(run, "usage_total_usd", None)
             if isinstance(run, dict):       # apify-client v1 은 dict
                 ds_id = ds_id or run.get("defaultDatasetId")
-                usd = usd if usd is not None else run.get("usageTotalUsd")
+            usd = finalized_usage_usd(client, run)
             if not ds_id:
                 log.warning("Apify run 에 dataset id 없음: %r", run)
                 return []
@@ -631,15 +680,13 @@ class ApifyProfileFeedSource(Source):
             client = ApifyClient(self.token)
             run = client.actor(self.actor).call(run_input=run_input)
             ds_id = getattr(run, "default_dataset_id", None)
-            usd = getattr(run, "usage_total_usd", None)
             if isinstance(run, dict):            # apify-client v1 은 dict
                 ds_id = ds_id or run.get("defaultDatasetId")
-                usd = usd if usd is not None else run.get("usageTotalUsd")
             if not ds_id:
                 log.warning("Apify run 에 dataset id 없음: %r", run)
                 return []
             items = list(client.dataset(ds_id).iterate_items())
-            self.last_usage_usd = usd if isinstance(usd, (int, float)) else None
+            self.last_usage_usd = finalized_usage_usd(client, run)
         except Exception as e:                   # 네트워크/플랜/쿼터 실패 → 회복력 있게 스킵
             log.warning("Apify 피드 수집 실패 (%s): %s", username, e)
             return []

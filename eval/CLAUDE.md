@@ -8,7 +8,9 @@
 | 파일 | 역할 |
 |---|---|
 | `test_bias.py` | 편향 태깅 — 게이트 recall/단락/precision 보존/config (18 케이스) |
-| `test_apify_source.py` | Apify 어댑터 오프라인 매핑·provenance·중복접힘·회복력 + **`fetch_profiles`**(로고 URL — HD 우선·폴백·결손 드롭, 게시물/타계정 아바타 미유출) (11 케이스) |
+| `test_apify_source.py` | Apify 어댑터 오프라인 매핑·provenance·중복접힘·회복력 + **`fetch_profiles`**(로고 URL — HD 우선·폴백·결손 드롭, 게시물/타계정 아바타 미유출) + **URL 소스**(앵커 오염 금지) + **피드 전량 소스**(실 액터 payload 32건 매핑 · `review_class` 미부착 · 소유자 폴백 · 핸들당 호출 1회 · profile-scraper 와 매퍼 한 벌) + 큐레이션 태그가 **KB 마켓 전부**를 덮는지(개수 상수 대신 커버리지) (24 케이스) |
+| `test_rawstore.py` | 원문 스냅샷 저장소 — 봉투 왕복(원문 무가공) · **append-only**(덮어쓰기 없음) · **최신 캡처 우선**(같은 초 충돌 정렬 회귀) · 런 합집합 · 0건 런 기록 · **워터마크 키별 격리** · 핸들 구분자 보존 · 경로이탈 차단 · 깨진 파일 비치명 · manifest 집계 (12 케이스) |
+| `test_product_registry.py` | 제품 후보 유도 — 마켓명/광역어 제외 · **고빈도 개인태그 분리(삭제 아님)** · 소표본 단정 금지 · 게시물 단위 계수 · 캡션 본문 미유출(ADR-0013) · **LLM 0회** · `load_product_registry` 마켓태그 배제 (10 케이스) |
 | `test_consolidated_sections.py` | 리뷰 요약(**6기준 × `{verdict, minority}`** + 장단점) — 미언급=빈칸·단일소스=통합None·홍보성 분리·no-LLM 회귀 + 배송·CS 섹션(주문단위 필드의 행 복제 계약) + 스키마 계약(소리·지속력 재료 유입 / `cs`·`shipping` 분기 / `promo_view` 키) + **ADR-0014 계약**(`criterion_stats` 판정 · 갭 미유입·카운트 출처 격리 · 부재/메타 스크럽 · **과잉 차단 회귀** · 1회 재시도 · 여섯 프롬프트 규칙 도달) + **ADR-0015 계약**(축 분리 — 제품 축에 주문 기준 부재 · 팬아웃 `_fold_orders` 접기 + **과소 집계 회귀** · 축 간 프롬프트 누출 · 축별 스키마) (24 케이스) |
 | `test_relevance_gate.py` | 관련성 게이트 — topic/domain 축 + **M/Q/E 3축**(KAX-AC4~AC10: chrome-strip·평서형 종결어미·전언 분리·편향 보존·순위/예산) |
 | `test_extract_hearsay.py` | 전언 하드닝(AC15) — 프롬프트 스냅샷 + `firsthand_evidence` 결정적 게이트 + 실호출 통합 |
@@ -32,6 +34,8 @@ python -m eval.test_source_links     # 원문 링크·임베드 정책(CI 게이
 python -m eval.test_layer1_collection  # 1층 수집 누적성(upsert COALESCE · 대상 선정)
 python -m eval.test_incremental_collection  # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair     # 제품명 귀속 복구(유령 제거 vs 진짜 제품 보존)
+python -m eval.test_rawstore           # 원문 저장소(append-only · 최신캡처 우선 · 워터마크)
+python -m eval.test_product_registry   # 제품 후보 유도(빈도 분리 · 무과금 · 캡션 미유출)
 python -m eval.test_post_columns     # 원문·작성 메타 매핑(CI 게이트)
 python -m eval.test_extract_thread   # 스레드 배치(키 없으면 실호출 케이스만 skip)
 python -m evals.run               # 추출/개체연결 pass-rate 지표 (→ ../evals/CLAUDE.md)

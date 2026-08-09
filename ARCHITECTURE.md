@@ -19,6 +19,7 @@ flowchart LR
     DC[DCInsideSource<br/>디시 아모스갤·부정편향]
     AP[ApifyHashtagSource<br/>인스타 해시태그·긍정편향]
     IG[InstagramSource<br/>1층 스펙·fixture]
+    PF[ApifyProfileFeedSource<br/>1층 판매자 피드 전량]
   end
   DC --> REL
   AP --> REL
@@ -27,6 +28,9 @@ flowchart LR
   BIAS -->|실사용·홍보성| EX2
   IG -->|fixture| L1
   L1[layer1.py<br/>seed_kb_products] --> SPEC
+  PF -->|가공 전 원문| RAW[(rawstore<br/>data/raw · append-only)]
+  RAW -->|from_raw · Apify 0원| SPEC
+  RAW -->|해시태그 빈도 · LLM 0회| REG[derive_product_registry<br/>제품 후보 / 마켓태그 후보]
   SPEC[extract.extract_spec<br/>1층 스펙] --> DBs[(specs)]
   EX2[extract.py<br/>2층 후기] --> LINK
   LINK[linking.py<br/>KB 개체연결·abstain] --> IDX
@@ -101,6 +105,9 @@ flowchart TD
 | `criterion_stats` 출력 | 요약 프롬프트의 `counts` · `review_summaries.payload` 스냅샷 — 숫자는 여기서만 나온다(ADR-0014, 화면 배지는 철회) |
 | 팬아웃 접기 키(`evidence_group_key`) | 근거 목록 그룹핑 · `list_reviews` 중복 제거 · **주문 축 집계·재료**(`_fold_orders`) — 한 조각을 세는 규칙이 갈리면 화면마다 건수가 달라진다(ADR-0015) |
 | `reviews` 에 작성일·반응수 컬럼 추가 | `pipeline.REVIEW_SORTS`(정렬 메뉴) · `list_reviews` · 리뷰 카드 라벨('수집' → '작성') |
+| `rawstore` 봉투 모양 | `slime_rag/sources/apify.py` 의 저장 호출 · `pipeline._raw_seller_posts`(재처리) · `derive_product_registry` · `manifest` — **봉투를 바꾸면 이미 디스크에 쌓인 스냅샷과 갈린다**(append-only 라 옛 파일은 재작성되지 않는다). 새 키는 더하되 있던 키의 뜻은 바꾸지 말 것 |
+| 판매자 매퍼(`_post_to_seller_review`) | `InstagramProfileSource`(~12 창) · `ApifyProfileFeedSource`(전량) · `_raw_seller_posts`(디스크 재처리) 셋이 공유 — `meta` 가 갈리면 `bias.partition` 이 경로마다 다른 값을 받는다 |
+| 마켓 목록(KB `markets[]`) | `_seller_targets`(수집 두 경로의 유일한 열거자) · `data/ig_hashtags.json`(`by_market` 키 = `market_word`, 게이트가 커버리지 강제) · `derive_product_registry` |
 
 ## 배포 (마지막 하드게이트)
 Render(관리형 Postgres+pgvector) → `schema.sql` 적용 → 정적 사이트(`web/`) + API 웹서비스(`api/`) 2개.

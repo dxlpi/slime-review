@@ -41,6 +41,7 @@ something to correct for** — never average it; show it per source, plus the ga
   no `resultsLimit`, so old products need repeat runs over time — but unlike the hashtag path it is
   **not rank-biased** (whole feed, not a top-N subset). It collects **seller posts only**; user reviews
   live on other accounts and stay the hashtag path's job.
+  **That 12-post ceiling is now bypassable** — see the raw-first collection entry below.
   ⚠️ **The second run moved Layer 1 coverage but not the review-side vocabulary gap** — of the 84
   product names on review rows, the 76 with no seller-side counterpart stayed at 76. The window is
   recent-only, so what arrives is new releases while the review corpus is about older products.
@@ -164,6 +165,39 @@ something to correct for** — never average it; show it per source, plus the ga
     `specs`, which doubles as the filter that keeps paid summaries off ghost products.
   Known hole, left deliberately: a piece whose extraction yields `reviews: []` leaves no row, so it is
   re-extracted every run. The tombstone ledger that would fix it is out of scope at ~19 threads/day.
+- **Collection is raw-first, and the product registry is derived for free** (2026-08-07). Two
+  problems, one change. ① Apify responses were **never persisted** — actor → `RawReview` → LLM → DB
+  was one pass, so a wrong extraction rule meant re-buying the scrape (which is exactly what the
+  phantom-product repair cost). ② The 14 markets' `products: []` is empty in the KB and fillable only
+  from the 4-handle fixture, so the residual phantom tags (`#꼼픽`·`#숭슬지나`) had no possible fix.
+  · **`slime_rag/rawstore.py`** puts a disk layer between the paid step and every processing step:
+    `data/raw/<kind>/<key>/<utc>.json`, one file per run, **append-only** (a later, shallower run
+    can never destroy an earlier capture — that property *is* the rollback story). The envelope
+    records actor/requested/`scraped_at`/`usage_total_usd`, matching the `_note`/`actor`/`items[]`
+    convention the old hand-made snapshots already used. Gitignored (ADR-0013).
+    ⚠️ Merge order is the envelope's `scraped_at`, **not** the filename — that broke in development:
+    a `-2` collision suffix sorts *before* the plain name (`-` < `.`), so the newest capture lost.
+  · **`pipeline.collect_seller_feeds`** walks each market's feed N deep via a different actor
+    (`apify/instagram-scraper`, `directUrls`=profile URL — it takes `resultsLimit`, which
+    `instagram-profile-scraper` does not). **One actor call per handle**, saved inside `_run` on
+    return, so a failure at market 9 cannot lose markets 1–8 of a paid sweep. `newer_than="auto"`
+    is a **per-market** watermark (`rawstore.newest_timestamp`) for the same reason the dcinside one
+    is per-anchor. `hit_limit` marks a feed that may have been truncated — no silent cap.
+    **No LLM, no DB.** `dry_run=True` default; 14 × 200 has a $7.56 ceiling.
+  · **`ingest_seller_profiles(from_raw=True)`** re-extracts off disk — LLM cost only, Apify $0.
+    Mapping goes through the same `_post_to_seller_review` the collector uses; unpacking the dict
+    separately would split `meta` shapes and feed `bias.partition` different values per source.
+  · **`pipeline.derive_product_registry`** (LLM 0회) turns the deep feed into per-market product
+    candidates, reusing `extract.product_hashtags` + `_tag_exclusions` verbatim and adding only
+    aggregation. The new signal is **frequency**: a personal tag sits on nearly every post, a product
+    tag on a handful — uncomputable from a 12-post window, and the only thing that can separate
+    `#꼼픽` from `#빠코볼`. High-coverage tags go to `market_tag_candidates` for **human** promotion,
+    never auto-excluded (over-exclusion deletes real products and is invisible on screen).
+    Output is `data/product_registry.json` — names/counts/dates/permalinks, **no caption text**, so
+    it commits. **Don't write it into KB `products[]`**: that field holds Layer-1 spec objects and
+    name-only entries are exactly the all-null shape `_specs_from_seller_post` drops as thin.
+  Both collectors stay: the cheap ~12 window for a daily top-up, the deep sweep for the product list.
+  **Not yet run against live data** — the sweep is paid and awaits a go.
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
@@ -190,6 +224,10 @@ python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 
 python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인 멱등성 · 1층 수집 누적성
 python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
+python -m eval.test_rawstore && python -m eval.test_product_registry  # 원문 저장소 · 제품 후보 유도
+python -c "from slime_rag import pipeline as p; print(p.collect_seller_feeds())"        # 1층 피드 전량 수집(dry_run 기본 · $0)
+python -c "from slime_rag import rawstore; print(rawstore.manifest())"                  # 원문 저장소 현황(무과금)
+python -c "from slime_rag import pipeline as p; print(p.derive_product_registry())"     # 제품 후보 레지스트리(LLM 0회)
 python -m eval.test_extract_hearsay && python -m eval.test_extract_thread   # extraction hardening / batching
 python evals/check_gold_integrity.py && python evals/calibrate_relevance.py --report   # gold + 3-axis gates
 python -m evals.run --min 1.0             # evaluation pass-rate gate

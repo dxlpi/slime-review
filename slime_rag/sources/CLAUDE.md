@@ -11,7 +11,7 @@
 | `base.py` | `RawReview`, `Source` ABC, `Throttle`, `robots_allowed`, `get`, 노이즈/유해 필터 |
 | `dcinside.py` | `DCInsideSource` — 아모스갤 본문+댓글(AJAX), 2층 백본 |
 | `instagram.py` | `InstagramSource` — 1층 fixture / Graph API 스텁 |
-| `apify.py` | `ApifyHashtagSource`(2층 해시태그) · `InstagramProfileSource`(1층 판매자) |
+| `apify.py` | `ApifyHashtagSource`(2층 해시태그) · `ApifyPostUrlSource`(2층 URL 직접) · `InstagramProfileSource`(1층 판매자 최신 ~12) · `ApifyProfileFeedSource`(1층 판매자 피드 전량 · 원문 디스크 저장) |
 | `orchestration.py` | `expand_queries`, `collect_all` |
 | `__init__.py` | 공개 API 재수출(`__all__`) — 외부는 항상 여기서 import |
 | `__main__.py` | `python -m slime_rag.sources [해시태그...]` CLI 데모 |
@@ -28,6 +28,22 @@ python -m eval.test_apify_source               # 오프라인 매핑 검증
 ## Non-obvious (주의 / Gotcha)
 - **Important:** 서브모듈은 패키지 한 단계 아래라 상위 모듈 접근은 `from ..config`/`..bias`/`..linking`/`..layer1`(더블닷). base 내부는 `from .base`.
 - **Note:** `_run`(apify) 이 유일한 네트워크 경계 — 오프라인 테스트는 여기 샘플 주입으로 무비용 검증.
+- **Important:** 1층 판매자 수집기가 **둘**이고 창 크기가 다르다. `InstagramProfileSource`
+  (profile-scraper)는 최신 **~12개**가 상한이다 — 액터에 `resultsLimit` 이 아예 없다.
+  `ApifyProfileFeedSource`(instagram-scraper, `directUrls`=프로필 URL)는 N개까지 내려간다.
+  마켓의 **제품 목록**을 만들려면 후자여야 한다: 12개 창은 최신순이라 들어오는 게 신제품인데
+  후기 코퍼스는 옛 제품 얘기를 한다(실측 — 1층 커버리지 10→12 마켓인데 어휘 갭 76은 그대로).
+- **Important:** `ApifyProfileFeedSource` 는 **핸들 하나당 액터 호출 하나**다. 몰아 넣으면
+  9번째에서 실패했을 때 1~8번의 **유료 결과까지** 날아간다. 그리고 저장은 `_run` **안에서**
+  응답 직후에 한다(`rawstore.save_run`) — 호출부에 두면 호출부가 죽는 순간 방금 산 원문이
+  사라진다. 테스트가 `_run` 을 통째로 주입하므로 오프라인 검증은 디스크를 안 건드린다.
+- **Don't:** 판매자 게시물에 `review_class` 를 달지 말 것. 2층 매퍼(`_item_to_review`)와
+  1층 매퍼(`_post_to_seller_review`)를 **합치지 않는 이유가 그것**이다 — 저쪽은 홍보성 라벨을
+  달아야 하고 이쪽은 달면 안 된다. 붙이는 순간 마켓 본인 글이 '홍보성 후기' 버킷으로 새고
+  1층 스펙 경로가 끊긴다(게이트: `eval/test_apify_source.py::test_feed_never_labels_review_class`).
+- **Note:** `ownerUsername` 이 비면 `inputUrl` 에서 핸들을 되찾는다(`_owner_from_input_url`).
+  소유자를 잃으면 `bias.partition` 이 판매자로 라우팅하지 못해 1층 글이 2층으로 샌다.
+  `/p/<code>/` 를 핸들 `p` 로 읽지 않게 게시물 경로는 명시적으로 뺀다.
 - **Don't:** 공개 심볼을 서브모듈에서 직접 import 하지 말 것 — 항상 `slime_rag.sources` 패키지 표면에서.
 - **Warning:** 토큰/패키지 없으면 소스는 예외 없이 `[]` 반환(회복력) — `collect_all` 이 스킵 로깅.
 

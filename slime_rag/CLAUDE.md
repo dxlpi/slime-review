@@ -19,10 +19,11 @@
 | `source_links.py` | 원문 링크 정책(순수) — `permalink`/`embed_url`/`evidence_group_key`/`build_source_ref`/`group_evidence_sources` + `logo_asset`(마켓 로고 표시 게이트). DB·네트워크·streamlit 무의존 |
 | `logos.py` | 마켓 IG 프로필 아바타 **1회성 수동 수집** CLI(ADR-0010) — 파이프라인 미배선, 자동갱신 없음 |
 | `consolidated_view.py` | 소스별 정서·갭·향불일치 + **기준별 건수**(`criterion_stats`) + 인스타/디시/통합 **리뷰 요약**(6기준 `CRITERIA` × **`{verdict, minority}`**, 미언급=빈칸; 홍보성 분리). **축 둘**(ADR-0015): 제품 축 `build_consolidated`(질감·향·소리·지속력 + 장단점) / 주문 축 `build_order_view`(고객응대·배송, **마켓당 한 벌**, 팬아웃 `_fold_orders` 접기). 마켓 모드(product=None) 지원 — 재료에 제품 라벨. **요약 프롬프트에 1층 스펙 미유입**(스펙↔후기 분리) |
+| `rawstore.py` | **수집 원문 스냅샷 저장소** — 가공 전 액터 응답을 그대로 디스크에(`data/raw/<kind>/<key>/<시각>.json`). append-only·최신캡처 우선 병합·키별 워터마크·`manifest`(무과금 관측). 네트워크·LLM·DB 무의존 |
 | `db.py` | pgvector(Postgres) 연결 한 곳 |
 | `llm_ops.py` | **모든 LLM 호출 단일 통로** — 로깅·토큰·비용(LEDGER)·재시도·structured outputs |
 | `config.py` | `.env` 단일 출처(`Settings` 데이터클래스) |
-| `pipeline.py` | end-to-end 오케스트레이터 + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치, 안정 키 `dc_post_id` · 워터마크 `_max_thread_no`) + 변경분 요약 갱신(`refresh_stale_summaries`/`_is_stale`, 판정 무료) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `order_view_for` 주문 축 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) + 요약 저장(`generate_summaries` 제품 · `generate_market_summaries` 마켓 · `stored_*`) |
+| `pipeline.py` | end-to-end 오케스트레이터 + **`collect_seller_feeds`**(1층 피드 전량 → 디스크, LLM 0회) · **`derive_product_registry`/`load_product_registry`**(해시태그 빈도 → 마켓별 제품 후보, LLM 0회) + `ingest_hashtag`(인스타)·`ingest_dcinside`(디시 배치, 안정 키 `dc_post_id` · 워터마크 `_max_thread_no`) + 변경분 요약 갱신(`refresh_stale_summaries`/`_is_stale`, 판정 무료) + UI 데이터접근 캡슐화(`consolidated_for` 제품 / `consolidated_for_market` 마켓 / `order_view_for` 주문 축 / `list_reviews` 커뮤니티 패널 + `REVIEW_SORTS`) + 요약 저장(`generate_summaries` 제품 · `generate_market_summaries` 마켓 · `stored_*`) |
 
 ## Common patterns (workflow)
 ```bash
@@ -205,6 +206,31 @@ python -m slime_rag.pipeline     # end-to-end 글루 (pgvector + .env 필요, �
   전부 매칭돼 **버릴 글에 유료 호출**이 나간다. 양방향으로 조용히 틀리고, 어느 쪽이 나올지는 그 런의
   무관한 다른 결과에 달린다(2026-08-07 실제 결함 — 테스트 픽스처가 수집기가 안 싣는 키를 넣어
   통과시켰다. 그래서 `eval` 픽스처는 `_candidates_for` 가 싣는 meta 만 담는다).
+- **Important:** 수집(유료·1회)과 처리(무료·N회)는 **디스크로 갈린다**(2026-08-07). 그전엔 Apify
+  응답이 `RawReview` → LLM → DB 한 패스로 흘러 **어디에도 남지 않았고**, 추출 규칙이 틀렸다는 걸
+  나중에 알면 액터를 다시 사야 했다(유령 제품 복구 때 실제로 그랬다). 이제
+  `collect_seller_feeds` 가 원문을 `rawstore` 에 쌓고, `ingest_seller_profiles(from_raw=True)` 가
+  그걸 읽어 **Apify 0원**으로 재추출한다. 재처리 매핑은 수집 경로와 같은 함수
+  (`sources.apify._post_to_seller_review`)를 써야 한다 — 여기서 dict 를 직접 풀면 `meta` 모양이
+  갈려 `bias.partition` 이 소스마다 다른 값을 받는다.
+  **Don't:** 저장을 호출부로 올리지 말 것(수집기 `_run` 안이 제자리다) — 호출부가 예외로 죽는
+  순간 방금 산 응답이 사라진다.
+- **Important:** 판매자 경로의 마켓 열거자는 **`_seller_targets` 하나**다. `ingest_seller_profiles`
+  와 `collect_seller_feeds` 가 공유한다 — 복제하면 '수집은 14마켓인데 적재는 12마켓' 같은
+  어긋남이 조용히 생기고 어느 쪽이 맞는지 사후에 못 가른다.
+- **Important:** `derive_product_registry` 가 가르는 건 **빈도**다. 해시태그 규칙만으로는
+  `#꼼픽`(개인 태그)과 `#빠코볼`(제품)을 원리적으로 못 가른다 — 둘 다 그냥 고유 태그다.
+  피드 전량이 있으면 갈린다: 개인/마켓 태그는 거의 전 게시물에, 제품 태그는 몇 건에만 붙는다.
+  12개 창에서는 **계산 자체가 불가능했던** 신호이고, 이게 피드 전량 수집의 나머지 절반이다.
+  **Don't:** 고빈도 태그를 자동 배제하지 말 것 — `market_tag_candidates` 로 분리만 하고 승격은
+  사람이 한다. 과잉 배제는 진짜 인기 제품을 지우는데 그 손실은 **화면에 안 보인다**(유령 제품과
+  반대 방향의, 더 알아채기 어려운 실패다). 표본이 작으면(<8건) 비율을 근거로 쓰지 않는다.
+  **Don't:** 결과를 KB `products[]` 에 쓰지 말 것 — 저 칸은 1층 스펙 객체를 담고
+  `layer1.iter_specs` 가 그 모양을 읽는다. 이름만 있는 항목은 `_PRODUCTHOOD_FIELDS` 전부 null 이라
+  `_specs_from_seller_post` 가 제품성 미달로 버리는 바로 그 모양이 된다.
+- **Note:** `rawstore` 의 병합 순서 정본은 파일명이 아니라 봉투의 **`scraped_at`** 이다.
+  개발 중 실제로 깨졌다: 충돌 때만 `-2` 접미사를 붙였더니 `...Z-2.json` 이 `...Z.json` 보다
+  앞서 정렬돼(`-` < `.`) **최신 캡처가 옛 캡처에 밀렸다** — 캡션 수정이 조용히 무시되는 경로다.
 - **Important:** `refresh_stale_summaries` 의 **판정은 무료, 생성만 유료**다(`dry_run=True` 기본).
   개수는 `consolidated_for(with_summary=False)`·`order_view_for(with_summary=False)` 에서 온다 —
   **SQL 로 재구현하지 말 것**: `n_reviews` 는 행 수지만 `n_orders` 는 팬아웃을 접은 **조각 수**라

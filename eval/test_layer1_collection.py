@@ -230,6 +230,64 @@ def test_crash_midrun_keeps_what_was_already_paid_for():
     print("✓ 중단 시 기지불분 7건 커밋 보존 OK")
 
 
+def _run_hashtag_ingest(conn, sellers, *, boom_at=None):
+    """LLM·네트워크 없이 `_ingest_instagram_raws` 의 **판매자 분기**만 돌린다."""
+    from slime_rag import bias, index as index_mod
+
+    def _fake_specs(cur, market, text, url, llm):
+        if boom_at is not None and conn.upserts == boom_at:
+            raise RuntimeError("크레딧 소진 429 재현")
+        conn.upserts += 1
+        return 1, False, 0
+
+    saved = (pipeline.connect, pipeline._specs_from_seller_post, pipeline.LLM,
+             bias.partition, index_mod.existing_post_ids, pipeline.join_specs)
+    pipeline.connect = lambda: conn
+    pipeline._specs_from_seller_post = _fake_specs
+    pipeline.LLM = lambda *_a, **_k: object()
+    bias.partition = lambda raws, kb, promo_detector=None: (list(raws), [])
+    index_mod.existing_post_ids = lambda *_a, **_k: set()
+    pipeline.join_specs = lambda _conn: 0
+    try:
+        return pipeline._ingest_instagram_raws(sellers, label="test")
+    finally:
+        (pipeline.connect, pipeline._specs_from_seller_post, pipeline.LLM,
+         bias.partition, index_mod.existing_post_ids, pipeline.join_specs) = saved
+
+
+def test_hashtag_seller_branch_commits_periodically():
+    """해시태그 경로의 판매자 분기도 주기 커밋한다 — 프로필 경로와 같은 계약.
+
+    ⚠️ 이 분기만 오래 구멍이었다. 후기 분기는 `index.index_post` 가 게시물마다 자기
+      커넥션으로 커밋해서 원래 안전한데, 판매자 분기는 루프 끝에서 한 번만 커밋해
+      중간에 죽으면 **이미 지불한** `extract_spec` 결과가 통째로 롤백됐다.
+      그리고 판매자 분기가 **먼저** 돈다 — 즉 유실 창이 런 앞머리에 있었다.
+    """
+    n = pipeline.SELLER_COMMIT_EVERY
+    sellers = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(2 * n + 1)]
+    conn = _CommitLogConn()
+    out = _run_hashtag_ingest(conn, sellers)
+    assert conn.commits[:2] == [n, 2 * n], \
+        f"{n}건마다 커밋되지 않았다, 실제 {conn.commits}"
+    assert out["seller_paid_posts"] == out["seller_committed_posts"] == 2 * n + 1, \
+        f"정상 종료면 유료 처리분 전부가 커밋분이어야 한다: {out}"
+    print(f"✓ 해시태그 판매자 분기: 유료 {out['seller_paid_posts']}건 · 커밋 {conn.commits} OK")
+
+
+def test_hashtag_seller_branch_keeps_paid_work_on_crash():
+    """중단돼도 기지불분은 남는다 — 예외를 그냥 전파시키면 __exit__ 이 롤백한다."""
+    sellers = [_Raw(f"https://ig/p/{i}", "slime_gina_") for i in range(10)]
+    conn = _CommitLogConn()
+    try:
+        _run_hashtag_ingest(conn, sellers, boom_at=7)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("중단 예외가 삼켜졌다 — 실패가 성공처럼 보인다")
+    assert conn.commits == [7], f"중단 시점 7건이 커밋됐어야 한다, 실제 {conn.commits}"
+    print("✓ 해시태그 판매자 분기: 중단 시 기지불분 7건 보존 OK")
+
+
 def test_commit_cycle_counts_paid_posts_not_skipped_ones():
     """주기의 단위는 순회 위치가 아니라 **값이 나간 건수**다.
 
@@ -283,5 +341,7 @@ if __name__ == "__main__":
     test_long_run_commits_periodically_not_only_at_the_end()
     test_crash_midrun_keeps_what_was_already_paid_for()
     test_commit_cycle_counts_paid_posts_not_skipped_ones()
+    test_hashtag_seller_branch_commits_periodically()
+    test_hashtag_seller_branch_keeps_paid_work_on_crash()
     test_dry_run_predicts_the_exact_number_of_paid_calls()
     print("\n1층 수집 경로 오프라인 테스트 통과 ✅")

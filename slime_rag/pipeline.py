@@ -33,6 +33,10 @@ from .llm_ops import LLM, summary
 
 log = logging.getLogger("pipeline")
 
+# 판매자 분기의 중간 커밋 주기(유료 처리 N건마다). `ingest_seller_profiles` 의
+# `commit_every` 기본값과 같은 값·같은 이유다 — 중단 시 유실 창을 N건으로 묶는다.
+SELLER_COMMIT_EVERY = 25
+
 # 수집 소스 → 편향 집계용 플랫폼 키. 종합뷰/요약이 이 라벨로 소스를 가른다.
 SOURCE_PLATFORM = {"amos": "dcinside", "instagram": "instagram"}
 
@@ -460,17 +464,41 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
              label, n_collected, n_seen, len(raws), len(sellers), len(users),
              n_suspect, n_saved, n_saved)
     n_spec = n_skip_nohash = n_thin = 0
+    n_paid = n_committed = 0                         # 유료로 처리한 게시물 수 / 그중 커밋된 수
     with connect() as conn:
         with conn.cursor() as cur:
-            for sp in sellers:                       # 판매자 캡션 → 1층 공식 스펙
-                # 게이트 규칙은 `_specs_from_seller_post` 한 곳에 있다 — 프로필 경로
-                # (`ingest_seller_profiles`)와 공유한다.
-                n, skipped, thin = _specs_from_seller_post(
-                    cur, sp.meta.get("seller_market"), sp.text, sp.url, llm)
-                n_spec += n
-                n_skip_nohash += int(skipped)
-                n_thin += thin
+            try:
+                for sp in sellers:                   # 판매자 캡션 → 1층 공식 스펙
+                    # 게이트 규칙은 `_specs_from_seller_post` 한 곳에 있다 — 프로필 경로
+                    # (`ingest_seller_profiles`)와 공유한다.
+                    n, skipped, thin = _specs_from_seller_post(
+                        cur, sp.meta.get("seller_market"), sp.text, sp.url, llm)
+                    n_spec += n
+                    n_skip_nohash += int(skipped)
+                    n_thin += thin
+                    n_paid += 1
+                    # 주기 단위는 순회 위치가 아니라 **값이 나간 건수**다
+                    # (`ingest_seller_profiles` 와 같은 규칙 — 거기 주석에 근거가 있다).
+                    if SELLER_COMMIT_EVERY and n_paid % SELLER_COMMIT_EVERY == 0:
+                        conn.commit()
+                        n_committed = n_paid
+            except BaseException:
+                # ⚠️ 이 분기는 **후기 분기보다 먼저** 돌고, 예전엔 루프 끝에서 한 번만
+                #   커밋했다. `with connect()` 의 __exit__ 이 롤백하므로 80번째에서 죽으면
+                #   앞선 79건의 **이미 지불한** extract_spec 결과가 통째로 사라진다.
+                #   후기 분기는 `index_post` 가 게시물마다 자기 커넥션으로 커밋해서 원래
+                #   안전한데, 이쪽만 구멍이었다(2026-08-09, 잔액 $3.99 런 앞두고 수정).
+                try:
+                    conn.commit()
+                    n_committed = n_paid
+                except Exception:                    # noqa: BLE001 - 원인 예외 보존이 우선
+                    log.exception("중단 시점 커밋 실패 — 미커밋 %d건은 재실행에서 다시 처리된다",
+                                  n_paid - n_committed)
+                log.warning("%s 판매자 분기 중단: 유료 %d건 중 %d건 커밋 · 재실행하면 "
+                            "기보유 컷이 커밋분을 건너뛴다", label, n_paid, n_committed)
+                raise
         conn.commit()
+        n_committed = n_paid
     if n_skip_nohash:
         log.info("판매자 글 중 제품 해시태그 없음 %d건 스킵(비매품/공지)", n_skip_nohash)
 
@@ -528,7 +556,10 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
               # 사후에 못 나누고, 둘은 아끼는 대상도 다르다(판정 단락 vs 조각 자체를 안 봄).
               "gate_suspect": n_suspect, "llm_calls_saved": n_saved,
               "skipped_seen": n_seen, "llm_calls_saved_by_dedup": saved_by_dedup,
-              "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref}
+              "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref,
+              # 판매자 분기의 유료 처리분과 그중 커밋분. 정상 종료면 같은 값이고, 다르면
+              # 그 차이가 곧 유실 창이다(후기 분기는 `index_post` 가 게시물마다 커밋한다).
+              "seller_paid_posts": n_paid, "seller_committed_posts": n_committed}
     log.info("%s 완료: %s", label, counts)
     return counts
 

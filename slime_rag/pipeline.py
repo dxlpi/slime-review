@@ -184,12 +184,26 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     APIFY_TOKEN 없으면 수집 0 → 모든 카운트 0(회복력). 색인은 DB(compose 55432)+BGE-M3 필요.
     """
     from .sources import ApifyHashtagSource
+
+    src = ApifyHashtagSource(token=settings.apify_token,
+                             results_per_hashtag=settings.apify_results_per_hashtag)
+    return _ingest_instagram_raws(list(src.collect(keywords, limit=limit)),
+                                  label="ingest_hashtag")
+
+
+def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
+    """수집된 인스타 조각 → 편향 분리 → 1층 스펙 / 2층 색인. **수집기 무관**한 공통 몸통.
+
+    `ingest_hashtag`(태그 검색)와 `ingest_post_urls`(URL 직접)는 '무엇을 요청하는가'만 다르고
+    그 뒤 처리는 한 글자도 다르지 않다 — 기보유 컷의 **위치**, 홍보 캐스케이드, 판매자 라우팅,
+    유령 제품 복구, `source_ref` 적재, 절감 카운터가 전부 같다.
+    **Don't:** 경로별로 복제하지 말 것 — 이 저장소에서 조용히 깨졌던 것들(컷을 첫 유료 단계
+    **뒤**에 두기, 두 절감 카운터를 합치기)이 정확히 이 몸통 안의 순서 문제라, 두 벌이 되면
+    한쪽만 고쳐지고 다른 쪽은 아무도 안 본다.
+    """
     from . import bias, extract
 
     kb = json.loads(settings.kb_demo_path.read_text(encoding="utf-8"))
-    src = ApifyHashtagSource(token=settings.apify_token,
-                             results_per_hashtag=settings.apify_results_per_hashtag)
-    raws = list(src.collect(keywords, limit=limit))
     n_collected = len(raws)                           # 컷 전 원본 수 — 아래에서 raws 가 줄어든다
     gate_terms = bias.load_gate_terms()               # 파일 읽기 — 무과금이라 컷보다 먼저 둔다
 
@@ -222,9 +236,11 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
     # 관측성: 게이트 통계는 판매자 제외(non-seller) 대상. 게이트통과=LLM호출, 단락=절감.
     n_suspect = sum(1 for u in users if bias.promo_gate(u.text, gate_terms))
     n_saved = len(users) - n_suspect
-    log.info("해시태그 수집 %d건(기보유 %d 제외 → 신규 %d) → 판매자 %d, 유저후기 %d "
+    # 라벨을 문장에 박지 않는다 — 몸통을 두 경로가 공유하므로 하드코딩하면 URL 경로 실행이
+    # '해시태그 수집'이라고 찍힌다(관측성이 조용히 거짓말하는 자리).
+    log.info("%s 수집 %d건(기보유 %d 제외 → 신규 %d) → 판매자 %d, 유저후기 %d "
              "(게이트통과 %d / genuine단락 %d / 절감 LLM호출 %d)",
-             n_collected, n_seen, len(raws), len(sellers), len(users),
+             label, n_collected, n_seen, len(raws), len(sellers), len(users),
              n_suspect, n_saved, n_saved)
     n_spec = n_skip_nohash = n_thin = 0
     with connect() as conn:
@@ -291,14 +307,345 @@ def ingest_hashtag(keywords: list[str], *, limit: int = 30) -> dict:
               "gate_suspect": n_suspect, "llm_calls_saved": n_saved,
               "skipped_seen": n_seen, "llm_calls_saved_by_dedup": saved_by_dedup,
               "rows_with_source_ref": n_ref, "rows_without_source_ref": n_noref}
-    log.info("ingest_hashtag 완료: %s", counts)
+    log.info("%s 완료: %s", label, counts)
     return counts
 
 
+def ingest_post_urls(urls: list[str], *, limit: int = 30,
+                     target: dict | None = None) -> dict:
+    """**게시물 URL 을 직접 지정**해 2층 후기를 수집·색인한다(ADR 근거: 아래).
+
+    해시태그 경로가 못 닿는 태그가 실재한다 — `#깡수박화채` 는 해시태그 액터에서 두 번 연속
+    0건인데 같은 런의 `#빈짱슬라임` 은 5건이 나왔고, 그 태그를 단 게시물은 URL 로는 정상
+    조회됐다(2026-08-07 실측). 그 자리를 메우는 경로이며, 처리 몸통은 해시태그 경로와 공유한다
+    (`_ingest_instagram_raws`) — 기보유 컷·홍보 캐스케이드·유령 제품 복구가 전부 그대로 걸린다.
+
+    ⚠️ **탐색이 아니라 보충이다.** URL 은 사람이 고르므로 표본이 아니다 — 여기로 들어온 건수를
+      '이 제품 후기 전량'으로 읽으면 안 된다(커버리지 주장의 근거로 쓰지 말 것).
+    ⚠️ 캡션에 평가 문장이 없는 게시물(해시태그만 있는 영상 후기 등)은 추출이 `reviews: []` 를
+      내고 **행이 안 생긴다**. 수집 실패가 아니라 담을 내용이 없는 것이고, 그런 조각은 행이
+      안 남아 다음 런에서 다시 추출된다(기존 구조적 구멍과 같은 자리).
+    ⚠️ 유료다 — Apify 결과당 요금 + 조각당 추출 LLM 호출.
+
+    target: 관련성 앵커(`{"slime": ..., "market": ...}`). URL 은 앵커가 될 수 없어 미주입 시
+      게이트는 패스스루로 떨어진다 — 사람이 고른 URL 이라 그 편이 정직하다.
+    """
+    from .sources import ApifyPostUrlSource
+
+    src = ApifyPostUrlSource(token=settings.apify_token)
+    raws = list(src.collect(urls, limit=limit, target=target))
+    return _ingest_instagram_raws(raws, label="ingest_post_urls")
+
+
 # ---------------------------------------------------------------- 1층 수집(마켓 본인 피드)
+def _seller_targets(markets: list[str] | None = None, *,
+                    only_missing: bool = False) -> list[tuple[str, str]]:
+    """대상 마켓 → `(market_word, handle)` 목록. **판매자 경로의 유일한 열거자**.
+
+    `ingest_seller_profiles`(최신 ~12) 와 `collect_seller_feeds`(피드 전량) 가 공유한다.
+    **Don't:** 경로별로 복제하지 말 것 — 한쪽만 KB 를 다시 읽게 되면 '수집은 14마켓인데
+    적재는 12마켓' 같은 어긋남이 조용히 생기고, 어느 쪽이 맞는지 사후에 못 가른다.
+
+    markets=None → KB 에서 **핸들 있는 마켓 전부**. only_missing=True → 그중 `specs` 가
+    아직 하나도 없는 마켓만(첫 훑기용 싼 경로).
+    """
+    kb = linking.load_kb()
+    by_handle = {m["handle"]: m.get("market_word") for m in kb.markets if m.get("handle")}
+    if markets is not None:
+        want = set(markets)
+        targets = [(w, h) for h, w in by_handle.items() if w in want]
+        if unknown := want - {w for w, _h in targets}:
+            # 무음 갭 금지: 오타·미등록 마켓을 조용히 건너뛰면 '수집했는데 왜 없지'가 된다.
+            log.warning("KB 에 핸들이 없어 건너뛴 마켓 %d개: %s",
+                        len(unknown), ", ".join(sorted(unknown)))
+        return targets
+    targets = [(w, h) for h, w in by_handle.items()]
+    if only_missing:
+        with connect() as conn:
+            have = {r[0] for r in conn.execute("SELECT DISTINCT market FROM specs").fetchall()}
+        targets = [(w, h) for w, h in targets if w not in have]
+    return targets
+
+
+def collect_seller_feeds(markets: list[str] | None = None, *,
+                         limit_per_market: int | None = None,
+                         newer_than: str | None = "auto",
+                         dry_run: bool = True) -> dict:
+    """마켓 피드를 **깊게** 훑어 원문을 디스크에 남긴다. 추출도 색인도 하지 않는다.
+
+    [결정 2026-08-07] 수집(유료·1회)과 처리(무료·N회)를 가르는 경계다. 그전엔 Apify 응답이
+    `RawReview` → LLM → DB 한 패스로 흘러 **어디에도 남지 않았고**, 추출 규칙이 틀렸다는 걸
+    나중에 알면 액터를 다시 사야 했다(유령 제품 복구 때 실제로 그랬다). 이제 이 함수가
+    원문을 `data/raw/ig_profile_feed/<handle>/` 에 쌓고, 처리는 `from_raw=True` 로 그걸 읽는다.
+
+    `ingest_seller_profiles` 와의 차이는 **창 크기**다. 저건 profile-scraper 라 최신 ~12개가
+    상한이고(액터에 `resultsLimit` 자체가 없다), 이건 instagram-scraper 로 피드를 N개까지
+    내려간다 — 마켓의 **제품 목록**을 만들려면 옛 게시물이 있어야 하는데 12개 창으로는
+    구조적으로 불가능하다(실측: 1층 커버리지는 올랐는데 후기 쪽 어휘 갭 76은 그대로였다).
+
+    limit_per_market: 핸들당 요청 결과 수. None 이면 `settings.apify_feed_results_per_market`.
+    newer_than: `"auto"` 면 그 마켓에서 **이미 확보한 최신 게시물 시각**부터만 요청한다
+      (`rawstore.newest_timestamp`) — 두 번째 스윕이 새 글 값만 내게 하는 워터마크다.
+      디시 워터마크와 같은 이유로 **마켓별**이다: 전체 최댓값을 쓰면 처음 훑는 마켓이 남의
+      마켓 시각부터 시작해 과거가 통째로 잘리고, 카운트엔 '새 글 없음'과 구분 안 되는 0 만
+      남는다. 전량 재수집이 필요하면 `None` 을 넘긴다.
+    dry_run=True(기본): 네트워크 미접촉. 대상과 **상한 비용**만 돌려준다.
+
+    ⚠️ dry_run=False 는 **유료**다(결과당 과금). LLM 은 한 번도 부르지 않는다.
+    ⚠️ `hit_limit`(반환량 == 요청량)이 True 인 마켓은 **피드가 잘렸을 수 있다**. 이 저장소의
+      규칙대로 조용한 절단을 만들지 않으려고 세어서 내보낸다 — 더 깊이 받으려면 그 마켓만
+      `limit_per_market` 을 올려 다시 돌린다(append-only 라 기존 스냅샷은 안 지워진다).
+    """
+    from .sources import ApifyProfileFeedSource
+    from . import rawstore
+
+    limit = limit_per_market or settings.apify_feed_results_per_market
+    targets = _seller_targets(markets)
+    # 결과당 과금이라 '요청 상한 × 마켓 수'가 비용 천장이다. 실제 사용액은 런마다 액터가
+    # 알려주므로(usageTotalUsd) 아래에서 실측으로 대체된다 — 상수 추정치를 남기지 않는다.
+    ceiling = len(targets) * limit / 1000 * 2.70
+    out: dict = {"targets": [w for w, _h in targets], "handles": [h for _w, h in targets],
+                 "limit_per_market": limit, "dry_run": dry_run,
+                 "apify_cost_ceiling_usd": round(ceiling, 4)}
+    if dry_run or not targets:
+        log.info("collect_seller_feeds(dry): %d마켓 × %d건 · 상한 $%.4f",
+                 len(targets), limit, ceiling)
+        return out
+
+    src = ApifyProfileFeedSource(token=settings.apify_token)
+    per_market: dict[str, dict] = {}
+    total_items = total_usd = 0
+    # 액터가 사용액을 안 실어 줄 때가 있다. 그걸 0 으로 더하면 **돈을 썼는데 $0 이라고
+    # 보고**하게 되므로, 합계와 분리해 '모르는 마켓 수'로 센다(무음 0 금지).
+    unknown_cost: list[str] = []
+    for market, handle in targets:
+        water = (rawstore.newest_timestamp("ig_profile_feed", handle)
+                 if newer_than == "auto" else newer_than)
+        try:
+            # 저장은 `_run` 안에서 일어난다 — 여기서 예외가 나도 원문은 이미 디스크에 있다.
+            items = src._run(handle, results_limit=limit, newer_than=water)
+        except Exception as e:      # 마켓 하나의 실패로 스윕 전체를 잃지 않는다
+            log.exception("피드 수집 실패 — 계속 진행: %s (%s)", handle, e)
+            per_market[market] = {"handle": handle, "error": str(e), "n_items": 0}
+            continue
+        usd = src.last_usage_usd
+        total_items += len(items)
+        if usd is None:
+            unknown_cost.append(market)
+        else:
+            total_usd += usd
+        per_market[market] = {
+            "handle": handle, "n_items": len(items), "usd": usd,
+            "watermark": water,
+            # 요청량을 꽉 채웠다 = 더 있는데 잘렸을 수 있다. '전부 걷었다'로 읽지 말 것.
+            "hit_limit": len(items) >= limit,
+        }
+    truncated = [m for m, v in per_market.items() if v.get("hit_limit")]
+    out.update({"per_market": per_market, "collected_posts": total_items,
+                "apify_cost_usd": round(total_usd, 4),
+                # 이 목록이 비어 있지 않으면 위 합계는 **하한**이다(실제 지출이 더 클 수 있다).
+                "markets_cost_unreported": unknown_cost,
+                "markets_possibly_truncated": truncated,
+                "raw_dir": str(settings.raw_dir / "ig_profile_feed")})
+    if unknown_cost:
+        log.warning("액터가 사용액을 안 준 마켓 %d개 — 보고된 $%.4f 는 하한이다: %s",
+                    len(unknown_cost), total_usd, ", ".join(unknown_cost))
+    if truncated:
+        log.warning("요청 상한을 꽉 채운 마켓 %d개 — 피드가 잘렸을 수 있다: %s",
+                    len(truncated), ", ".join(truncated))
+    log.info("collect_seller_feeds 완료: %d마켓 %d건 · 실사용 $%.4f",
+             len(per_market), total_items, total_usd)
+    return out
+
+
+# 마켓 전체 게시물의 이 비율 이상에 붙은 태그는 제품명이 아니라 **마켓 태그**로 본다.
+# 근거: 제품 태그는 그 제품 게시물에만 붙어 소수에 그치는데, 개인 태그(`#꼼픽`)·마켓 별칭은
+# 사실상 전 게시물에 붙는다. 0.35 는 보수적으로 잡은 값이다 — 낮추면 실제 인기 제품이
+# 후보에서 빠지고, 이건 자동 배제가 아니라 **사람이 볼 목록**이라 놓치는 쪽이 더 나쁘다.
+MARKET_TAG_COVERAGE = 0.35
+# 이 값보다 게시물이 적으면 비율이 의미 없다(3건 중 2건 = 0.67 이라도 근거가 아니다).
+MARKET_TAG_MIN_POSTS = 8
+
+
+def _type_tag_forms() -> frozenset[str]:
+    """KB `slime_types` → 제품이 될 수 없는 **종류단어** 태그 표면형 집합(정규화된 형태).
+
+    [실측 2026-08-09, 9마켓 1462게시물] 마켓마다 태깅 습관이 갈린다. 대부분은 제품 하나에
+    게시물 하나라 `n_posts==1` 이 **진짜 제품의 서명**이지만, 진통제·베이퍼는 제품명이 아니라
+    **분류**로 태그를 단다(`#크런치슬라임`·`#디폼슬라임`·`#촉감류`). 빈도 기준은 그중 상위만
+    잡고(커버리지 ≥0.35) `#지글리`·`#빨대슬라임` 처럼 드물게 붙는 종류단어는 놓친다 —
+    표본이 아니라 **어휘**의 문제라 빈도로는 끝까지 안 갈린다.
+
+    KB 가 이미 `slime_types` 를 갖고 있으니 그걸 쓴다(메모 `entity-linking-typeword-gap` 의
+    같은 갭). `촉감류(점토)` 처럼 괄호가 붙은 항목은 괄호를 벗긴 형태와 `+슬라임` 형태까지 편다.
+    """
+    from . import extract
+    raw = json.loads(settings.kb_demo_path.read_text(encoding="utf-8"))
+    forms: set[str] = set()
+    for t in raw.get("slime_types") or []:
+        base = re.sub(r"\(.*?\)", "", t).strip()
+        for v in {t, base}:
+            if v:
+                forms |= {extract._norm_tag(v), extract._norm_tag(v + "슬라임")}
+    return frozenset(forms)
+
+
+def derive_product_registry(markets: list[str] | None = None, *,
+                            coverage: float = MARKET_TAG_COVERAGE,
+                            write: bool = True) -> dict:
+    """디스크 원문 → 마켓별 **제품 후보 레지스트리**. LLM 을 한 번도 부르지 않는다.
+
+    [결정 2026-08-07] KB 의 `products[]` 는 14마켓 전부 비어 있고, 채워지는 건 실행 중
+    메모리에서 fixture(4핸들)로부터일 뿐이다. 그래서 제품명 귀속의 마지막 구멍 —
+    개인 태그(`#꼼픽`·`#숭슬지나`)가 제품으로 색인되는 것 — 을 막을 방법이 없었다.
+    해시태그 규칙으로는 원리적으로 못 가른다(둘 다 그냥 고유 태그다).
+
+    **피드 전량을 갖고 있으면 가를 수 있다: 빈도다.** 개인/마켓 태그는 거의 모든 게시물에
+    붙고 제품 태그는 몇 건에만 붙는다. 12개 창에서는 계산 자체가 불가능했던 신호이고,
+    이게 `collect_seller_feeds` 가 존재하는 이유의 나머지 절반이다.
+
+    규칙은 새로 만들지 않는다 — `extract.product_hashtags` + `_tag_exclusions` 를 그대로 쓴다
+    (마켓 자기이름·광역 슬라임어 제외). 여기서 더하는 건 **집계**뿐이다.
+
+    ⚠️ 높은 커버리지 태그는 `market_tag_candidates` 로 **분리만** 하고 자동 배제하지 않는다.
+      승격(KB `aliases` 에 넣기)은 사람이 한다 — 과잉 배제는 진짜 인기 제품을 지우는데,
+      그 손실은 화면에 안 보인다(유령 제품과 반대 방향의, 더 알아채기 어려운 실패다).
+    ⚠️ 결과를 KB `products[]` 에 쓰지 **말 것**. 저 칸은 1층 스펙 객체(`product_name`·향·
+      풀조합·질감…)를 담고 `layer1.iter_specs` 가 그 모양을 읽는다. 이름만 있는 항목을 넣으면
+      스펙 없는 행이 `specs` 로 들어가는데, 그건 `_specs_from_seller_post` 가 제품성 미달로
+      버리는 바로 그 모양(`_PRODUCTHOOD_FIELDS` 전부 null)이다.
+    ⚠️ 산출물에 **캡션 본문을 담지 않는다** — 이름·건수·날짜·permalink 뿐이라 커밋 가능하다
+      (ADR-0013: 수집물은 DB/디스크, 배포되는 건 발췌와 링크).
+    """
+    from . import extract, rawstore
+
+    kb = linking.load_kb()
+    by_word = {m.get("market_word"): m for m in kb.markets}
+    targets = _seller_targets(markets)
+    type_forms = _type_tag_forms()
+    out_markets: dict = {}
+    n_products = n_market_tags = n_type_tags = 0
+    for market, handle in targets:
+        items = rawstore.latest_items("ig_profile_feed", handle)
+        exclude = _tag_exclusions(market)
+        tags: dict[str, dict] = {}
+        n_posts = 0
+        for item in items:
+            caption = (item.get("caption") or "").strip()
+            if not caption:
+                continue
+            n_posts += 1
+            ts = item.get("timestamp")
+            url = item.get("url") or (
+                f"https://www.instagram.com/p/{item['shortCode']}/"
+                if item.get("shortCode") else None)
+            # 한 게시물이 같은 태그를 두 번 달아도 1건 — 커버리지가 곧 게시물 비율이어야 한다.
+            for tag in dict.fromkeys(extract.product_hashtags(caption, exclude=exclude)):
+                rec = tags.setdefault(tag, {"name": tag, "n_posts": 0, "first_seen": None,
+                                            "last_seen": None, "permalinks": []})
+                rec["n_posts"] += 1
+                if isinstance(ts, str):
+                    if rec["first_seen"] is None or ts < rec["first_seen"]:
+                        rec["first_seen"] = ts
+                    if rec["last_seen"] is None or ts > rec["last_seen"]:
+                        rec["last_seen"] = ts
+                if url and len(rec["permalinks"]) < 3:      # 표본 3개면 사람이 확인하기 충분
+                    rec["permalinks"].append(url)
+        products, market_tags, type_tags = [], [], []
+        for rec in tags.values():
+            rec["coverage"] = round(rec["n_posts"] / n_posts, 3) if n_posts else 0.0
+            wide = (n_posts >= MARKET_TAG_MIN_POSTS and rec["coverage"] >= coverage)
+            if extract._norm_tag(rec["name"]) in type_forms:
+                type_tags.append(rec)      # 종류단어는 빈도와 무관하게 제품이 아니다
+            elif wide:
+                market_tags.append(rec)
+            else:
+                products.append(rec)
+        products.sort(key=lambda r: (-r["n_posts"], r["name"]))
+        market_tags.sort(key=lambda r: (-r["coverage"], r["name"]))
+        type_tags.sort(key=lambda r: (-r["n_posts"], r["name"]))
+        n_products += len(products)
+        n_market_tags += len(market_tags)
+        n_type_tags += len(type_tags)
+        out_markets[market] = {
+            "handle": handle,
+            "n_posts": n_posts,
+            "products": products,
+            "market_tag_candidates": market_tags,
+            "type_tag_candidates": type_tags,
+            # 이미 KB 가 아는 별칭 — 후보를 볼 때 '이미 처리됨'과 '새로 발견'을 가르는 기준
+            "known_aliases": sorted(by_word.get(market, {}).get("aliases") or []),
+        }
+        log.info("제품 레지스트리 %s: 게시물 %d · 제품후보 %d · 마켓태그후보 %d · 종류단어 %d",
+                 market, n_posts, len(products), len(market_tags), len(type_tags))
+    doc = {
+        "_note": ("판매자 피드 해시태그에서 유도한 제품 후보(무과금 파생물, LLM 0회). "
+                  "market_tag_candidates·type_tag_candidates 는 자동 배제되지 않는다 — "
+                  "사람이 KB aliases / slime_types 로 승격한다."),
+        "_source": "data/raw/ig_profile_feed (slime_rag.collect_seller_feeds)",
+        "_rule": ("extract.product_hashtags + _tag_exclusions 후, "
+                  f"게시물 {MARKET_TAG_MIN_POSTS}건 이상 마켓에서 커버리지 ≥ {coverage} 는 마켓태그 후보. "
+                  "KB slime_types 표면형(+'슬라임')은 빈도와 무관하게 종류단어 후보."),
+        "_reading": ("마켓 대부분은 제품 하나에 게시물 하나라 n_posts==1 이 정상이다 — "
+                     "1회 등장을 노이즈로 읽지 말 것(2026-08-09 실측 9마켓)."),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "markets": out_markets,
+    }
+    if write:
+        settings.product_registry_path.write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        log.info("제품 레지스트리 기록: %s", settings.product_registry_path)
+    return {"markets": len(out_markets), "product_candidates": n_products,
+            "market_tag_candidates": n_market_tags, "type_tag_candidates": n_type_tags,
+            "path": str(settings.product_registry_path) if write else None,
+            "llm": {k: summary()[k] for k in ("calls",)}}
+
+
+def load_product_registry() -> dict[str, list[str]]:
+    """레지스트리 → `{market_word: [제품명…]}`. 파일 없으면 `{}`.
+
+    `extract.resolve_product_name(known_products=...)` 의 ③ 타이브레이크와
+    개체연결이 쓰는 모양이다. `market_tag_candidates` 는 **제품이 아니므로 빼고** 준다.
+    """
+    path = settings.product_registry_path
+    if not path.exists():
+        return {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        log.warning("제품 레지스트리 읽기 실패 — 빈 사전으로 진행: %s", e)
+        return {}
+    return {market: [p["name"] for p in (entry.get("products") or [])]
+            for market, entry in (doc.get("markets") or {}).items()}
+
+
+def _raw_seller_posts(targets: list[tuple[str, str]], *, count_only: bool = False):
+    """디스크에 쌓인 판매자 피드 원문 → `RawReview` 목록(또는 건수만).
+
+    `collect_seller_feeds` 가 남긴 스냅샷을 **재과금 없이** 다시 읽는 통로다. 매핑은 수집
+    경로와 같은 함수(`_post_to_seller_review`)를 써야 한다 — 여기서 dict 를 직접 풀면
+    수집 경로와 `meta` 모양이 갈려 `bias.partition` 이 소스마다 다른 값을 받는다.
+    """
+    from .sources.apify import _post_to_seller_review
+    from . import rawstore
+
+    n, out = 0, []
+    for _market, handle in targets:
+        for item in rawstore.latest_items("ig_profile_feed", handle):
+            review = _post_to_seller_review(item, item.get("ownerUsername") or handle,
+                                            platform="instagram")
+            if review is None:                  # 빈/저품질 캡션 — 수집 경로와 같은 기준
+                continue
+            n += 1
+            if not count_only:
+                out.append(review)
+    return n if count_only else out
+
+
 def ingest_seller_profiles(markets: list[str] | None = None, *,
                            only_missing: bool = False, skip_seen: bool = True,
-                           limit_per_market: int = 12, dry_run: bool = True) -> dict:
+                           limit_per_market: int = 12, from_raw: bool = False,
+                           dry_run: bool = True) -> dict:
     """마켓 **본인 계정 피드** → 1층 공식 스펙. ADR-0003 이 막힌 자리의 우회 경로다.
 
     `business_discovery` 는 App Review 벽이지만(ADR-0003) Apify `instagram-profile-scraper`
@@ -325,35 +672,38 @@ def ingest_seller_profiles(markets: list[str] | None = None, *,
       '액터가 최신 ~12글만 주니 주기적으로 돌려 앞으로 쌓는 것'인데, 기본 대상이
       '스펙 0개인 마켓'이면 두 번째 실행부터 대상이 **빈 목록**이 된다 — 누적하라고 만든
       경로가 누적을 못 했다. 이제 기본은 전체이고, 옛 동작은 명시 옵션으로만 쓴다.
+    from_raw=True: Apify 를 부르지 않고 `collect_seller_feeds` 가 남긴 **디스크 원문**을 읽는다.
+      추출 규칙을 고친 뒤 다시 돌리는 정규 경로다 — 드는 값은 LLM 뿐이고 Apify 는 0원이다.
+      창도 더 넓다(피드 전량 vs 최신 ~12). `skip_seen=False` 와 같이 쓰면 강제 재추출이 된다.
     dry_run=True(기본): 네트워크·LLM·DB 미접촉. 대상과 예상비용만 돌려준다.
     ⚠️ dry_run=False 는 **유료**다 — Apify 프로필 요금 + 캡션 1건당 `extract_spec` LLM 호출.
+      (`from_raw=True` 면 Apify 몫은 빠지고 LLM 몫만 남는다.)
     """
     from .sources import InstagramProfileSource
 
-    kb = linking.load_kb()
-    by_handle = {m["handle"]: m.get("market_word") for m in kb.markets if m.get("handle")}
-    if markets is not None:
-        want = set(markets)
-        targets = [(w, h) for h, w in by_handle.items() if w in want]
-        if unknown := want - {w for w, _h in targets}:
-            # 무음 갭 금지: 오타·미등록 마켓을 조용히 건너뛰면 '수집했는데 왜 없지'가 된다.
-            log.warning("KB 에 핸들이 없어 건너뛴 마켓 %d개: %s", len(unknown), ", ".join(sorted(unknown)))
-    else:
-        targets = [(w, h) for h, w in by_handle.items()]
-        if only_missing:
-            with connect() as conn:
-                have = {r[0] for r in conn.execute("SELECT DISTINCT market FROM specs").fetchall()}
-            targets = [(w, h) for w, h in targets if w not in have]
-
-    cost = len(targets) / 1000 * InstagramProfileSource.COST_PER_1000
+    targets = _seller_targets(markets, only_missing=only_missing)
+    # 역인덱스는 **KB 전체**다(대상 목록이 아니라). 액터가 리다이렉트된 계정을 돌려줄 때
+    # 그게 다른 KB 마켓이면 그 마켓으로 귀속하던 기존 동작을 유지한다 — 대상만으로 좁히면
+    # 같은 입력이 `skipped_unknown_handle` 로 바뀐다(이번 변경의 범위가 아니다).
+    by_handle = {m["handle"]: m.get("market_word")
+                 for m in linking.load_kb().markets if m.get("handle")}
+    cost = 0.0 if from_raw else len(targets) / 1000 * InstagramProfileSource.COST_PER_1000
     out: dict = {"targets": [w for w, _h in targets], "handles": [h for _w, h in targets],
-                 "apify_cost_usd": round(cost, 4), "dry_run": dry_run, "skip_seen": skip_seen}
+                 "apify_cost_usd": round(cost, 4), "dry_run": dry_run,
+                 "skip_seen": skip_seen, "from_raw": from_raw}
     if dry_run or not targets:
-        log.info("ingest_seller_profiles(dry): %d마켓 · 예상 Apify 비용 $%.4f", len(targets), cost)
+        log.info("ingest_seller_profiles(dry): %d마켓 · 예상 Apify 비용 $%.4f%s",
+                 len(targets), cost, " (from_raw — Apify 미접촉)" if from_raw else "")
+        if from_raw:                            # 무엇을 재처리할지는 무과금으로 셀 수 있다
+            out["available_posts"] = _raw_seller_posts(targets, count_only=True)
         return out
 
-    src = InstagramProfileSource(token=settings.apify_token)
-    raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
+    if from_raw:
+        raws = _raw_seller_posts(targets)
+        log.info("원문 재처리: %d건(디스크) — Apify 호출 0회", len(raws))
+    else:
+        src = InstagramProfileSource(token=settings.apify_token)
+        raws = list(src.collect([h for _w, h in targets], limit=limit_per_market * len(targets)))
     llm = LLM()
     n_spec = n_skip = n_nomarket = n_thin = n_seen = 0
     with connect() as conn:

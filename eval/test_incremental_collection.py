@@ -298,9 +298,13 @@ def test_dedup_counter_is_named_apart_from_promo_gate_saving():
     """`llm_calls_saved`(홍보 게이트 단락분)와 `llm_calls_saved_by_dedup` 은 **다른 키**다.
 
     합치면 어느 절감인지 사후에 못 가른다 — 아끼는 대상이 다르다(판정 단락 vs 조각 미열람).
+
+    ⚠️ 카운터는 `ingest_hashtag` 이 아니라 **공통 몸통** `_ingest_instagram_raws` 에 있다 —
+      해시태그 경로와 URL 직접 경로(`ingest_post_urls`)가 그 몸통을 공유하므로, 이 계약도
+      한 자리에서만 검사한다. 경로별로 복제되면 한쪽만 고쳐진다.
     """
     import inspect
-    src = inspect.getsource(pipeline.ingest_hashtag)
+    src = inspect.getsource(pipeline._ingest_instagram_raws)
     assert '"llm_calls_saved":' in src and '"llm_calls_saved_by_dedup":' in src, src
     print("✓ 절감 카운터 두 축이 별도 키 OK")
 

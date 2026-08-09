@@ -97,6 +97,44 @@ def summary() -> dict:
     }
 
 
+# ---------------------------------------------------------------- 429 두 종류
+# 429 는 **두 개의 다른 실패**다. 섞으면 한쪽이 다른 쪽의 처방을 받는다.
+#   · `rate_limit_exceeded` (TPM/RPM) — 일시적. 기다리면 풀린다. 기다려야 한다.
+#   · `insufficient_quota` / `credit_balance_exhausted` — 잔액 0. 기다려도 안 풀린다.
+# 실측(2026-08-09, 원문 재처리 런): TPM 200,000 한도에 걸려 60건 만에 죽었다. 그때 재시도가
+# **잠 없이** 즉시 돌아 두 번의 시도가 밀리초 안에 소진됐고, 서버가 '424ms 뒤에 다시'라고
+# 알려 준 값은 아무도 안 읽었다. 잔액은 $3.81 남아 있었다 — 돈 문제가 아니라 속도 문제였는데
+# 실패 모양이 같아서 처음엔 크레딧 소진으로 읽혔다.
+RATE_LIMIT_MAX_WAITS = 6        # 대기 횟수 상한. 넘으면 포기하고 올린다(무한 대기 금지)
+RATE_LIMIT_BASE_DELAY = 2.0     # 서버가 값을 안 주면 이 값부터 지수 백오프
+RATE_LIMIT_MAX_DELAY = 60.0     # 한 번에 이 이상은 안 기다린다
+
+_RETRY_AFTER_RE = re.compile(r"try again in\s+(\d+(?:\.\d+)?)\s*(ms|s)\b", re.I)
+
+
+def _is_quota_exhausted(err) -> bool:
+    """잔액 소진인가 — 기다려도 안 풀리는 429."""
+    s = str(err)
+    return "insufficient_quota" in s or "credit_balance_exhausted" in s
+
+
+def _retry_after_seconds(err) -> Optional[float]:
+    """일시적 속도 제한이면 **기다릴 초**, 아니면 None.
+
+    서버가 메시지에 담아 주는 값('Please try again in 424ms')을 먼저 읽는다 — 우리가 고른
+    상수보다 서버가 아는 값이 정확하다. 없으면 호출부가 지수 백오프로 채운다.
+    """
+    if _is_quota_exhausted(err):
+        return None                              # 기다림이 처방이 아니다
+    s = str(err)
+    if "rate_limit" not in s and "429" not in s and type(err).__name__ != "RateLimitError":
+        return None                              # 속도 제한이 아닌 실패(5xx 등)
+    if (m := _RETRY_AFTER_RE.search(s)):
+        val = float(m.group(1))
+        return val / 1000 if m.group(2).lower() == "ms" else val
+    return RATE_LIMIT_BASE_DELAY
+
+
 class LLM:
     """모든 LLM 호출의 단일 통로."""
 
@@ -142,16 +180,35 @@ class LLM:
             kwargs["reasoning_effort"] = effort     # 'low'|'medium'|'high'
 
         last_err: Optional[str] = None
+        fatal = False
         for attempt in range(1, 3):                  # 최대 2회(최초 + 재시도 1)
-            t0 = time.monotonic()
-            try:
-                resp = self.client.chat.completions.create(**kwargs)
-            except openai.APIError as e:
-                last_err = f"{type(e).__name__}: {e}"
-                LEDGER.append(CallRecord(label, model, "api_error",
-                                         int((time.monotonic() - t0) * 1000),
-                                         attempts=attempt, error=last_err))
-                log.warning("LLM api_error [%s] %s", label, last_err)
+            # 속도 제한 대기는 **이 예산을 안 쓴다.** 파싱 재시도 1회는 스펙(결정성)이고
+            # TPM 대기는 그것과 무관한 사정이라, 한 통에 담으면 잠깐 밀린 것 때문에
+            # 정작 파싱 실패에 쓸 재시도가 사라진다.
+            resp = None
+            for wait_no in range(RATE_LIMIT_MAX_WAITS + 1):
+                t0 = time.monotonic()
+                try:
+                    resp = self.client.chat.completions.create(**kwargs)
+                    break
+                except openai.APIError as e:
+                    last_err = f"{type(e).__name__}: {e}"
+                    LEDGER.append(CallRecord(label, model, "api_error",
+                                             int((time.monotonic() - t0) * 1000),
+                                             attempts=attempt, error=last_err))
+                    delay = _retry_after_seconds(e)
+                    if delay is None or wait_no == RATE_LIMIT_MAX_WAITS:
+                        # 잔액 소진은 재시도가 무의미하다 — 남은 예산까지 태우지 않는다.
+                        fatal = _is_quota_exhausted(e)
+                        log.warning("LLM api_error [%s] %s", label, last_err)
+                        break
+                    delay = min(delay * (2 ** wait_no), RATE_LIMIT_MAX_DELAY)
+                    log.info("LLM 속도제한 [%s] %.1fs 대기 후 재시도 (%d/%d)",
+                             label, delay, wait_no + 1, RATE_LIMIT_MAX_WAITS)
+                    time.sleep(delay)
+            if resp is None:
+                if fatal:
+                    break
                 continue
 
             latency = int((time.monotonic() - t0) * 1000)

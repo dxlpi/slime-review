@@ -124,7 +124,8 @@ something to correct for** — never average it; show it per source, plus the ga
   scent divergence, the supporter bucket, and the evidence-source list are all still **computed** in
   `consolidated_view.py`; whether the new screen renders them is an open design question, not a build one.
 - **Collection is incremental and summaries refresh only on change** (2026-08-07,
-  plan `.omc/plans/2026-08-07-incremental-collection-and-stale-summaries.md`). Four things landed:
+  the source plan `incremental-collection-and-stale-summaries.md` is author-local and not part of
+  this repo). Four things landed:
   · **The dcinside comment key was run-dependent and the constraint above never bound it.** `post_id`
     ended in the run's `enumerate` position, so one extra collected item shifted every later comment
     into a *new* row. `pipeline.dc_post_id` now builds it from `comment_no` (the id dcinside itself

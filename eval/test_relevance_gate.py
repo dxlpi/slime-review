@@ -115,16 +115,70 @@ def test_ac2_classify_wired_and_callable():
 
 # ---------------------------------------------------------------- AC3 (쿼리 조건부 / 랜박)
 def test_ac3_query_conditional_ranbox():
-    """동일 랜박 텍스트: 타깃 제품 포함이면 KEEP, 무관 타깃이면 DROP."""
+    """동일 랜박 텍스트: 타깃 제품 포함이면 온토픽, 무관 타깃이면 오프토픽.
+
+    ⚠️ ADR-0017 이후 **디시에서 topic 은 드롭 권한이 없다**(`drop_axes=("meta",)`) — 그래서
+    이 계약은 'DROP 되는가'가 아니라 **'축이 두 경우를 여전히 가르는가'**로 표현된다.
+    가르는 능력 자체가 죽으면 순위(`_rank_key`)도 같이 죽으므로, 드롭을 껐다고 검사를
+    지우면 안 된다. 드롭 권한이 살아 있는 기본 설정(`DROP_AXES_DEFAULT`)의 DROP 은 아래
+    `test_topic_still_drops_when_axis_has_authority` 가 따로 고정한다.
+    """
     ranbox = RawReview(text="랜박 뜯었는데 허니푸냥이 나왔다 향 좋네 대만족",
                        url="u", platform="dcinside")
     conf = R.RELEVANCE_CONF["dcinside"]
-    keep = R.classify(ranbox, {"market": "봄", "slime": "허니푸냥이"}, conf)
+    on = R.classify(ranbox, {"market": "봄", "slime": "허니푸냥이"}, conf)
+    off = R.classify(ranbox, {"market": None, "slime": "레몬커드쉘도넛"}, conf)
+    assert on.topic_score > off.topic_score, \
+        f"타깃 포함/무관이 topic 으로 안 갈림 ({on.topic_score:.3f} vs {off.topic_score:.3f})"
+    assert not on.below_tau, f"타깃 포함인데 τ 미만 (score={on.topic_score:.3f})"
+    assert off.below_tau, f"무관 타깃인데 τ 이상 (score={off.topic_score:.3f})"
+    assert off.keep and off.axis != "topic", \
+        f"디시에서 topic 이 드롭했다(ADR-0017 위반): axis={off.axis}"
+    print(f"✓ AC3 쿼리 조건부 랜박 온토픽({on.topic_score:.2f})/오프토픽({off.topic_score:.2f}) OK")
+
+
+def test_topic_still_drops_when_axis_has_authority():
+    """`drop_axes` 기본값(전 축)에서는 topic 이 예전 그대로 DROP 한다 — 하위호환 고정.
+
+    ADR-0017 은 **디시 설정**을 좁힌 것이지 topic 축을 없앤 게 아니다. 이 검사가 없으면
+    나중에 축 자체를 지우는 리팩터가 인스타까지 조용히 통과시킨다.
+    """
+    ranbox = RawReview(text="랜박 뜯었는데 허니푸냥이 나왔다 향 좋네 대만족",
+                       url="u", platform="dcinside")
+    conf = dict(R.RELEVANCE_CONF["dcinside"])
+    conf.pop("drop_axes")                       # → DROP_AXES_DEFAULT (전 축 드롭)
     drop = R.classify(ranbox, {"market": None, "slime": "레몬커드쉘도넛"}, conf)
-    assert keep.keep, f"타깃 포함 랜박은 KEEP 이어야 (score={keep.topic_score:.3f})"
     assert not drop.keep and drop.axis == "topic", \
-        f"무관 타깃 랜박은 DROP(topic) 이어야 (score={drop.topic_score:.3f})"
-    print(f"✓ AC3 쿼리 조건부 랜박 KEEP({keep.topic_score:.2f})/DROP({drop.topic_score:.2f}) OK")
+        f"기본 drop_axes 에서 topic DROP 이 안 남 (keep={drop.keep}, axis={drop.axis})"
+    assert drop.below_tau, "DROP 인데 below_tau 가 기록되지 않음"
+    print(f"✓ 기본 drop_axes 에서 topic DROP 유지 OK (score={drop.topic_score:.2f})")
+
+
+def test_low_e_ranks_to_tail_instead_of_dropping():
+    """ADR-0017 — E 합집합 음성은 **드롭이 아니라 순위 꼬리**(문서화된 계약 D2 재판정).
+
+    `slime_rag/CLAUDE.md` 는 오래 'E 음성은 드롭이 아니라 순위 꼬리'라고 적어 왔는데 코드는
+    `e_union` 으로 버리고 있었다(ADR-0007 D2, '의도적 이탈'로 기록). 여기서 그 이탈을 닫는다.
+    """
+    conf = R.RELEVANCE_CONF["dcinside"]
+    tgt = {"market": "봄", "slime": "허니푸냥이"}
+    # 질문 화행 — E=0 이라 예전 규칙에선 e_union 으로 죽던 모양.
+    v = R.classify(RawReview(text="봄 허니푸냥이 살만한가? 아직 안샀는데 고민중",
+                             url="q", platform="dcinside"), tgt, conf)
+    assert v.keep, f"E 음성이 드롭됨(ADR-0017 위반): axis={v.axis}"
+    assert v.low_e, "E 음성인데 low_e 가 기록되지 않음(관측 손실)"
+    assert v.e_bucket == 0, f"E 음성인데 순위 버킷이 꼬리가 아님: {v.e_bucket}"
+    print(f"✓ ADR-0017 E 음성 KEEP + 꼬리 버킷 OK (low_e={v.low_e}, bucket={v.e_bucket})")
+
+
+def test_meta_is_the_only_drop_axis_for_dcinside():
+    """디시 `drop_axes` 는 정확히 `("meta",)` — 설정이 곧 계약이라 값 자체를 고정한다."""
+    assert R.RELEVANCE_CONF["dcinside"]["drop_axes"] == ("meta",), \
+        f"디시 drop_axes 가 바뀜: {R.RELEVANCE_CONF['dcinside'].get('drop_axes')}"
+    # 인스타는 명시하지 않아 기본값(전 축) — 이 변경이 다른 소스로 새지 않았는지.
+    assert "drop_axes" not in R.RELEVANCE_CONF["instagram"], \
+        "인스타에 drop_axes 가 생겼다 — ADR-0017 은 디시 한정 재판정이다"
+    print("✓ ADR-0017 디시 drop_axes=('meta',) · 인스타 무변경 OK")
 
 
 # ---------------------------------------------------------------- AC3b (name-collision, 메커니즘)
@@ -159,8 +213,13 @@ def test_ac3b_domain_gate_drops_nonslime():
 def test_ac5_examined_cap_and_shortfall():
     """examined 가 K*limit 에 도달하면 조기 종료하고 shortfall 을 WARN 로깅."""
     cap = _capture_sources_log()
-    # 전부 비관련 → KEEP 0. limit=2, K=3 → cap=6 에서 조기 종료(20건 중 6건만 examine).
-    drops = [RawReview(text=f"오늘 날씨 뉴스 폭염 잡담 {i} 점심 치킨", url=f"u{i}", platform="dcinside")
+    # 전부 DROP → KEEP 0. limit=2, K=3 → cap=6 에서 조기 종료(20건 중 6건만 examine).
+    # ⚠️ ADR-0017 이후 디시에서 '전부 DROP' 을 만드는 축은 **meta 하나뿐**이다. 예전엔 무관한
+    #   잡담("오늘 날씨 뉴스 폭염")으로 충분했지만 이제 topic 은 드롭 권한이 없어 그대로 KEEP 되고,
+    #   예산이 차 버려 examined 가 cap 이 아니라 budget 에서 멈춘다 — 상한 검사가 조용히 무의미해진다.
+    #   그래서 갤 메타 어휘(`relevance_rules.LEXICON["meta"]`)로 바꾼다: 검사 대상은 여전히
+    #   examined 상한이고, 재료만 **실제 운용 설정에서 드롭되는 축**으로 맞춘 것이다.
+    drops = [RawReview(text=f"주딱 완장 클린암갤 공지 {i} 닥눈삼", url=f"u{i}", platform="dcinside")
              for i in range(20)]
     gate = RelevanceGate("dcinside", {"market": None, "slime": "허니푸냥이"}, [], limit=2)
     assert gate.cap == 6, f"cap=K*limit=6 기대, 실제 {gate.cap}"
@@ -189,7 +248,9 @@ def test_ac5_max_pages_preserved():
 def test_ac7_drop_log_schema():
     """모든 DROP 이 axis/score/kind/url 과 함께 로깅된다."""
     cap = _capture_sources_log()
-    reviews = [RawReview(text="오늘 점심 뭐 먹지 배고프다 치킨", url="drop-url-1", platform="dcinside")]
+    # AC5 와 같은 이유로 재료가 meta 여야 한다 — ADR-0017 이후 디시에서 실제로 DROP 되는 축은
+    # meta 하나뿐이라, 무관 잡담을 쓰면 KEEP 되어 'DROP 로그 스키마' 검사가 재료를 잃는다.
+    reviews = [RawReview(text="주딱 완장 클린암갤 닥눈삼 공지", url="drop-url-1", platform="dcinside")]
     gate = RelevanceGate("dcinside", {"market": None, "slime": "허니푸냥이"}, [], limit=5)
     list(gate.filter(reviews))
     gate.finish()
@@ -335,6 +396,9 @@ if __name__ == "__main__":
     test_ac1_relevant_scarcity_returns_fewer()
     test_ac2_classify_wired_and_callable()
     test_ac3_query_conditional_ranbox()
+    test_topic_still_drops_when_axis_has_authority()
+    test_low_e_ranks_to_tail_instead_of_dropping()
+    test_meta_is_the_only_drop_axis_for_dcinside()
     test_ac3b_domain_gate_drops_nonslime()
     test_ac5_examined_cap_and_shortfall()
     test_ac5_max_pages_preserved()

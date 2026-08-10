@@ -169,7 +169,8 @@ class RelevanceGate:
 
     def __init__(self, platform: str, target: Optional[dict], keywords: list[str],
                  limit: int, logger=log):
-        from ..relevance import RELEVANCE_CONF, RELEVANCE_K, TAU_SCOPE_MISMATCH
+        from ..relevance import (DROP_AXES_DEFAULT, RELEVANCE_CONF, RELEVANCE_K,
+                                 TAU_SCOPE_MISMATCH)
         self.platform = platform
         self.limit = limit
         self.log = logger
@@ -197,6 +198,13 @@ class RelevanceGate:
         self.emitted = 0                              # 패스스루 카운터
         self.unprocessed = 0                          # 예산 초과(드롭 아님) — AC10
         self.dropped = {"topic": 0, "meta": 0, "domain": 0, "e_union": 0}
+        # 드롭 권한을 뺀 축이 '탈락'이라 봤지만 살아남은 수(ADR-0017). 드롭 카운터와 **따로** 센다 —
+        # 합치면 '걸러냈다'와 '규칙상 안 거른다'가 한 숫자로 뭉개져, `drop_axes` 를 좁혔을 때
+        # 늘어난 행이 어디서 왔는지 사후에 못 가른다(기보유 컷과 홍보 게이트를 가른 것과 같은 이유).
+        self.kept_below_tau = 0
+        self.kept_low_e = 0
+        # 요약 로그가 '어떤 규칙으로 돈 런인지' 함께 남기도록 여기서 붙든다(finish 는 지연 import 밖).
+        self.drop_axes = tuple(sorted(set((self.conf or {}).get("drop_axes", DROP_AXES_DEFAULT))))
 
     def should_stop(self) -> bool:
         if not self.active:
@@ -249,8 +257,15 @@ class RelevanceGate:
             if v.near_boundary:
                 self.log.info("relevance near-boundary keep score=%.3f url=%s",
                               v.topic_score, review.url)
+            if v.below_tau:
+                self.kept_below_tau += 1
+            if v.low_e:
+                self.kept_low_e += 1
             review.meta["relevance"] = {
                 "axis": v.axis, "topic_score": round(v.topic_score, 4),
+                # 예전 규칙이면 죽었을 조각인지 — `reviews.relevance_meta` 로 영속(하드게이트 #3).
+                # 이게 행에 안 남으면 ADR-0017 이전/이후 코퍼스를 사후에 구분할 방법이 없다.
+                "below_tau": v.below_tau, "low_e": v.low_e,
                 "M": v.M, "Q": v.Q, "E": v.E,
                 "e_rule": v.e_rule, "e_probe": v.e_probe, "e_bucket": v.e_bucket,
                 "bias_hold": v.bias_hold, "rank": rank,
@@ -274,5 +289,7 @@ class RelevanceGate:
                 "relevance shortfall [%s]: relevant=%d < budget=%d (%s, examined=%d, cap=%d)",
                 self.platform, self.relevant, self.budget, reason, self.examined, self.cap)
         if self.examined:
-            self.log.info("relevance summary [%s] examined=%d relevant=%d unprocessed=%d dropped=%s",
-                          self.platform, self.examined, self.relevant, self.unprocessed, self.dropped)
+            self.log.info("relevance summary [%s] examined=%d relevant=%d unprocessed=%d dropped=%s "
+                          "kept_below_tau=%d kept_low_e=%d drop_axes=%s",
+                          self.platform, self.examined, self.relevant, self.unprocessed, self.dropped,
+                          self.kept_below_tau, self.kept_low_e, self.drop_axes)

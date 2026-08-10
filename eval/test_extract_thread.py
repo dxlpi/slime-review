@@ -76,6 +76,17 @@ def _thread(n_comments: int) -> list[RawReview]:
     return [post] + comments
 
 
+def _expected_product(raw: RawReview) -> str | None:
+    """`FakeLLM` 이 그 조각에 붙일 제품명 — 추출 단계 출력 기준.
+
+    ⚠️ 추출 층은 **비제품 단어 게이트를 걸지 않는다**(마켓 접두를 뗄 KB 가 없어서, 걸면
+      `ㅇㅊ` 같은 맨몸 마켓 표기의 마켓 신호가 사라진다 — `extract_thread` 의 금지 주석 참조).
+      그 게이트는 `linking.link` 가 접두 분리 **뒤에** 건다. 그래서 여기 기대값은 원문
+      첫 낱말 그대로이고, 합성 판정은 `eval/test_market_prefix.py` 가 본다.
+    """
+    return (raw.text.split() or [""])[0]
+
+
 # ---------------------------------------------------------------- AC12
 def test_ac12_call_count():
     """댓글 10개 스레드(조각 11개) → 1회 호출. batch_size 를 넘으면 2회."""
@@ -89,6 +100,172 @@ def test_ac12_call_count():
     print("✓ AC12 호출 수: 조각 11개 → 1회 (batch_size=6 이면 2회) OK")
 
 
+def test_post_body_reaches_every_chunk_of_a_long_thread():
+    """batch_size 를 넘는 스레드에서도 **모든 청크**가 글 본문을 문맥으로 받는다(ADR-0017).
+
+    `members = [post] + comments` 를 그냥 잘라 보내면 둘째 청크부터 글이 빠진다. 그러면
+    ① 프롬프트가 'S0=글 본문'이라고 말하는데 실제 S0 가 댓글이고 ② 제품명을 생략한 댓글의
+    귀속(AC13)이 그 청크에서만 조용히 불가능해진다 — 배치의 존재 이유 절반이 그 문맥이다.
+    ⚠️ 이 분기는 ADR-0017 전까지 **한 번도 안 돌았다**: 게이트가 스레드당 최대 9조각만
+      통과시켰다(실측). M 만 드롭으로 바꾼 뒤 같은 저장소에서 10스레드가 12를 넘는다.
+    """
+    raws = _thread(15)                       # 조각 16개
+    llm = FakeLLM()
+    pairs = X.extract_collected(raws, llm, batch_size=6)
+    assert len(llm.calls) == 3, f"조각 16 · batch_size 6 → 3회여야, 실제 {len(llm.calls)}"
+    post_text = raws[0].text
+    for i, prompt in enumerate(llm.calls):
+        assert post_text in prompt, f"{i+1}번째 청크 프롬프트에 글 본문이 없다"
+    # 문맥 조각이 결과로 새지 않는다 — 반환은 여전히 조각 수와 1:1 이고 순서도 그대로다.
+    assert len(pairs) == len(raws), f"반환 {len(pairs)}건 ≠ 조각 {len(raws)}건(문맥 문서 유출)"
+    for raw, doc in pairs:
+        got = doc["reviews"][0]["mentioned_product"]
+        want = _expected_product(raw)
+        assert got == want, f"귀속이 밀림: {want!r} 자리에 {got!r}"
+    print(f"✓ 긴 스레드 전 청크에 글 본문 문맥 도달 + 귀속 정렬 OK (호출 {len(llm.calls)}회)")
+
+
+def test_single_and_thread_schemas_share_one_product_shape():
+    """단건 스키마와 스레드 배치 스키마의 **제품 항목 모양이 같다**(AC12 동등성의 전제).
+
+    `_PRODUCT_PROPS` 를 공유하도록 짜여 있어 정의가 갈라질 수 없다 — 갈라지면 배치 결과와
+    단건 결과가 조용히 달라져 동등성 실측이 무의미해진다. `mentioned_market` 처럼 나중에
+    추가된 칸이 한쪽에만 들어가는 게 정확히 그 사고다.
+    """
+    single = X.LAYER2_SCHEMA["properties"]["reviews"]["items"]
+    batch = X.LAYER2_THREAD_SCHEMA["properties"]["docs"]["items"] \
+             ["properties"]["reviews"]["items"]
+    assert single == batch, "단건/배치 제품 항목 스키마가 갈라졌다"
+    for field in ("mentioned_product", "mentioned_market", "firsthand_evidence"):
+        assert field in single["properties"], f"{field} 가 제품 항목에 없다"
+        assert field in single["required"], f"{field} 가 required 가 아니다(strict 위반)"
+    # 항목 단위 마켓은 **nullable 추가**여야 한다 — 인스타 캡션은 이 칸을 안 채운다.
+    assert "null" in single["properties"]["mentioned_market"]["type"], \
+        "mentioned_market 가 nullable 이 아니다(미언급 → null 위반)"
+    print("✓ 단건/배치 제품 항목 스키마 공유 + 항목 마켓 nullable OK")
+
+
+# ---------------------------------------------------------------- 제품 어휘(초성·약칭)
+def test_failed_batch_costs_only_that_batch():
+    """배치 하나가 죽어도 **그 배치만** 잃고 정렬은 유지된다 — 실측 회귀(2026-08-09).
+
+    유료 런에서 34앵커 중 2앵커가 `JSONDecodeError`(출력 잘림) 하나로 통째로 죽었다
+    (74조각). 예외를 그대로 올리면 그 앵커의 남은 스레드까지 날아간다.
+    빈 문서로 자리를 채워야 zip 이 조용히 잘라 뒤쪽 귀속을 밀지 않는다.
+    """
+    class Boom(FakeLLM):
+        def complete(self, prompt, **kw):
+            self.calls.append(prompt)
+            if len(self.calls) == 1:
+                raise RuntimeError("LLM 호출 실패: JSONDecodeError: Unterminated string")
+            return super().complete(prompt, **{k: v for k, v in kw.items()})
+
+    raws = _thread(11)                       # 조각 12개 · batch_size 6 → 2배치(첫 배치가 죽는다)
+    llm = Boom()
+    pairs = X.extract_collected(raws, llm, batch_size=6)
+    assert len(pairs) == len(raws), f"실패 배치가 정렬을 깼다: {len(pairs)} vs {len(raws)}"
+    # 죽은 배치는 빈 문서 → 행이 안 남아 다음 런이 공짜로 재시도한다(raw-first 의 값어치).
+    assert all(not p[1].get("reviews") for p in pairs[:6]), "죽은 배치가 내용을 만들어냈다"
+    # 살아남은 배치는 정상 귀속.
+    for raw, doc in pairs[6:]:
+        assert doc["reviews"][0]["mentioned_product"] == _expected_product(raw), "생존 배치 귀속이 밀림"
+    print(f"✓ 실패 배치 격리 + 정렬 보존 OK (호출 {len(llm.calls)}회)")
+
+
+def test_thread_call_raises_output_ceiling():
+    """스레드 배치는 기본 4,096 이 아니라 `THREAD_MAX_TOKENS` 로 부른다.
+
+    GPT-5 계열의 `max_completion_tokens` 는 **추론 토큰까지 포함**이라 기본값으로는
+    본문이 나오기 전에 예산이 마른다 — 실측으로 2앵커가 잘린 JSON 에 죽었다.
+    """
+    seen = {}
+
+    class Capture(FakeLLM):
+        def complete(self, prompt, **kw):
+            seen.update(kw)
+            return super().complete(prompt, **kw)
+
+    X.extract_thread("제목", ["ㅂ 푸냥이 좋음"], Capture())
+    assert seen.get("max_tokens") == X.THREAD_MAX_TOKENS, \
+        f"스레드 호출이 출력 상한을 안 올림: {seen.get('max_tokens')}"
+    assert X.THREAD_MAX_TOKENS > 4096, "상한이 기본값 이하면 잘림이 재발한다"
+    print(f"✓ 스레드 배치 출력 상한 {X.THREAD_MAX_TOKENS} 전달 OK")
+
+
+def test_vocab_only_lists_forms_present_in_the_text():
+    """후보 목록은 **본문에 표면형이 실제로 등장한** 항목만 — 반-지어내기 장치의 절반.
+
+    목록을 통째로 실으면 모델이 애매한 문장을 그럴듯한 이름에 스냅시킬 수 있다. 등장한 것만
+    실으면 목록에 오르는 이름은 전부 텍스트에 근거가 있다(부수적으로 토큰도 준다).
+    """
+    vocab = X.build_product_vocab(["허니푸냥이", "밀크버터크림식빵", "빠코볼"])
+    cands = X.vocab_candidates(vocab, "허니푸냥이 향 좋더라 근데 빠코볼은 별로")
+    assert set(cands) == {"허니푸냥이", "빠코볼"}, f"후보가 본문과 안 맞음: {set(cands)}"
+    assert "밀크버터크림식빵" not in cands, "본문에 없는 제품이 후보에 실렸다(지어내기 벡터)"
+    prompt = X.build_thread_prompt("제목", ["허니푸냥이 향 좋더라"], cands)
+    assert "[제품 후보]" in prompt and "허니푸냥이" in prompt
+    assert "[제품 후보]" not in X.build_thread_prompt("제목", ["아무말"], None), \
+        "후보가 없는데 머리말이 붙었다"
+    print(f"✓ 제품 후보는 본문 등장분만 + 프롬프트 주입 OK ({len(cands)}개)")
+
+
+def test_vocab_never_generates_product_choseong():
+    """⛔ 제품 초성은 **생성하지 않는다** — 실측 오탐 9/14(웃음·욕설·타제품 초성과 충돌).
+
+    `linking._kb_surface_forms` 가 같은 이유로 이미 초성을 뺀다. 약칭은 사람이 시드한
+    `data/product_aliases.json` 에서만 온다(음절 클리핑이라 생성 불가).
+    """
+    vocab = X.build_product_vocab(["허니푸냥이", "쿠키컵코코아"])
+    assert vocab["허니푸냥이"] == ["허니푸냥이"], f"초성이 생성됨: {vocab['허니푸냥이']}"
+    assert vocab["쿠키컵코코아"] == ["쿠키컵코코아"], f"초성이 생성됨: {vocab['쿠키컵코코아']}"
+    # 웃음 런에 초성이 걸리던 실제 오탐 — 생성하지 않으므로 이제 후보가 안 나온다.
+    assert not X.vocab_candidates(vocab, "ㅋㅋㅋㅋㅋㅋㅋㅋㅇㅋ담 차수때 도전해봄"), \
+        "웃음 런이 제품 후보로 걸린다(초성 생성 회귀)"
+    # 사람이 시드한 약칭은 쓴다.
+    seeded = X.build_product_vocab(["허니푸냥이"], {"봄": {"푸냥이": "허니푸냥이"}})
+    assert seeded["허니푸냥이"] == ["푸냥이", "허니푸냥이"], f"시드 약칭 미반영: {seeded}"
+    assert set(X.vocab_candidates(seeded, "푸냥이 인별에 많이 올라오던데")) == {"허니푸냥이"}
+    print("✓ 제품 초성 미생성 + 사람 시드 약칭만 사용 OK")
+
+
+def test_vocab_guard_holds_invented_names():
+    """스레드 어디에도 근거가 없는 제품명은 **보류**(null)한다 — 규칙은 프롬프트, 강제는 코드."""
+    cands = {"허니푸냥이": ["허니푸냥이"]}
+    doc = {"reviews": [{"mentioned_product": "레몬커드쉘도넛", "firsthand_evidence": "x"}]}
+    held = X.enforce_product_vocab(doc, "허니푸냥이 향 좋더라", cands)
+    assert held == 1 and doc["reviews"][0]["mentioned_product"] is None, \
+        f"지어낸 제품명이 살아남음: {doc['reviews'][0]['mentioned_product']}"
+    print("✓ 근거 없는 제품명 보류 OK")
+
+
+def test_vocab_guard_keeps_context_resolved_comment():
+    """⛔ 회귀 가드 — 근거 판정을 **조각 단위**로 좁히면 AC13 이 통째로 죽는다.
+
+    제품명을 생략하고 앞 조각을 받아 말한 댓글은 자기 텍스트에 이름이 **없다**. 그게 정상이고
+    배치 추출의 존재 이유다. 스레드 후보에 있으면 통과시켜야 한다(개발 중 실제로 한 번
+    이 방향으로 잘못 짰다 — 사후 검사가 배치의 이득을 되돌리는 꼴이었다).
+    """
+    cands = {"허니푸냥이": ["허니푸냥이"]}            # 글 본문에서 나온 후보
+    doc = {"reviews": [{"mentioned_product": "허니푸냥이", "firsthand_evidence": "향이 에바"}]}
+    held = X.enforce_product_vocab(doc, "웅 근데 향이 좀 에바ㅠ", cands)   # 댓글엔 이름 없음
+    assert held == 0 and doc["reviews"][0]["mentioned_product"] == "허니푸냥이", \
+        "문맥으로 귀속된 댓글이 보류됐다(AC13 파손)"
+    print("✓ 문맥 귀속 댓글은 보류하지 않음(AC13 보존) OK")
+
+
+def test_vocab_guard_keeps_real_product_absent_from_vocab():
+    """1층에 없는 **진짜 제품**은 본문에 그대로 있으면 남긴다 — 과잉 보류 회귀.
+
+    과잉 배제는 유령 제품과 반대 방향의, **화면에 안 보이는** 실패다(빠코폼 사례).
+    """
+    cands = {"빠코볼": ["빠코볼"]}
+    doc = {"reviews": [{"mentioned_product": "빠코폼", "firsthand_evidence": "x"}]}
+    held = X.enforce_product_vocab(doc, "빠코폼 파였는데 빠코볼도 존잼", cands)
+    assert held == 0 and doc["reviews"][0]["mentioned_product"] == "빠코폼", \
+        "어휘에 없는 진짜 제품이 지워졌다"
+    print("✓ 어휘 밖 진짜 제품 보존(과잉 보류 방지) OK")
+
+
 def test_ac12_per_comment_attribution():
     """결과 행이 조각별로 **정확히** 귀속된다 — 한 칸이라도 밀리면 실패."""
     raws = _thread(8)
@@ -96,7 +273,7 @@ def test_ac12_per_comment_attribution():
     assert len(pairs) == len(raws), f"조각 {len(raws)}개인데 결과 {len(pairs)}개"
     for raw, doc in pairs:
         got = doc["reviews"][0]["mentioned_product"]
-        want = raw.text.split()[0]
+        want = _expected_product(raw)
         assert got == want, f"귀속 어긋남: {raw.text[:12]!r} → {got!r} (기대 {want!r})"
     print("✓ AC12 조각별 귀속 정확 OK")
 
@@ -130,7 +307,7 @@ def test_ac12_missing_doc_is_padded():
     for raw, doc in pairs:
         if raw is raws[2]:
             continue
-        assert doc["reviews"][0]["mentioned_product"] == raw.text.split()[0], \
+        assert doc["reviews"][0]["mentioned_product"] == _expected_product(raw), \
             "빠진 조각 뒤로 귀속이 밀림"
     print("✓ AC12 누락 조각 패딩(귀속 밀림 없음) OK")
 
@@ -149,6 +326,35 @@ def test_hearsay_gate_applies_to_batch_path():
     assert all(doc["reviews"] == [] for _, doc in pairs), \
         "배치 경로가 전언 게이트를 통과시킴(가짜 후기 행이 적재된다)"
     print("✓ AC15 배치 경로에도 전언 게이트 적용 OK")
+
+
+def test_thread_market_fills_but_never_overwrites():
+    """스레드 market 상속은 **채우기 전용**이다 — 자기 마켓을 뽑은 조각은 그대로 둔다.
+
+    실측(2026-08-10, 아모스갤 813행): 덮어쓰기 때문에 **36행이 자기 본문과 모순**됐다.
+    스레드 200743 은 본문에 마켓이 7개 나오는 비교 스레드인데, 글에서 잡힌 `빈짱` 하나가
+    19행 전부에 찍혔다 — 남의 마켓 후기가 빈짱 후기로 집계된다는 뜻이라 출처 편향(1급 기능)의
+    왜곡이다. 틀린 마켓은 NULL 보다 나쁘다.
+
+    ⚠️ 상속 자체를 없애면 안 된다 — 마켓을 말하지 않은 댓글은 여전히 글의 값을 받아야
+      개체연결이 선다(그게 애초에 상속이 있는 이유다). 그래서 양방향으로 잰다.
+    """
+    class OwnMarkets(FakeLLM):
+        """S0(글)=빈짱 · S1=연찌(자기 마켓 있음) · S2=없음(상속 대상)."""
+
+        def complete(self, prompt, **kw):
+            out = super().complete(prompt, **kw)
+            markets = {"S0": "ㅂㅉ", "S1": "ㅇㅉ", "S2": None}
+            for d in out["docs"]:
+                d["market"] = markets.get(d["source_id"])
+            return out
+
+    pairs = X.extract_collected(_thread(2), OwnMarkets())
+    got = [doc.get("market") for _, doc in pairs]
+    assert got[1] == "ㅇㅉ", f"자기 마켓을 뽑은 조각이 덮어쓰기당함: {got[1]!r} (기대 'ㅇㅉ')"
+    assert got[2] == "ㅂㅉ", f"마켓 없는 형제가 글의 값을 못 물려받음: {got[2]!r} (기대 'ㅂㅉ')"
+    assert got[0] == "ㅂㅉ", f"글 자신의 마켓이 바뀜: {got[0]!r}"
+    print("✓ 스레드 market 채우기 전용(자기 값 보존 + 형제 상속) OK")
 
 
 def test_ac12_orphan_comments_without_post():
@@ -381,9 +587,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     test_ac12_call_count()
+    test_post_body_reaches_every_chunk_of_a_long_thread()
+    test_single_and_thread_schemas_share_one_product_shape()
+    test_failed_batch_costs_only_that_batch()
+    test_thread_call_raises_output_ceiling()
+    test_vocab_only_lists_forms_present_in_the_text()
+    test_vocab_never_generates_product_choseong()
+    test_vocab_guard_holds_invented_names()
+    test_vocab_guard_keeps_context_resolved_comment()
+    test_vocab_guard_keeps_real_product_absent_from_vocab()
     test_ac12_per_comment_attribution()
     test_ac12_missing_doc_is_padded()
     test_hearsay_gate_applies_to_batch_path()
+    test_thread_market_fills_but_never_overwrites()
     test_ac12_orphan_comments_without_post()
     test_grade_attribution_offline()
     test_ac13_sibling_context_attribution()

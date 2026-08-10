@@ -93,6 +93,59 @@ def test_deterministic_firsthand_gate():
     print("✓ AC15 결정적 게이트 3겹(빈 근거·지어낸 인용·전언 근거) OK")
 
 
+def test_candidate_span_gate_drops_shopping_lists():
+    """4번째 겹 — 근거 조각이 **구매 예정 표지**면 폐기한다(장바구니 목록 ≠ 후기).
+
+    실측(2026-08-10, 아모스갤): `담았는데 우뗘??` 한 조각이 제품 6행을 냈다. 사지도 않은
+    제품 6건이 중립 후기로 집계에 들어간 것이다.
+    """
+    src = ("허니푸냥이 만져봤는데 좋았음 개굴악어 빠코볼 담았는데 우뗘?? "
+           "레몬스쿱 빼야겟다 ㅂㅇㅍ는 좀 고민")
+    doc = {"reviews": [
+        {"mentioned_product": "허니푸냥이", "firsthand_evidence": "만져봤는데 좋았음"},
+        {"mentioned_product": "개굴악어", "firsthand_evidence": "담았는데 우뗘??"},
+        {"mentioned_product": "빠코볼", "firsthand_evidence": "담았는데 우뗘??"},
+        {"mentioned_product": "레몬스쿱", "firsthand_evidence": "레몬스쿱 빼야겟다"},
+        {"mentioned_product": "베이퍼것", "firsthand_evidence": "ㅂㅇㅍ는 좀 고민"},
+    ]}
+    kept = [r["mentioned_product"] for r in drop_hearsay_reviews(doc, src)["reviews"]]
+    assert kept == ["허니푸냥이"], f"구매 예정 게이트 오작동: {kept}"
+    print("✓ AC15 4번째 겹(구매 예정 근거) 폐기 OK")
+
+
+def test_candidate_span_gate_keeps_terse_ownership_ratings():
+    """⛔ **과교정 회귀 — 여기가 이 게이트에서 가장 비싼 자리다.**
+
+    짧은 평점 나열은 진짜 보유 후기다. 스레드 142738 은 `이렇개 만져봤고` 라고 밝힌
+    보유 평가글인데, 항목이 `잭두콩 썸` 처럼 두 단어라 '후보 목록'처럼 **보인다**.
+    표지가 없으면 통과시켜야 한다 — 회수 손실은 화면에 안 보이고, 그중 부정 후기의
+    손실은 1급 기능(출처 편향)을 직접 깎는다.
+    """
+    src = "이렇개 만져봤고 잭두콩 썸 핑키별 쏘쏘 1믹스 2허밍 향은 궁금해서 사본 거임"
+    doc = {"reviews": [
+        {"mentioned_product": "잭두콩", "firsthand_evidence": "잭두콩 썸"},
+        {"mentioned_product": "핑키별", "firsthand_evidence": "핑키별 쏘쏘"},
+        {"mentioned_product": "믹스", "firsthand_evidence": "1믹스 2허밍"},
+        # `궁금` 은 어휘에 **없다** — 유일한 실측 매칭이 `궁금해서 사본`(산 뒤 후기)이었다.
+        {"mentioned_product": "레몬커드쉘도넛", "firsthand_evidence": "궁금해서 사본"},
+    ]}
+    kept = [r["mentioned_product"] for r in drop_hearsay_reviews(doc, src)["reviews"]]
+    assert kept == ["잭두콩", "핑키별", "믹스", "레몬커드쉘도넛"], \
+        f"진짜 보유 후기를 버렸다(과교정): {kept}"
+    print("✓ AC15 4번째 겹 과교정 방지(짧은 평점·순위·구매 후 서술 보존) OK")
+
+
+def test_candidate_gate_is_not_an_axis():
+    """구매 예정 판정은 **관련성 축이 아니다** — 게이트가 이걸로 조각을 버리면 안 된다.
+
+    첨삭 스레드는 후보에서 빠지면 안 된다: 거기 달린 **댓글**엔 남이 쓴 진짜 후기가 있다.
+    """
+    from slime_rag import relevance_rules as rules
+    assert rules.is_candidate_span("담았는데 우뗘??") is True
+    assert set(rules.axes("개굴악어 빠코볼 담았는데 우뗘??")) == {"M", "Q", "E"}, "축이 늘었다"
+    print("✓ 구매 예정 판정이 M/Q/E 축에 안 섞임 OK")
+
+
 def test_doc_shape_unchanged_by_hardening():
     """
     문서 모양·호출부는 불변이어야 한다(계획 C-3 의 의도).
@@ -150,6 +203,9 @@ if __name__ == "__main__":
     test_direct_perception_contrast_present()
     test_overcorrection_guard_present()
     test_deterministic_firsthand_gate()
+    test_candidate_span_gate_drops_shopping_lists()
+    test_candidate_span_gate_keeps_terse_ownership_ratings()
+    test_candidate_gate_is_not_an_axis()
     test_doc_shape_unchanged_by_hardening()
     test_live_hearsay_dropped()
     print("\n전언 하드닝 테스트 통과 ✅")

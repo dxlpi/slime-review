@@ -230,6 +230,276 @@ def test_registry_does_not_resurrect_dropped_rules():
     print("✓ ③′ 는 앞 규칙(배제·해시태그 없음)을 되살리지 않는다 OK")
 
 
+# ---------------------------------------------------------------- 비제품 라벨 게이트(B)
+# 제품이 아니라 **판매 형식**을 가리키는 말(`비매품`·`이번차수`)이 제품명 칸에 들어온 실측
+# 11행 / 8개 이름(2026-08-10)이 계기다. 유령 제품과 같은 방향의 실패지만 원인이 다르다 —
+# 저건 캡션의 스펙 줄을 들어올린 것이고, 이건 원문이 실제로 그렇게 부른 것이다.
+#
+# ⚠️ 이 블록의 절반은 **과잉 차단 회귀**다. 계획서는 `비매` 계열을 통째로 지우자고 했는데,
+#   실측해 보니 `연찌비매17`·`푸딩비매품`·`웨이즈1월비매` 는 **1층 `specs` 에 실재하는
+#   제품**이었다(specs 64행이 이 모양). 연찌·웨이즈는 비매품에 번호를 붙여 해시태그로 판다.
+#   부분일치로 지웠으면 그 제품들이 통째로 사라졌을 것이고, 그 손실은 화면에 안 보인다.
+KNOWN = {"연찌비매17", "푸딩비매품", "웨이즈1월비매", "웨이즈할로윈비매3", "빠코볼", "나비매듭"}
+
+
+def test_bare_labels_are_never_products():
+    """맨몸 라벨은 `known_products` 와 무관하게 비제품이다 — 무엇도 식별하지 못하는 이름이다."""
+    for label in ("비매", "비매품", "비매5", "비매품 1번", "이번비매", "저번 비매",
+                  "이번차수", "차수", "3차수", "랜덤박스", "랜박"):
+        assert extract.is_non_product_label(label, KNOWN), f"라벨을 놓쳤다: {label}"
+        assert extract.is_non_product_label(label), f"known 없이도 걸러야 한다: {label}"
+    print("✓ 맨몸 라벨 → 비제품 OK")
+
+
+def test_real_products_that_merely_contain_a_label_word_survive():
+    """부분일치 금지 회귀 — 진짜 제품명 안에 `비매`·`차수` 가 들어갈 수 있다.
+
+    ⛔ `'비매' in name` 으로 되돌리지 말 것. 이 손실은 유령 제품과 반대 방향이라
+      **화면에 흔적이 없다** — 후기가 그냥 제품 없이 사라진다.
+    """
+    for real in ("나비매듭", "말차수플레", "홍차수플레", "빠코볼", "구아검지글리"):
+        assert not extract.is_non_product_label(real, KNOWN), f"진짜 제품을 지웠다: {real}"
+        assert not extract.is_non_product_label(real), f"known 없이도 살아야 한다: {real}"
+    print("✓ 라벨어를 품은 진짜 제품명 생존 OK")
+
+
+def test_numbered_seller_series_are_real_products():
+    """`연찌비매17` 류는 **1층에 실재하는 제품**이다 — 판매 형식이 아니라 제품 식별자다.
+
+    실측(2026-08-10): `specs` 64행이 이 모양이다(연찌 57 · 웨이즈 6 · 푸딩 1).
+    계획서가 예상하지 못한 반례이고, 이 테스트가 그 실측을 코드로 붙잡아 둔다.
+    """
+    for real in ("연찌비매17", "푸딩비매품", "웨이즈1월비매", "웨이즈할로윈비매3"):
+        assert not extract.is_non_product_label(real, KNOWN), f"1층 제품을 라벨로 봤다: {real}"
+    print("✓ 번호 붙은 판매자 비매품 시리즈는 제품 OK")
+
+
+def test_a_numbered_bare_label_that_is_a_real_product_survives():
+    """`비매품50` 은 **연찌가 해시태그로 파는 실제 제품**이다(레지스트리 실측).
+
+    ⛔ '라벨 + 숫자면 무조건 비제품'으로 되돌리지 말 것 — 그 규칙이 정확히 이 이름을 지웠다.
+      `비매5`(가짜)와 `비매품50`(진짜)은 **구조가 같아서** 구조로는 못 가른다. 증거로만 갈린다.
+    ⚠️ 그러면서 맨몸 `비매품` 은 계속 지워져야 한다 — 레지스트리에 판매자가 실제로 단
+      `#비매품` 태그가 후보로 올라와 있어서, 증거를 물으면 맨몸 라벨이 되살아난다.
+    """
+    known = KNOWN | {"비매품50", "비매품"}          # 레지스트리엔 맨몸 `비매품` 도 있다(잡음)
+    assert not extract.is_non_product_label("비매품50", known), \
+        "번호 붙은 진짜 비매품 제품을 지웠다"
+    assert extract.is_non_product_label("비매품", known), \
+        "맨몸 라벨이 레지스트리 잡음으로 되살아났다"
+    assert extract.is_non_product_label("비매5", known), "가짜는 계속 걸러야 한다"
+    print("✓ 비매품50(진짜) 생존 · 맨몸 비매품(잡음) 제거 OK")
+
+
+def test_the_evidence_set_must_not_be_narrowed_per_market_or_per_thread():
+    """같은 이름은 어느 경로에서 봐도 **같은 판정**이어야 한다 — 좁힌 집합이 그걸 깬다.
+
+    ⛔ 실제로 이 방향으로 두 번 잘못 짰다: 인스타 경로는 마켓별 집합을, 디시 경로는
+      **스레드 본문에 등장한** 후보만 넘기고 있었다. 좁힌 집합은 비어 있지 않으므로
+      페일세이프(③)가 안 걸리고, 진짜 제품이 '증거 있는데 불일치'로 읽혀 지워진다.
+      백필은 전량을 보므로 같은 이름에 경로마다 반대 판정이 붙는다.
+    """
+    full = {"푸딩비매품", "빠코볼"}
+    narrowed = {"빠코볼"}                            # 그 스레드/마켓에서만 보이는 좁은 집합
+    assert not extract.is_non_product_label("푸딩비매품", full)
+    assert extract.is_non_product_label("푸딩비매품", narrowed), \
+        "좁힌 집합이 진짜 제품을 지운다는 사실 자체가 이 테스트의 전제다"
+    # 그래서 호출부는 전량을 넘겨야 한다 — 시그니처로 그 의도를 고정한다.
+    import inspect
+    assert "label_known" in inspect.signature(extract.repair_product_names).parameters, \
+        "라벨 증거는 타이브레이크 인자와 **별도 인자**여야 한다(섞으면 마켓별로 좁혀진다)"
+    assert "label_known" in inspect.signature(extract.extract_thread).parameters
+    assert "label_known" in inspect.signature(extract.extract_collected).parameters
+    print("✓ 라벨 증거 집합은 전용 인자(좁힘 금지) OK")
+
+
+def test_qualified_labels_need_evidence_to_be_dropped():
+    """수식된 라벨은 `known_products` 가 **있을 때만** 지운다(페일세이프).
+
+    `베이퍼비매` 와 `연찌비매17` 은 구조가 같다(마켓 + 라벨). 구조만으로는 못 가르므로
+    1층/레지스트리 증거에 묻는다. 증거가 없으면 **건드리지 않는다** — 증거 없이 지우는
+    쪽이 화면에 안 보이는 손실이라 더 나쁘다(`enforce_product_vocab` ③과 같은 규칙).
+    """
+    for qualified in ("베이퍼비매", "교동 지글리 비매"):
+        assert extract.is_non_product_label(qualified, KNOWN), f"놓쳤다: {qualified}"
+        assert not extract.is_non_product_label(qualified), \
+            f"증거 없이 지웠다: {qualified}"
+    print("✓ 수식된 라벨: 증거 있을 때만 제거 OK")
+
+
+def test_the_gate_nulls_the_name_but_keeps_the_review():
+    """제품명만 비우고 **후기 항목은 남긴다** — 1급 규칙은 '미언급 → null' 이지 드롭이 아니다.
+
+    그 조각의 배송·CS 는 마켓 축(ADR-0015)에 그대로 들어가야 한다. 항목을 버리면
+    주문 축 집계에서 조용히 빠진다.
+    """
+    doc = {"reviews": [{"mentioned_product": "비매품 1번", "overall": {"summary": "별로"}},
+                       {"mentioned_product": "빠코볼", "overall": {"summary": "좋음"}}]}
+    n = extract.drop_non_product_labels(doc, KNOWN)
+    assert n == 1, n
+    assert len(doc["reviews"]) == 2, f"후기 항목이 버려졌다: {doc['reviews']}"
+    assert doc["reviews"][0]["mentioned_product"] is None
+    assert doc["reviews"][0]["overall"]["summary"] == "별로", "내용이 손상됐다"
+    assert doc["reviews"][1]["mentioned_product"] == "빠코볼"
+    print("✓ 라벨은 null · 후기 항목은 보존 OK")
+
+
+def test_the_gate_runs_before_the_hashtag_gate_so_dcinside_is_covered():
+    """B2 회귀 — 해시태그가 없는 입력(디시)에도 걸려야 한다.
+
+    ⛔ `product_hashtags(text)` 의 조기 반환 **뒤로** 옮기지 말 것. 그 자리에 있어서
+      `비매품 1번` 이 살아남았다(실측 id=53). 인스타 전용 게이트 하나에 규칙을 얹으면
+      '모든 소스에 적용된다'가 조용히 거짓이 된다.
+    """
+    doc = {"reviews": [{"mentioned_product": "비매품 1번", "overall": {"summary": "별로"}}]}
+    out = extract.repair_product_names(doc, "해시태그 하나도 없는 디시 본문",
+                                       exclude=EXCL, known_products=L1, known_fallback=REG)
+    assert out["reviews"][0]["mentioned_product"] is None, \
+        f"디시 입력에 라벨 게이트가 안 돌았다: {out['reviews']}"
+    print("✓ 해시태그 없는 소스에도 라벨 게이트 적용 OK")
+
+
+def test_the_label_gate_does_not_disturb_normal_instagram_repair():
+    """라벨 게이트가 앞에 붙어도 기존 복구 판정은 그대로다(회귀)."""
+    doc = {"reviews": [{"mentioned_product": "아마존 우드 점토", "overall": {"summary": "좋아요"}}]}
+    out = extract.repair_product_names(doc, CAP_SPECLINE, exclude=EXCL, known_products=L1)
+    assert out["reviews"][0]["mentioned_product"] == "빠코볼", out["reviews"]
+    print("✓ 라벨 게이트 추가 후에도 기존 복구 무변경 OK")
+
+
+# ---------------------------------------------------------------- 보류분 말더듬 접기
+def _held(**blocks) -> dict:
+    return {"mentioned_product": None, **blocks}
+
+
+def test_identical_held_items_fold_as_extractor_stutter():
+    """내용이 **글자 하나까지 같은** 보류 항목은 한 건이다 — 추출기 말더듬 제거.
+
+    실측: 한 조각이 `아쿠아 자몽 후르츠 프쿠 썸파` 를 두고 완전히 동일한 항목을 3개
+    내보냈다. 이름이 없어 `UNIQUE(source, post_id, product)` 도 못 거른다 — Postgres 는
+    NULL 을 서로 다른 값으로 보기 때문에 그대로 3행이 된다.
+    """
+    stutter = _held(texture={"feel": ["쫀득"], "sentiment": "pos", "evidence": "쫀득해"},
+                    overall={"summary": "괜찮아요", "model_sentiment": "pos"},
+                    firsthand_evidence="만져보니 쫀득")
+    out = extract._fold_by_product([dict(stutter), dict(stutter), dict(stutter)])
+    assert len(out) == 1, f"동일 보류 3건이 안 접혔다: {len(out)}"
+    print("✓ 동일 내용 보류분 접기(말더듬 제거) OK")
+
+
+def test_held_items_that_differ_in_any_block_stay_apart():
+    """⛔ 내용이 다르면 **절대** 접지 않는다 — 이름 없는 두 항목은 서로 다른 제품일 수 있다."""
+    base = dict(texture={"feel": ["쫀득"], "sentiment": "pos"},
+                overall={"summary": "괜찮아요", "model_sentiment": "pos"})
+    other_attr = {**base, "texture": {"feel": ["말랑"], "sentiment": "pos"}}
+    other_overall = {**base, "overall": {"summary": "별로였어요", "model_sentiment": "neg"}}
+    other_ev = {**base, "firsthand_evidence": "다른 문장"}
+    for variant, why in ((other_attr, "속성 블록"), (other_overall, "총평"),
+                         (other_ev, "근거 조각")):
+        out = extract._fold_by_product([_held(**base), _held(**variant)])
+        assert len(out) == 2, f"{why} 가 다른데 접혔다 — 다른 의견이 한 건이 됐다"
+    print("✓ 내용이 다른 보류분은 분리 유지 OK")
+
+
+def test_contentless_held_items_are_never_folded():
+    """내용이 **하나도 없는** 보류 둘은 말더듬의 증거가 아니다 — 접지 않는다.
+
+    이 자리엔 원래 이름(`정체불명A`/`정체불명B`)이 이미 안 남아 있어 구분할 재료가 없다.
+    과소 집계는 과대 집계보다 알아채기 어렵다(`_fold_orders` 와 같은 판단).
+    """
+    out = extract._fold_by_product([_held(), _held()])
+    assert len(out) == 2, f"빈 보류분이 접혔다: {out}"
+    print("✓ 내용 없는 보류분 미접기 OK")
+
+
+def test_named_fold_is_unaffected_by_the_held_rule():
+    """이름 있는 항목의 접기 규칙(더 많이 찬 쪽 생존)은 그대로다."""
+    thin = {"mentioned_product": "빠코볼"}
+    rich = {"mentioned_product": "빠코볼", "texture": {"feel": ["쫀득"], "sentiment": "pos"},
+            "overall": {"summary": "좋아요", "model_sentiment": "pos"}}
+    out = extract._fold_by_product([thin, rich])
+    assert len(out) == 1 and out[0] is rich, out
+    print("✓ 이름 있는 접기 규칙 무변경 OK")
+
+
+# ---------------------------------------------------------------- 비제품 '단어' 게이트
+def test_type_words_are_never_products():
+    """종류어는 제품명이 아니다(사용자 규칙) — **완전일치**로만 비운다.
+
+    실측(2026-08-10, 아모스갤): `디폼` 3행 · `클리어` 3행 · `수수깡` 3행 · `빨대` 1행 ·
+    `크런치` 1행 · `빈백` 1행이 제품 행이었다. 이 이름으로는 어느 `specs` 와도 안 조인된다.
+    """
+    for word in ("디폼", "클리어", "수수깡", "빨대", "빈백", "크런치", "폼볼", "지글리"):
+        assert extract.is_non_product_word(word), f"종류어를 놓쳤다: {word}"
+    print("✓ 종류어 완전일치 → 비제품 OK")
+
+
+def test_glue_and_base_material_words_are_never_products():
+    """풀·베이스 재료어도 제품이 아니다 — 캡션 스펙 줄이 제품명으로 들어올려진 자국이다."""
+    for word in ("글루올", "택키", "아마존", "우드", "우마존", "생베", "점토", "화이트글루"):
+        assert extract.is_non_product_word(word), f"재료어를 놓쳤다: {word}"
+    print("✓ 풀·재료어 완전일치 → 비제품 OK")
+
+
+def test_composites_containing_a_type_or_glue_word_survive():
+    """⛔ **부분일치 금지 회귀.** 라벨 게이트(`나비매듭`)와 정확히 같은 실패 모드다.
+
+    실측(2026-08-10, `specs` 제품명 1,980개): 종류어·재료어와 **완전히 같은** 제품명은
+    0개인데, 그 단어를 **품은** 제품명은 16개다. 부분일치로 넓히면 그 16개가 통째로
+    사라지고, 그 손실은 화면에 안 보인다(후기가 그냥 제품 없이 사라진다).
+    """
+    for real in ("내리꽃디폼", "디폼생베", "디폼클리어", "베이직우드폼", "베이직우드버터",
+                 "말차초코크런치바", "허밍크런치", "오레오흑임자크런치", "크런치팝팝",
+                 "몽글클라우드", "우드득건반", "믹스폼듀", "물젤리수수깡"):
+        assert not extract.is_non_product_word(real), f"합성 제품명을 지웠다: {real}"
+    print("✓ 종류어·재료어를 품은 합성 제품명 생존 OK")
+
+
+def test_forgotten_name_fragments_are_never_products():
+    """`어쩌구/어쩌고/어쩍고` 는 '이름이 기억 안 난다'는 **명시적 표지**다 → 식별자가 아니다."""
+    for frag in ("버블버블 어쩌구", "쿠키 바닐라 어쩌구", "캔디어쩌구",
+                 "벨벳어쩍고", "생크림 뼈 어쩌구"):
+        assert extract.is_non_product_word(frag), f"조각 이름을 놓쳤다: {frag}"
+    print("✓ 조각 마커(어쩌구) → 비제품 OK")
+
+
+def test_jamo_only_names_are_never_products():
+    """자모뿐인 이름은 제품명일 수 없다.
+
+    KB 에 있는 마켓 초성은 `linking.split_market_prefix` 가 이미 떼어 마켓으로 승격시킨다.
+    여기 남는 건 KB **밖** 자모(실측: `ㅅㄱㄷ` 2행 · `ㅇㅍㅋ`·`ㅃㅇ`·`ㅇㄹ`·`ㅅㅈㄴ` 각 1행)인데,
+    그것도 마켓 표기지 제품명이 아니다 — 어느 쪽이든 제품으로 색인될 값이 아니다.
+    """
+    for jamo in ("ㅅㄱㄷ", "ㅇㅍㅋ", "ㅃㅇ", "ㅇㄹ", "ㅅㅈㄴ", "ㅂㅇㅍ", "ㅁㅁㄴ"):
+        assert extract.is_non_product_word(jamo), f"자모 이름을 놓쳤다: {jamo}"
+    # 자모가 **섞인** 완성형 이름은 건드리지 않는다 — 거긴 접두 분리의 몫이다.
+    assert not extract.is_non_product_word("ㅂㅇㅍ 빨대")
+    assert not extract.is_non_product_word("ㅈㄴ아몬드바나나브레드")
+    print("✓ 자모뿐인 이름 → 비제품 (혼합형은 무변경) OK")
+
+
+def test_word_gate_nulls_the_name_but_keeps_the_review():
+    """이름만 비우고 **행은 남긴다** — 그 조각의 배송·CS 는 마켓 축에 그대로 들어가야 한다."""
+    doc = {"reviews": [{"mentioned_product": "디폼", "texture": {"sentiment": "pos"}},
+                       {"mentioned_product": "빠코볼"}]}
+    n = extract.drop_non_product_words(doc)
+    assert n == 1, n
+    assert len(doc["reviews"]) == 2, "게이트가 후기 항목을 버렸다(미언급 → null, 드롭 아님)"
+    assert doc["reviews"][0]["mentioned_product"] is None
+    assert doc["reviews"][0]["texture"] == {"sentiment": "pos"}, "평가 내용이 사라졌다"
+    assert doc["reviews"][1]["mentioned_product"] == "빠코볼"
+    print("✓ 단어 게이트: 이름만 null · 후기 항목 보존 OK")
+
+
+def test_word_gate_reaches_dcinside_through_the_thread_path():
+    """디시(해시태그 없음)에도 걸려야 한다 — 라벨 게이트가 같은 이유로 배치 경로에 산다."""
+    doc = {"reviews": [{"mentioned_product": "수수깡"}]}
+    extract.repair_product_names(doc, "해시태그 없는 디시 본문 수수깡 좋더라")
+    assert doc["reviews"][0]["mentioned_product"] is None, \
+        "해시태그 없는 소스에서 단어 게이트가 안 돌았다"
+    print("✓ 해시태그 없는 소스에도 단어 게이트 적용 OK")
+
+
 if __name__ == "__main__":
     test_glue_and_scent_lines_become_the_hashtagged_product()
     test_market_tag_never_becomes_a_product()
@@ -245,4 +515,25 @@ if __name__ == "__main__":
     test_registry_never_overrides_a_layer1_decision()
     test_registry_holds_when_it_matches_more_than_one()
     test_registry_does_not_resurrect_dropped_rules()
+    test_excluded_tag_is_not_protected_as_a_distinct_product()
+    test_bare_labels_are_never_products()
+    test_real_products_that_merely_contain_a_label_word_survive()
+    test_numbered_seller_series_are_real_products()
+    test_qualified_labels_need_evidence_to_be_dropped()
+    test_the_gate_nulls_the_name_but_keeps_the_review()
+    test_the_gate_runs_before_the_hashtag_gate_so_dcinside_is_covered()
+    test_the_label_gate_does_not_disturb_normal_instagram_repair()
+    test_a_numbered_bare_label_that_is_a_real_product_survives()
+    test_the_evidence_set_must_not_be_narrowed_per_market_or_per_thread()
+    test_identical_held_items_fold_as_extractor_stutter()
+    test_held_items_that_differ_in_any_block_stay_apart()
+    test_contentless_held_items_are_never_folded()
+    test_named_fold_is_unaffected_by_the_held_rule()
+    test_type_words_are_never_products()
+    test_glue_and_base_material_words_are_never_products()
+    test_composites_containing_a_type_or_glue_word_survive()
+    test_forgotten_name_fragments_are_never_products()
+    test_jamo_only_names_are_never_products()
+    test_word_gate_nulls_the_name_but_keeps_the_review()
+    test_word_gate_reaches_dcinside_through_the_thread_path()
     print("\n제품명 귀속 복구 오프라인 테스트 통과 ✅")

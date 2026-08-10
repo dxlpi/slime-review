@@ -92,7 +92,12 @@ def _run_index_post(relevance_meta=None, source_ref=None):
         index: {"embed": lambda texts: [[0.0] * 4 for _ in texts]},
         linking: {
             "load_kb": lambda: object(),           # index_post 가 무조건 호출 — 더미로 흡수
-            "link_post": lambda doc, *, kb, aliases=None: [
+            # ⚠️ `**_` 로 받는다. 대역이 실제 시그니처를 **정확히** 흉내내면, `link_post` 에
+            #   인자가 하나 붙을 때마다 이 파일 전체가 TypeError 로 죽는다(실제로 그랬다 —
+            #   `inversion=` 추가에 세 대역이 한꺼번에 터졌고, 그 바람에 이 파일이 지키는
+            #   `ON CONFLICT DO NOTHING` 계약 검사까지 같이 사라졌다). 여기서 검증하는 건
+            #   index_post 의 **적재 동작**이지 개체연결의 시그니처가 아니다.
+            "link_post": lambda doc, *, kb, aliases=None, **_: [
                 _FakeLink(market="빈짱", market_confidence=0.9, product="한줌")
             ],
         },
@@ -187,7 +192,7 @@ def test_source_ref_replicated_to_fanout_rows():
     originals = _patch({
         index: {"embed": lambda texts: [[0.0] * 4 for _ in texts]},
         linking: {"load_kb": lambda: object(),
-                  "link_post": lambda d, *, kb, aliases=None: [
+                  "link_post": lambda d, *, kb, aliases=None, **_: [
                       _FakeLink("빈짱", 0.9, "한줌"), _FakeLink("빈짱", 0.9, "빠삭귤")]},
     })
     try:
@@ -231,7 +236,7 @@ def test_returns_actual_inserted_count_not_row_count():
     originals = _patch({
         index: {"embed": lambda texts: [[0.0] * 4 for _ in texts]},
         linking: {"load_kb": lambda: object(),
-                  "link_post": lambda d, *, kb, aliases=None: [
+                  "link_post": lambda d, *, kb, aliases=None, **_: [
                       _FakeLink("빈짱", 0.9, "한줌"), _FakeLink("빈짱", 0.9, "빠삭귤")]},
     })
     try:

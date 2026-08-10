@@ -17,10 +17,13 @@
 
 from __future__ import annotations
 
+import logging
 import re
 
 from .config import settings
 from .llm_ops import LLM
+
+log = logging.getLogger("extract")
 
 _NO_RE = re.compile(r"[?&]no=(\d+)")
 
@@ -66,6 +69,15 @@ _PRODUCT_PROPS: dict = {
     "mentioned_product": {"type": ["string", "null"],
                           "description": "이 항목이 가리키는 제품명. 같은 베이스명을 비교하면 구분어 포함"
                                          "(예: '한줌'이 둘이면 한글과자한줌 / 과일사탕한줌)."},
+    # 항목 단위 마켓. 최상위 `market`(주문 단위)의 **예외 통로**다 — 보통 1주문=1마켓이라
+    # 최상위 하나로 충분하지만, 이 갤엔 여러 마켓을 한 줄에 나열하는 글이 있다
+    # (`ㅇㅍㅋ 든든장작 … ㅅㄹㄹ 약과볼`). 그런 글에서 최상위 하나만 쓰면 나머지 제품이
+    # 전부 남의 마켓 후기로 집계된다 — 실측 94행이 KB 마켓을 2개 이상 언급한다.
+    # ⚠️ 최상위와 같은 규칙: **표기 그대로**(정규화는 linking 단계), 일반어는 마켓이 아니다.
+    "mentioned_market": {"type": ["string", "null"],
+                         "description": "이 항목의 제품 앞·근처에 마켓 초성·약칭이 따로 붙은 경우만. "
+                                        "표기 그대로(정규화 금지). 글 전체가 한 마켓이면 여기 말고 "
+                                        "최상위 market 에만 넣는다. 없으면 null."},
     "scent": _nullable_obj({
         "perceived": _nstr(),
         "projection": _nenum(PROJECTION),
@@ -155,6 +167,9 @@ LAYER2_SYSTEM = f"""\
   → 예) "ㅂㅉ 한줌\n…한글과자한줌…과일사탕…" : market="ㅂㅉ", reviews=[한글과자한줌, 과일사탕한줌].
 - 배송/주문/문자/도착/CS 는 최상위 shipping_cs 하나. 이걸로 제품 항목(reviews)을 만들지 마라.
 - reviews[].mentioned_product 엔 '제품명'만. 마켓 초성을 제품명에 섞지 마라.
+- 한 글이 **여러 마켓**의 제품을 나열하면(예: "ㅇㅍㅋ 든든장작 … ㅅㄹㄹ 약과볼") 각 항목의
+  reviews[].mentioned_market 에 그 항목의 마켓을 적는다. 글 전체가 한 마켓이면 거긴 null 로
+  두고 최상위 market 에만 넣는다(중복 기재 금지).
 
 [추측 금지]
 - texture.feel 은 본문에 통제어휘 표현이 실제로 나온 경우에만 채운다. 없으면 빈 배열 [].
@@ -219,7 +234,16 @@ LAYER2_THREAD_SYSTEM = LAYER2_SYSTEM + """
   그 제품이 무엇인지 앞 조각에서 찾아 mentioned_product 에 적는다. 하지만 앞 조각의 평가를
   그 조각으로 복사하지는 마라 — 각 항목은 그 조각이 실제로 말한 것만 담는다.
   예) [S1] "카피바라랑 푸냥이 중 뭐가 나아?" / [S2] "웅 근데 향이 좀 에바ㅠ"
-      → S2 의 mentioned_product 는 앞 문맥이 가리키는 제품. S1 에는 평가 항목을 만들지 마라."""
+      → S2 의 mentioned_product 는 앞 문맥이 가리키는 제품. S1 에는 평가 항목을 만들지 마라.
+
+[제품 후보 — 있을 때만]
+- 머리말에 `[제품 후보]` 줄이 있으면 `이름(초성·약칭)` 목록이다. 이 갤은 제품을 초성·약칭으로
+  부른다(`ㅂㅇㅍ 밀버크`, `아바`) — 그 표기를 **제품으로 알아보라고** 주는 참고 자료다.
+- **쓰임은 하나뿐: 본문에 실제로 나온 표기를 정규 이름으로 펴는 것.** 본문의 표기를 목록에서
+  찾아 그 정규 이름을 mentioned_product 에 적는다.
+- ⛔ 목록에 있다는 이유로 **본문에 없는 제품을 적지 마라.** 이 목록은 후보지 정답이 아니다.
+  본문 어디에도 근거가 없으면 mentioned_product 는 null 이다(미언급 → null, 1급 규칙).
+- ⛔ 어느 이름인지 애매하면(표기 하나가 여러 후보에 걸리면) 고르지 말고 null 로 둬라."""
 
 
 # ---------------------------------------------------------------- 1층 스키마 (판매자 → 공식 스펙)
@@ -373,6 +397,165 @@ GENERIC_TAGS = frozenset({
 })
 
 
+# ---------------------------------------------------------------- 비제품 라벨
+# 제품이 아니라 **판매 형식**을 가리키는 말. 추출기가 `mentioned_product` 로 들어올리면
+# '비매'라는 이름의 유령 제품이 마켓마다 하나씩 생긴다(실측 2026-08-10: 11행 / 8개 이름).
+#
+# ⚠️ **이 목록은 부분일치로 쓰면 안 된다.** 실측 반례가 둘 다 실재한다:
+#   · `나비매듭`·`말차수플레` — 진짜 제품명 안에 `비매`·`차수` 가 들어간다(과잉 차단).
+#   · `연찌비매17`·`푸딩비매품`·`웨이즈1월비매` — **1층 `specs` 에 실재하는 제품**이다.
+#     연찌·웨이즈는 비매품에 번호를 붙여 해시태그로 파는데, 그건 판매 형식이 아니라
+#     그 마켓의 제품 식별자다(계획서가 예상 못 한 실측 — specs 64행이 이 모양이다).
+# 그래서 판정은 두 갈래로 갈린다(`is_non_product_label` 참조): **맨몸 라벨**은 무조건
+# 비제품이고, **수식된 라벨**은 1층/레지스트리가 모르는 이름일 때만 비제품이다.
+NON_PRODUCT_LABELS = frozenset({"비매", "비매품"})       # 접미로 붙는다: 'X의 비매품'
+NON_PRODUCT_LABELS_EXACT = frozenset({"차수", "랜덤박스", "랜박", "랜덤팩"})
+# 지시어 접두 — '이번 비매'는 '비매'와 같은 말이다. 제품명의 일부가 될 수 없다.
+_LABEL_DEICTICS = ("이번", "저번", "지난", "다음", "요번")
+# 꼬리 수량 표기 — `비매5`·`비매품 1번`·`3차수`. 이것만으로는 제품 식별이 안 된다.
+_LABEL_TRAILING_RE = re.compile(r"(?:\d+\s*(?:번|차|호)?|번)\s*$")
+_LABEL_LEADING_RE = re.compile(r"^\d+\s*")
+
+
+def _label_core(name: str) -> str:
+    """라벨 판정용 축약형 — 꼬리 수량과 지시어 접두를 벗긴 몸통(공백 제거)."""
+    s = _norm(name)
+    for _ in range(3):                           # `비매품 1번` 처럼 두 겹인 경우
+        m = _LABEL_TRAILING_RE.search(s)
+        if not m or m.start() == 0:
+            break
+        s = s[:m.start()]
+    for d in _LABEL_DEICTICS:
+        if s.startswith(d) and len(s) > len(d):
+            s = s[len(d):]
+            break
+    # 앞자리 회차 표기 — `3차수`. 뒤가 아니라 **앞**에 붙는 형태라 위 꼬리 정규식이 못 잡는다.
+    # 벗긴 뒤 `NON_PRODUCT_LABELS_EXACT` 와 **완전일치**해야 라벨이므로, 숫자로 시작하는
+    # 진짜 제품명(`4pm스낵` 류)이 여기서 잘려도 판정에는 닿지 않는다.
+    if (m := _LABEL_LEADING_RE.match(s)) and m.end() < len(s):
+        s = s[m.end():]
+    return s
+
+
+def is_non_product_label(name: str | None, known_products=None) -> bool:
+    """이 이름이 제품이 아니라 **판매 형식 라벨**인가. 순수 함수(무LLM·무DB·무네트워크).
+
+    세 갈래다. 갈리는 축은 **이름이 라벨 말고 무엇을 더 들고 있는가**이고, 갈래마다
+    증거(`known_products`)를 얼마나 신뢰하는지가 다르다.
+
+      ① **맨몸**(`비매`·`비매품`·`차수`·`랜덤박스`) — 이름이 라벨 그 자체다. 무조건 비제품.
+         ⚠️ 여기서 `known_products` 를 보면 **안 된다**: 레지스트리에 판매자가 실제로 단
+           `#비매품` 태그가 후보로 올라와 있어(실측), 증거를 물으면 맨몸 라벨이 되살아난다.
+      ② **수량만 붙음**(`비매5`·`비매품 1번`·`이번비매`·`3차수`) — 라벨 + 숫자/지시어뿐이다.
+         원칙적으로는 식별 정보가 없지만 **반례가 있다**: `비매품50` 은 연찌가 해시태그로 파는
+         실제 제품이다(`#비매품50`). 그래서 증거가 있으면 제품으로 본다. 증거가 **없으면**
+         비제품으로 본다 — 라벨+숫자는 그 자체로는 아무 마켓도 가리키지 못하기 때문이다.
+      ③ **수식어가 붙음**(`베이퍼비매`·`교동 지글리 비매`) — 라벨로 **끝나되** 앞에 낱말이 있다.
+         `연찌비매17`·`푸딩비매품` 이 같은 모양인데 **1층에 실재하는 제품**이라 구조만으로는
+         못 가른다. 증거가 없으면 **건드리지 않는다**(페일세이프) — 증거 없이 지우는 쪽이
+         화면에 안 보이는 손실이라 더 나쁘다(`enforce_product_vocab` 의 ③과 같은 규칙).
+
+    `known_products`: 1층 `specs` + 제품 후보 레지스트리의 이름들(**마켓 무관 전량**).
+      ⚠️ 마켓별로도, 스레드별로도 좁히지 말 것 — 여기서 묻는 건 '이 마켓의 제품인가'가 아니라
+        '이 표기가 누군가의 제품명으로 실재하는가'다. 좁히면 마켓을 아직 모르는 조각
+        (=디시의 절반)에서 ②③이 전부 지워지고, 같은 이름에 경로마다 다른 판정이 붙는다.
+        재료는 `pipeline.known_product_names()` 한 벌이다.
+    """
+    raw = _norm(name or "")
+    core = _label_core(raw)
+    if not core:
+        return False
+    is_label_core = core in NON_PRODUCT_LABELS or core in NON_PRODUCT_LABELS_EXACT
+    if is_label_core and raw == core:
+        return True                              # ① 맨몸 — 증거를 묻지 않는다
+    known = {_norm_tag(p) for p in (known_products or ())}
+    if is_label_core:
+        return _norm_tag(raw) not in known       # ② 수량 — 증거 없으면 비제품
+    if not any(core.endswith(lbl) for lbl in NON_PRODUCT_LABELS):
+        return False
+    if not known:
+        return False                             # ③ 증거 없음 → 건드리지 않는다
+    return _norm_tag(raw) not in known
+
+
+# ---------------------------------------------------------------- 비제품 '단어'
+# 라벨(`비매`·`차수`)이 **판매 형식**을 가리킨다면, 이쪽은 **종류어·재료어·조각난 이름**이다.
+# 둘 다 제품이 아니지만 막는 실패가 달라서 게이트도 카운터도 가른다(합치면 어느 게이트가
+# 일했는지 사후에 못 가른다 — `llm_calls_saved` 를 가른 것과 같은 이유).
+#
+# ⚠️ **완전일치로만 쓴다.** 실측(2026-08-10, `specs` 제품명 1,980개): 종류어·재료어와
+#   **완전히 같은** 제품명은 0개인데, 그 단어를 **품은** 제품명은 16개다(`내리꽃디폼`·
+#   `베이직우드폼`·`말차초코크런치바`·`허밍크런치`…). 부분일치로 넓히면 그 16개가 통째로
+#   사라지고, 그 손실은 화면에 안 보인다(유령 제품과 반대 방향의, 더 알아채기 어려운 실패).
+#   `is_non_product_label` 이 `나비매듭` 때문에 부분일치를 금지한 것과 같은 자리다.
+
+# 풀·베이스 재료어. 1층 `base_combo` 어휘에서 왔다 — 캡션의 **스펙 줄**이 제품명으로
+# 들어올려진 자국이다(인스타에서 `아마존 우드 점토` 가 제품 행 8건을 만든 그 실패의 디시판).
+GLUE_WORDS = frozenset({
+    "글루올", "택키", "아마존", "우드", "우마존", "생베", "점토", "화이트글루", "글리",
+})
+# '이름이 기억 안 난다'는 **명시적 표지**. 이게 붙은 이름은 제품 식별자가 아니다.
+FRAGMENT_MARKERS = ("어쩌구", "어쩌고", "어쩍고")
+# 자모만으로 된 이름 — 제품명일 수 없다. KB 에 있는 마켓 초성은 `linking.split_market_prefix`
+# 가 이미 떼고 마켓으로 승격시킨다. 여기 남는 건 KB 밖 자모(`ㅅㄱㄷ`·`ㅇㅍㅋ`·`ㅃㅇ`)인데,
+# 그것도 마켓 표기지 제품명이 아니다 — 어느 쪽이든 제품으로 색인될 값이 아니다.
+_ALL_JAMO_RE = re.compile(r"^[ㄱ-ㅎ\s]+$")
+
+
+def is_non_product_word(name: str | None) -> bool:
+    """이 이름이 제품이 아니라 **종류어·재료어·조각난 이름**인가. 순수 함수(무LLM·무DB·무KB).
+
+    `is_non_product_label` 의 형제다. 넷 중 하나면 True:
+      ① 종류 통제어휘와 **완전일치**(`디폼`·`클리어`·`수수깡`·`빨대`·`빈백`·`크런치`…).
+         사용자 규칙: 종류어는 제품명이 아니다(→ [MEMORY.md] 슬라임 속성 어휘 분류 규칙).
+      ② 풀·베이스 재료어와 **완전일치**(`글루올`·`아마존`·`점토`…).
+      ③ 이름에 '기억 안 남' 표지가 붙어 있다(`버블버블 어쩌구`).
+      ④ 이름이 자모뿐이다(`ㅅㄱㄷ`).
+    ①②는 **완전일치 전용**이다 — 위 상수 주석의 실측 근거 참조. 합성어는 건드리지 않는다.
+    """
+    core = _norm(name or "")
+    if not core:
+        return False
+    if core in {_norm(t) for t in TYPE_ENUM} or core in GLUE_WORDS:
+        return True
+    if any(m in core for m in FRAGMENT_MARKERS):
+        return True
+    return bool(_ALL_JAMO_RE.match(name or ""))
+
+
+def drop_non_product_words(doc: dict) -> int:
+    """`mentioned_product` 가 비제품 단어면 `None` 으로 비운다. 반환: 비운 건수.
+
+    `drop_non_product_labels` 와 **따로 센다** — 둘은 아예 다른 실패를 막는다(판매 형식어 vs
+    종류어·재료어). 여기서도 **행은 버리지 않는다**: 제품 귀속만 사라지고 그 조각의 배송·CS 는
+    마켓 축(ADR-0015) 집계에 그대로 남는다.
+    """
+    dropped = 0
+    for rv in (doc.get("reviews") or []):
+        if is_non_product_word(rv.get("mentioned_product")):
+            rv["mentioned_product"] = None
+            dropped += 1
+    return dropped
+
+
+def drop_non_product_labels(doc: dict, known_products=None) -> int:
+    """`mentioned_product` 가 비제품 라벨이면 `None` 으로 비운다. 반환: 비운 건수.
+
+    **후기 항목 자체는 버리지 않는다** — 1급 규칙은 '미언급 → null' 이지 '드롭'이 아니다.
+    제품 귀속만 사라지고 마켓 축(배송·CS) 집계에는 그대로 남는다.
+
+    ⚠️ 소스마다 적용 자리가 다르지만 **규칙은 `is_non_product_label` 한 벌**이다:
+      인스타는 `repair_product_names` 머리(해시태그 게이트 **앞**), 디시는 `extract_thread`.
+      해시태그 게이트 뒤에 두면 디시엔 아예 안 돈다 — 그래서 `비매품 1번` 이 살아남았다.
+    """
+    dropped = 0
+    for rv in (doc.get("reviews") or []):
+        if is_non_product_label(rv.get("mentioned_product"), known_products):
+            rv["mentioned_product"] = None
+            dropped += 1
+    return dropped
+
+
 def _norm_tag(t: str) -> str:
     """태그 비교용 정규화: 공백·`_`·`.` 제거 + 소문자.
 
@@ -471,7 +654,14 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
          인용이기도 해서, 원문에 없는 문자열은 그 자체로 결함이다.
       3) 근거 조각 자체가 전언·미사용 표지를 담고 있으면 폐기 — "다들 좋다고 하는"을 근거로
          댔다면 그건 본인 경험의 근거가 아니다.
+      4) 근거 조각이 **구매 예정 표지**를 담고 있으면 폐기 — `담았는데 우뗘??` 를 근거로 댄
+         항목은 장바구니 목록이지 후기가 아니다(실측 아모스갤: 그 한 조각이 제품 6행을 냈다).
     source_text 를 안 넘기면 2)는 건너뛴다(원문을 모르는 호출부 하위호환).
+
+    ⚠️ 4)는 **좁게 유지한다.** 짧은 평점 나열(`잭두콩 썸`)·순위(`1믹스 2허밍`)·표지 없는
+      질문은 진짜 보유 후기라 여기서 버리면 안 된다 — 회수 손실은 화면에 안 보이고,
+      그중 부정 후기의 손실은 1급 기능(출처 편향)을 직접 깎는다. Q/E 순위가 이미 뒤로
+      미루므로(ADR-0006/0017) 애매한 건 버리지 말고 순위에 맡긴다.
     """
     from . import relevance_rules as rules
 
@@ -484,6 +674,8 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
         if haystack and _norm(ev) not in haystack:
             continue
         if rules.is_hearsay_span(ev):
+            continue
+        if rules.is_candidate_span(ev):
             continue
         kept.append(r)
     doc["reviews"] = kept
@@ -500,20 +692,52 @@ def _filled_score(item: dict) -> int:
     return n * 2 + sum(1 for k in ("summary", "stated_rating") if ov.get(k))
 
 
+def _held_fingerprint(item: dict) -> str:
+    """보류(제품명 None) 항목의 **내용 지문** — 말더듬 판정에만 쓴다.
+
+    제품명을 뺀 나머지 전부를 정렬된 JSON 으로 굳힌다. 키 순서가 달라도 같은 내용이면 같은
+    지문이 나오게(`sort_keys`) 해야, 배치 응답의 키 순서 흔들림이 말더듬을 못 접게 만들지 않는다.
+    """
+    import json
+    return json.dumps({k: v for k, v in item.items() if k != "mentioned_product"},
+                      sort_keys=True, ensure_ascii=False)
+
+
 def _fold_by_product(items: list[dict]) -> list[dict]:
     """같은 제품으로 접힌 항목을 하나로 병합 — **이중 계상 방지**.
 
     복구만 하고 안 접으면 유령 2행이 진짜 제품 2행이 될 뿐이다(AC3). 실측: `DLNVdrIzQdm` 은
     한 캡션에서 `아마존 우드 점토`(풀조합)와 `코코넛과자`(향)를 각각 제품으로 내보냈는데,
     둘 다 `빠코볼` 로 복구되면 한 사람의 한 의견이 빠코볼 후기 **2건**이 된다.
-    ⚠️ 보류(None)는 접지 않는다 — 서로 다른 제품일 수 있고, 합치면 다른 의견이 한 건이 된다.
+    ⚠️ 보류(None)는 **내용이 완전히 같을 때만** 접는다(추출기 말더듬). 내용이 다르면 서로
+      다른 제품일 수 있고, 합치면 다른 의견이 한 건이 된다 — 아래 분기 주석 참조.
     """
     out: list[dict] = []
     seen: dict[str, int] = {}                    # 정규화 제품명 → out 인덱스
+    held: set[str] = set()                       # 보류분 내용 지문
     for it in items:
         name = it.get("mentioned_product")
         if not name:
-            out.append(it)                       # 보류분은 그대로 둔다
+            # 보류(None)는 **내용이 완전히 같을 때만** 접는다 — 추출기 말더듬이 제거다.
+            # 실측: 한 조각이 `아쿠아 자몽 후르츠 프쿠 썸파` 를 두고 내용이 글자 하나까지
+            # 같은 항목을 3개 내보냈다. 이름이 없어 `UNIQUE(source, post_id, product)` 도
+            # 못 걸러서(Postgres 는 NULL 을 서로 다른 값으로 본다) 그대로 3행이 된다.
+            # ⛔ 내용이 **다르면 절대 접지 않는다.** 이름 없는 두 항목은 서로 다른 제품일 수
+            #   있고, 합치면 다른 의견이 한 건으로 사라진다(원칙 2 — 과잉 병합 금지).
+            # ⚠️ 지문에 `firsthand_evidence` 를 **포함한다**: 말더듬은 근거 조각까지 똑같이
+            #   반복되지만, 서로 다른 문장에서 온 두 의견은 근거가 다르다. 그게 '말더듬'과
+            #   '속성이 비어 있는 별개 의견'을 가르는 유일한 신호다.
+            # ⚠️ DB 제약으로 풀지 말 것 — `(source, post_id) WHERE product IS NULL` 부분
+            #   유니크 인덱스는 **서로 다른** 보류 제품 둘을 한 조각에서 충돌시킨다.
+            # ⚠️ **내용이 없는 항목은 접지 않는다.** 속성 블록도 총평도 없는 보류 둘은
+            #   말더듬의 증거가 아니라 그냥 구분할 재료가 없는 것이다 — 원래 이름이 서로
+            #   달랐어도(`정체불명A`/`정체불명B`) 이 자리엔 이미 이름이 안 남아 있다.
+            #   과소 집계는 과대 집계보다 알아채기 어렵다(`_fold_orders` 와 같은 판단).
+            fp = _held_fingerprint(it)
+            if _filled_score(it) and fp in held:
+                continue
+            held.add(fp)
+            out.append(it)
             continue
         key = _norm_tag(name)
         if key not in seen:
@@ -525,7 +749,8 @@ def _fold_by_product(items: list[dict]) -> list[dict]:
 
 
 def repair_product_names(doc: dict, text: str, *, exclude=None,
-                         known_products=None, known_fallback=None) -> dict:
+                         known_products=None, known_fallback=None,
+                         label_known=None) -> dict:
     """추출된 `mentioned_product` 를 **캡션 해시태그**로 검증·복구한다(순수·무LLM).
 
     후기 분기에는 판매자 분기와 달리 제품 게이트가 없어서, 추출기가 캡션의 **스펙 줄**을
@@ -555,6 +780,18 @@ def repair_product_names(doc: dict, text: str, *, exclude=None,
     known_fallback: 같은 마켓의 **제품 후보 레지스트리**(`pipeline.load_product_registry`).
       ③이 1층에서 한 건도 못 찾았을 때만 본다(③′) — 아래 `resolve_product_name` 참조.
     """
+    # 비제품 라벨은 **해시태그 게이트 앞**에서 비운다. 뒤에 두면 해시태그가 없는 소스(디시)에는
+    # 아예 안 돌아서 `비매품 1번` 같은 이름이 그대로 제품 행이 된다(실측 11행).
+    # ⚠️ 재료는 **`label_known` 전용 인자**다. `known_products`/`known_fallback` 로 때우지 말 것 —
+    #   저 둘은 그 **마켓의** 제품 집합(③/③′ 타이브레이크용)이라, 그걸 라벨 판정에 쓰면
+    #   마켓을 아직 모르는 조각에서 증거가 비어 판정이 갈린다. 여기서 묻는 건 '어느 마켓의
+    #   제품인가'가 아니라 '이 표기가 누군가의 제품명으로 실재하는가'이고, 답은 마켓과 무관한
+    #   전량이어야 한다(`pipeline.known_product_names`). 미주입이면 ③이 페일세이프로 떨어진다.
+    drop_non_product_labels(doc, label_known)
+    # 종류어·재료어도 같은 자리에서 비운다 — 이 경로가 인스타의 유일한 게이트 지점이고,
+    # 아래 해시태그 게이트는 태그가 없으면 즉시 반환하므로 뒤에 두면 안 걸린다.
+    drop_non_product_words(doc)
+
     if not product_hashtags(text, exclude=exclude):
         return doc                               # 해시태그 없는 소스(디시) → 무변경
 
@@ -682,36 +919,188 @@ def _empty_doc() -> dict:
 MAX_THREAD_SOURCES = settings.max_thread_sources
 
 
-def build_thread_prompt(title: str | None, texts: list[str]) -> str:
-    """조각들에 [S<n>] 번호를 붙인 스레드 프롬프트. 번호가 귀속의 유일한 근거다."""
+# ---------------------------------------------------------------- 제품 어휘(초성·약칭)
+# 왜 프롬프트에 넣나: **linking 은 모델이 이미 뽑은 것만 정규화한다.** 댓글이 `ㅇㅇㅈ 아바 좋더라`
+# 라고 하면 모델이 먼저 '아바'를 제품으로 **인식**해야 `mentioned_product` 에 뭔가가 들어가고,
+# 그래야 linking 이 정규화할 대상이 생긴다. 인식 자체가 안 되면 사후 정규화로는 못 되살린다
+# (사용자 지적 2026-08-09). 디시 신규 877조각 중 **44%(390건)** 가 초성 토큰을 포함한다.
+#
+# ⚠️ 이건 1급 규칙('미언급 → null, 지어내기 금지')과 정면으로 닿는 자리다. 후보 목록을 통째로
+#   보여 주면 모델이 애매한 문장을 그럴듯한 제품명에 **스냅**시킬 수 있다. 그래서 두 겹으로 막는다:
+#   ① 목록은 **그 스레드 본문에 실제로 등장한 표면형만** 남긴다(아래 `vocab_candidates`) —
+#      즉 목록에 오르는 이름은 전부 텍스트에 근거가 있다. 없는 이름은 애초에 안 보인다.
+#   ② 그래도 규칙은 프롬프트, **강제는 코드**다(이 저장소의 일관된 규칙 — `drop_hearsay_reviews`
+#      와 `_fold_orders` 가 같은 자리다). `enforce_product_vocab` 이 사후에 다시 검사한다.
+PRODUCT_VOCAB_MAX = 24  # 프롬프트에 싣는 후보 상한(침묵 절단 금지 — 넘치면 로그로 드러낸다)
+
+
+def build_product_vocab(names, aliases: dict | None = None) -> dict[str, list[str]]:
+    """`{정규 제품명: [표면형…]}` — 표면형 = 이름 자체 + **사람이 시드한 약칭**.
+
+    ⛔ **제품 초성을 생성하지 마라.** `linking._kb_surface_forms` 가 같은 이유로 이미 그렇게
+      한다("제품 태그와 충돌할 만큼 짧고"). 그 규칙을 모르고 한 번 넣어 봤다가 실측으로 확인했다
+      (2026-08-09, 디시 171스레드): 생성 초성 매칭 14건 중 **9건이 오탐**이었다 —
+      `ㅋㅋㅋㅋㅋㅇ`(쿠키컵코코아)는 웃음 `ㅋㅋㅋㅋㅋㅋㅋㅋㅇㅋ` 안에서, `ㅂㅋㅋㅋ`(바콕쿠키)는
+      욕설+웃음 `ㅅㅂㅋㅋㅋ` 안에서, `ㅅㄹㅇ`(슬랑이)는 **다른 마켓·제품의 초성**
+      `ㅅㄹㅇㅂㄴ`·`ㅅㄹㅇㅈㄴ` 안에서 걸렸다(6건). 제품명은 6~9음절이라 초성이 길어질 것 같지만,
+      실제로 이 갤이 쓰는 약칭은 초성이 아니라 **음절 클리핑**(`허니푸냥이`→`푸냥이`)이다.
+      깨끗하게 맞은 4건은 전부 생성분이 아니라 `data/product_aliases.json` 의 사람 시드였다.
+      초성이 유효한 건 **마켓명**(`베이퍼`→`ㅂㅇㅍ`)뿐이고 그건 개체연결이 이미 한다.
+
+    즉 약칭 재료는 **사람만 만들 수 있다.** 그래도 시드는 안전하고 점진적이다: 틀린 약칭은
+    어떤 스레드 본문에도 안 걸려 그냥 무시되고, 맞는 약칭은 즉시 인식된다(재추출 불필요).
+    """
+    vocab: dict[str, list[str]] = {}
+    for n in names:
+        n = (n or "").strip()
+        if n:
+            vocab.setdefault(n, [n])
+    for _market, table in (aliases or {}).items():
+        for short, canon in (table or {}).items():
+            if canon in vocab and short:
+                vocab[canon] = sorted(set(vocab[canon]) | {short})
+    return vocab
+
+
+def vocab_candidates(vocab: dict[str, list[str]], text: str) -> dict[str, list[str]]:
+    """`vocab` 중 **이 텍스트에 표면형이 실제로 등장한** 항목만. 프롬프트 주입 재료.
+
+    이 필터가 반-지어내기 장치의 절반이다(나머지 절반은 `enforce_product_vocab`).
+    부수 효과로 토큰도 크게 준다 — 마켓당 160여 개를 매 호출 싣는 대신 보통 한 줌만 남는다.
+    """
+    if not vocab or not text:
+        return {}
+    hits = {canon: forms for canon, forms in vocab.items()
+            if any(f and f in text for f in forms)}
+    return hits
+
+
+def _vocab_line(cands: dict[str, list[str]]) -> str:
+    """후보를 `이름(표면형·표면형)` 꼴 한 줄로. 상한 초과분은 **세어서 드러낸다**."""
+    items = sorted(cands.items())
+    shown, extra = items[:PRODUCT_VOCAB_MAX], len(items) - PRODUCT_VOCAB_MAX
+    parts = []
+    for canon, forms in shown:
+        alt = [f for f in forms if f != canon]
+        parts.append(f"{canon}({'·'.join(alt)})" if alt else canon)
+    line = ", ".join(parts)
+    if extra > 0:
+        line += f" 외 {extra}개"
+    return line
+
+
+def enforce_product_vocab(doc: dict, text: str, cands: dict[str, list[str]]) -> int:
+    """`mentioned_product` 에 **근거가 있는지** 코드로 검사하고, 없으면 `None` 으로 보류한다.
+
+    `cands` 는 이미 `vocab_candidates` 로 **그 스레드 본문에 등장한 것만** 남긴 목록이다 —
+    따라서 `name in cands` 자체가 '스레드에 근거 있음'이다. 반환값은 보류시킨 건수(관측용).
+
+    통과 조건(하나라도 만족):
+      ① 이름이 **이 조각** 본문에 그대로 있다 — 가장 흔한 정상 경로.
+      ② 이름이 **스레드 후보**에 있다 — 제품명을 생략하고 앞 조각을 받아 말한 댓글(AC13).
+         ⛔ 근거 판정을 조각 단위로 좁히면 **바로 이 기능이 죽는다**: 문맥으로 귀속된 댓글은
+           자기 텍스트에 이름이 없어서 전부 null 이 된다. 배치 추출의 존재 이유 절반을
+           사후 검사가 되돌리는 꼴이라, 근거 스코프는 스레드여야 한다.
+      ③ 어휘 자체가 비었다(미주입 경로) — 검사하지 않는다(하위호환).
+    어느 것도 아니면 = 스레드 어디에도 그 표기가 없다 = **지어냈다** → 보류.
+
+    ⛔ 규칙을 프롬프트에만 맡기지 말 것: 같은 입력 4회에 4번 다른 답이 나온 전례가 있다
+      (`drop_hearsay_reviews` 가 생긴 이유). 여기도 같은 실패 모드다.
+    ⚠️ 과잉 보류도 회귀 대상이다 — 1층에 없는 **진짜 제품**을 지우는 방향이고, 그 손실은
+      화면에 안 보인다(유령 제품과 반대 방향의, 더 알아채기 어려운 실패). 그래서 ①이 먼저다:
+      본문에 그대로 있으면 어휘에 없어도 남긴다.
+    """
+    if not cands:
+        return 0
+    held = 0
+    for rv in (doc.get("reviews") or []):
+        name = (rv.get("mentioned_product") or "").strip()
+        if not name or name in text or name in cands:
+            continue
+        rv["mentioned_product"] = None
+        held += 1
+    return held
+
+
+def build_thread_prompt(title: str | None, texts: list[str],
+                        products: dict[str, list[str]] | None = None) -> str:
+    """조각들에 [S<n>] 번호를 붙인 스레드 프롬프트. 번호가 귀속의 유일한 근거다.
+
+    `products` 가 있으면 **본문에 실제로 등장한** 제품 후보를 머리말에 싣는다(초성·약칭 인식용).
+    """
     head = f"[제목] {title}\n" if title else ""
+    vocab = f"[제품 후보] {_vocab_line(products)}\n" if products else ""
     body = "\n".join(f"[S{i}] {t}" for i, t in enumerate(texts))
-    return head + body
+    return head + vocab + body
+
+
+# 스레드 배치의 출력 상한. 기본 4,096 으로는 **모자란다** — 실측(2026-08-09 유료 런):
+# 34앵커 중 2앵커가 `JSONDecodeError: Unterminated string`(char 10,803 / 12,383)으로 통째로 죽었다.
+# ⚠️ GPT-5 계열에서 `max_completion_tokens` 는 **추론 토큰까지 포함**한다. 즉 4,096 중 상당 부분이
+#   본문이 나오기도 전에 소진된다. 파싱 재시도 1회는 같은 지점에서 똑같이 잘리므로 무의미하다
+#   (결정성 재시도는 '다른 답'을 위한 게 아니다).
+# 왜 지금 터졌나: ADR-0017 이전엔 게이트가 스레드당 9조각까지만 통과시켜 출력이 상한 안에 들었다.
+# M-only 로 배치가 조밀해지면서 처음 넘쳤다 — 긴 스레드 청크 문제와 같은 뿌리다.
+THREAD_MAX_TOKENS = 16384
 
 
 def extract_thread(title: str | None, texts: list[str], llm: LLM,
-                   model: str | None = None) -> list[dict]:
+                   model: str | None = None,
+                   products: dict[str, list[str]] | None = None,
+                   label_known=None) -> list[dict]:
     """
     스레드 조각들 → 조각별 문서 리스트(입력 순서 정렬, 길이 보장).
     응답에 빠진 조각은 빈 문서로 메운다 — 조용히 짧은 리스트를 돌려주면 호출부에서 귀속이 밀린다.
+
+    `products`: 이 스레드 본문에 표면형이 등장한 제품 어휘. 프롬프트 머리말로 들어가고,
+      반환 직전 `enforce_product_vocab` 이 **같은 어휘로 코드 검사**한다(규칙은 프롬프트,
+      강제는 코드).
     """
     if not texts:
         return []
     out = llm.complete(
-        build_thread_prompt(title, texts),
+        build_thread_prompt(title, texts, products),
         system=LAYER2_THREAD_SYSTEM,
         schema=LAYER2_THREAD_SCHEMA,
         model=model,
+        max_tokens=THREAD_MAX_TOKENS,
         label="extract.layer2.thread",
     )
     by_id: dict[str, dict] = {}
     for doc in (out.get("docs") or []):
         by_id.setdefault(str(doc.get("source_id", "")).strip(), doc)
     docs = []
+    held = 0
+    labeled = 0
     for i in range(len(texts)):
         doc = dict(by_id.get(f"S{i}") or by_id.get(str(i)) or _empty_doc())
         doc.pop("source_id", None)               # 귀속은 리스트 위치로 끝났다
-        docs.append(drop_hearsay_reviews(doc, texts[i]))
+        doc = drop_hearsay_reviews(doc, texts[i])
+        # 비제품 라벨(`비매품 1번`·`이번차수`)을 먼저 비운다. 어휘 검사보다 **앞**인 이유는
+        # 그런 이름이 대개 본문에 그대로 있어서(①) 어휘 검사를 그냥 통과하기 때문이다 —
+        # 근거는 있는데 제품이 아닌 경우라, 두 검사가 서로를 대신하지 못한다.
+        # ⚠️ 재료는 `label_known`(마켓 무관 전량)이지 `products` 가 **아니다**. `products` 는
+        #   이 **스레드 본문에 등장한** 후보만 남은 집합이라, `푸딩 비매품` 처럼 표기가 살짝
+        #   달라 후보에 못 든 진짜 제품이 '증거 없음'이 아니라 '증거 있는데 불일치'로 읽혀
+        #   지워진다(집합이 비지 않아 페일세이프가 안 걸린다). 백필은 전량을 보므로 같은
+        #   이름에 경로마다 다른 판정이 붙는다 — 규칙이 갈리는 전형적인 모양이다.
+        labeled += drop_non_product_labels(doc, label_known)
+        # ⛔ 여기서 `drop_non_product_words` 를 부르지 말 것 — **되돌린 자리다**(2026-08-10).
+        #   이 층은 KB 를 모르므로 마켓 접두를 뗄 수 없는데, 종류어·자모 게이트를 먼저 걸면
+        #   `ㅇㅊ` 같은 맨몸 마켓 표기가 '자모뿐인 이름'으로 먼저 비워져 **마켓 신호가 사라진다**
+        #   — 그 행은 스레드 도장 마켓을 0.95(직접 매칭)로 물려받아, 되돌릴 표식도 없는
+        #   오귀속이 된다. 반대 방향으로도 샌다: `ㅂㅇㅍ 빨대` 의 나머지 `빨대`(종류어)가
+        #   게이트를 이미 지나쳐 제품으로 남는다. 실측으로 둘 다 재현됐다.
+        #   분리와 단어 게이트는 KB 를 아는 `linking.link` 에서 **그 순서로 함께** 돈다.
+        held += enforce_product_vocab(doc, texts[i], products or {})
+        docs.append(doc)
+    if held:
+        # 침묵 금지 — 어휘 주입이 지어내기를 얼마나 막았는지가 그 기능의 유일한 실측치다.
+        log.info("제품 어휘 검사: 근거 없는 제품명 %d건 보류(후보 %d개)", held, len(products or {}))
+    if labeled:
+        # 어휘 검사 보류와 **따로** 센다 — 둘은 아예 다른 실패를 막는다(지어내기 vs 판매 형식어).
+        # 합치면 어느 게이트가 일했는지 사후에 못 가른다(`llm_calls_saved` 를 가른 것과 같은 이유).
+        log.info("비제품 라벨 게이트: 제품명 %d건 비움", labeled)
     return docs
 
 
@@ -759,7 +1148,9 @@ def count_thread_batches(raws: list, batch_size: int = MAX_THREAD_SOURCES) -> in
 
 
 def extract_collected(raws: list, llm: LLM, model: str | None = None,
-                      batch_size: int = MAX_THREAD_SOURCES) -> list[tuple]:
+                      batch_size: int = MAX_THREAD_SOURCES,
+                      product_vocab: dict[str, list[str]] | None = None,
+                      label_known=None) -> list[tuple]:
     """
     수집된 RawReview(글 + 댓글)를 **스레드 단위 배치**로 추출한다(계획 C-1).
     이 갤은 후기가 댓글에 많아(sources.py 주석) 댓글도 1급 후기로 취급한다.
@@ -772,32 +1163,73 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
     부수 이득(AC13): 같은 호출 안에 형제 댓글이 있으므로 **제품명을 생략한 댓글의 귀속**이 가능해진다.
     per-comment 경로에서는 원리적으로 불가능했던 케이스다.
 
-    market 상속은 유지한다 — 댓글 단독 추출은 'ㅂ슬라임' 등으로 흔들려 개체연결을 막는다.
+    market 상속은 유지하되 **채우기 전용**이다 — 댓글 단독 추출은 'ㅂ슬라임' 등으로 흔들려
+    개체연결을 막으므로 마켓을 말하지 않은 조각엔 스레드 값을 물려주지만, 자기 마켓을 뽑은
+    조각은 그대로 둔다(덮어쓰면 비교 스레드에서 남의 마켓 후기가 된다 — 아래 실측 주석).
 
     반환: [(raw, doc), ...] — index.index_post 입력으로 그대로 사용(호출부 무변경).
     """
     threads = group_threads(raws)
 
     out: list[tuple] = []
+    failed = 0                       # 실패한 배치 수 — 무음 유실 금지(아래에서 로그로 드러낸다)
     for _, thread in threads.items():
         post, cmts = thread["post"], thread["comments"]
         title = (post.raw_title if post else None) or \
                 (cmts[0].meta.get("parent_title") if cmts else None)
         members = ([post] if post else []) + cmts
+        # 제품 후보는 **스레드 전체 본문**으로 한 번 좁힌다 — 조각마다 좁히면 제품명을 생략한
+        # 댓글(바로 이 기능의 대상)이 자기 텍스트엔 근거가 없어 후보를 못 받는다. 형제 문맥이
+        # 배치의 존재 이유인 것과 같은 논리다. 사후 코드 검사는 조각 단위로 따로 돈다.
+        thread_text = "\n".join((r.text or "") for r in members)
+        cands = vocab_candidates(product_vocab or {}, thread_text)
 
         docs: list[dict] = []
         for start in range(0, len(members), batch_size):
             chunk_members = members[start:start + batch_size]
-            docs.extend(extract_thread(title, [r.text for r in chunk_members], llm, model))
+            texts = [r.text for r in chunk_members]
+            # 13조각 넘는 스레드는 청크가 갈리는데, **글 본문은 members[0] 하나뿐**이라
+            # 둘째 청크부터는 댓글만 남는다. 그러면 ① 프롬프트가 'S0=글 본문'이라고 말하는데
+            # 실제 S0 가 댓글이고 ② 제품명을 생략한 댓글의 귀속(AC13)이 원리적으로 불가능해진다
+            # — 배치 추출의 존재 이유 절반이 그 문맥이다. 그래서 이어지는 청크마다 글 본문을
+            # **문맥으로만** 앞에 넣고 그 결과 문서는 버린다(색인은 청크 원소에만 대응).
+            # ⚠️ ADR-0017(M 만 드롭) 전에는 게이트가 스레드당 최대 9조각까지만 통과시켜 이
+            #   분기가 **한 번도 안 돌았다**. 실측: 같은 저장소에서 M-only 는 10스레드가 12를
+            #   넘고 54조각이 글 본문 없이 판정될 뻔했다(최대 스레드 25조각).
+            ctx_post = post if (start and post is not None) else None
+            if ctx_post is not None:
+                texts = [ctx_post.text] + texts
+            try:
+                chunk_docs = extract_thread(title, texts, llm, model, products=cands,
+                                            label_known=label_known)
+            except Exception as e:
+                # 배치 하나가 죽어도 **그 배치만** 잃는다. 예전엔 예외가 그대로 올라가
+                # 그 앵커의 남은 스레드가 통째로 날아갔다(실측: 2앵커 74조각).
+                # 빈 문서로 자리를 채워 **정렬을 지킨다** — 짧은 리스트를 돌려주면 zip 이
+                # 조용히 잘라 뒤쪽 조각의 귀속이 통째로 밀린다(패딩과 같은 이유).
+                # 값은 이미 나갔지만 행은 안 남으므로 **다음 런이 공짜로 재시도**한다
+                # (원문이 디스크에 있다 — 그게 raw-first 의 값어치다).
+                failed += 1
+                log.error("스레드 배치 추출 실패 — 이 배치만 건너뜀(%d조각): %s", len(texts), e)
+                chunk_docs = [_empty_doc() for _ in texts]
+            docs.extend(chunk_docs[1:] if ctx_post is not None else chunk_docs)
 
         # 스레드 market 은 글에서 뽑은 것이 권위. 없으면 댓글 중 처음 잡힌 것.
         market = docs[0].get("market") if post and docs else None
         if not market:
             market = next((d.get("market") for d in docs if d.get("market")), None)
         for raw, doc in zip(members, docs):
-            if market:
+            # **채우기만 한다 — 덮어쓰지 않는다.** 조각이 자기 마켓을 뽑았으면 그게 그 조각의
+            # 사실이고, 스레드 값은 마켓을 말하지 않은 형제를 위한 폴백일 뿐이다.
+            # 실측(2026-08-10, 아모스갤 813행): 덮어쓰기 때문에 **36행이 자기 본문과 모순**됐다.
+            # 스레드 200743 은 본문에 마켓이 7개 등장하는 비교 스레드인데, 글에서 잡힌 `빈짱`
+            # 하나가 19행 전부에 찍혔다 — 다른 마켓 후기가 빈짱 후기로 집계된다는 뜻이고,
+            # 그건 1급 기능인 출처 편향의 왜곡이다(틀린 마켓은 NULL 보다 나쁘다).
+            if market and not doc.get("market"):
                 doc["market"] = market
             out.append((raw, doc))
+    if failed:
+        log.error("스레드 배치 %d개 추출 실패 — 그 조각들은 행이 안 남아 다음 런이 재시도한다", failed)
     return out
 
 

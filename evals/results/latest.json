@@ -17,7 +17,7 @@
     {
       "suite": "extract",
       "status": "skipped",
-      "reason": "골드 케이스 0건 — 필드-매치 채점은 llm_ops 연결 후 확장"
+      "reason": "OPENAI_API_KEY 없음 — LLM 추출 평가 건너뜀"
     }
   ]
 }

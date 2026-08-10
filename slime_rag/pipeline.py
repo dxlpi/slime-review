@@ -514,6 +514,15 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
     # `specs` 는 캡션이 두꺼운 제품만 담고(제품성 게이트) 레지스트리는 피드 전량의 해시태그라,
     # 실측 408행 대 약 2,200후보다. 파일이 없으면 `{}` 라 폴백이 그냥 안 걸린다.
     registry = load_product_registry()
+    # 제품→마켓 역인덱스도 **유료 호출 앞에서 한 번만** 만든다(무과금). 인스타는 캡션에
+    # 마켓 표면형이 거의 항상 있어 발동이 드물지만, `_market_from_caption` 이 못 짚는 글
+    # (핸들만 있거나 태그만 있는 캡션 — `purge_offtopic_reviews` 주석의 실측 4건)에서 걸린다.
+    # 비제품 라벨 판정 재료는 **마켓 무관 전량**이다(`is_non_product_label` 독스트링). 위
+    # `known`/`registry` 는 마켓별로 갈라 둔 타이브레이크 재료라 여기 쓰면 안 된다 — 쓰면
+    # 마켓 미상 조각에서 증거가 비어 같은 이름이 경로마다 다른 판정을 받는다.
+    # 처리할 조각이 없으면 만들지 않는다 — DB 왕복 + 790KB JSON 파싱을 공짜로 치를 이유가 없다.
+    inversion = market_inversion_index() if users else None
+    label_known = known_product_names() if users else set()
     # ⚠️ 여기서 필요한 건 **KB 객체**(`resolve_market`·`markets` 속성)지 위의 `kb` dict 가 아니다.
     #   `bias.partition` 은 원본 JSON dict 를 받고, 개체연결 쪽은 파싱된 객체를 받는다 — 같은
     #   이름으로 두 형태가 오가는 자리라 한쪽을 다른 쪽에 넘기면 AttributeError 로 죽는다.
@@ -532,12 +541,14 @@ def _ingest_instagram_raws(raws: list, *, label: str) -> dict:
             doc, u.text,
             exclude=_tag_exclusions(mkt) if mkt else all_excl,
             known_products=known.get(mkt, ()),
-            known_fallback=registry.get(mkt, ()))
+            known_fallback=registry.get(mkt, ()),
+            label_known=label_known)          # 라벨 판정은 **마켓 무관 전량**(위 주석 참조)
         ref = source_links.build_source_ref("instagram", u.url, u.meta)
         rows = index.index_post(doc, source="instagram",
                                 post_id=u.meta.get("shortcode"), review_class=rc,
                                 relevance_meta=u.meta.get("relevance"), source_ref=ref,
-                                raw=u)                 # 원문 본문·작성 메타 동반 적재(ADR-0013)
+                                raw=u,                 # 원문 본문·작성 메타 동반 적재(ADR-0013)
+                                inversion=inversion)
         if ref:
             n_ref += rows
         else:
@@ -854,6 +865,30 @@ def derive_product_registry(markets: list[str] | None = None, *,
             "llm": {k: summary()[k] for k in ("calls",)}}
 
 
+def dcinside_product_vocab(conn=None) -> dict[str, list[str]]:
+    """디시 추출 프롬프트에 실을 **제품 어휘**(`{정규명: [표면형…]}`). LLM 0회.
+
+    재료는 셋을 합친다: 1층 `specs` 의 제품명(권위) + 레지스트리 유도 후보 + 사람이 시드한
+    약칭 사전. 마켓 스코프를 **여기서 풀어** 평평하게 준다 — 디시는 추출 **전에** 마켓을 모르기
+    때문이다(마켓은 글에서 뽑은 값이 권위라 추출 결과다). 대신 `extract.vocab_candidates` 가
+    스레드 본문에 실제로 등장한 표면형만 남기므로, 평평해도 프롬프트에 실리는 건 한 줌이다.
+
+    ⚠️ 여기서 `resolve_product_name` 의 '1층과 레지스트리를 합집합하지 말 것' 금지와 헷갈리지
+      말 것. 저기는 **판정**(어느 이름으로 확정할지)이라 합치면 있던 판정이 보류로 퇴화한다.
+      여기는 **인식 재료**(이 표기가 제품인가)라, 후보가 많을수록 초성을 알아볼 확률만 오르고
+      확정은 하류(`enforce_product_vocab` → 개체연결)가 따로 한다.
+    """
+    from . import extract
+
+    # 이름 집합은 `known_product_names` 한 벌이다 — 여기가 하는 일은 그걸 **표면형으로
+    # 확장**하는 것(초성·약칭)뿐이다. 집합을 두 곳에서 따로 모으면 한쪽만 재료가 늘어난 채
+    # 조용히 갈라지고, 그러면 프롬프트가 아는 이름과 라벨 게이트가 아는 이름이 달라진다.
+    vocab = extract.build_product_vocab(sorted(known_product_names(conn)),
+                                        linking.load_product_aliases())
+    log.info("제품 어휘: 정규명 %d개(1층+레지스트리+약칭사전)", len(vocab))
+    return vocab
+
+
 def load_product_registry() -> dict[str, list[str]]:
     """레지스트리 → `{market_word: [제품명…]}`. 파일 없으면 `{}`.
 
@@ -870,6 +905,246 @@ def load_product_registry() -> dict[str, list[str]]:
         return {}
     return {market: [p["name"] for p in (entry.get("products") or [])]
             for market, entry in (doc.get("markets") or {}).items()}
+
+
+# ---------------------------------------------------------------- 별칭 후보 유도(무과금)
+def _levenshtein(a: str, b: str) -> int:
+    """표준 편집거리(삽입·삭제·치환 각 1) — 표준 라이브러리만, 새 의존성 없음.
+
+    호출부(`_edit1_pairs`)가 길이차 ≤1 인 쌍만 여기로 보내므로 매 호출의 행렬은 작다
+    (전 이름쌍을 이 함수로 돌리지 않는다 — 그건 버킷팅이 아끼는 부분).
+    """
+    if a == b:
+        return 0
+    la, lb = len(a), len(b)
+    if la == 0 or lb == 0:
+        return max(la, lb)
+    prev = list(range(lb + 1))
+    for i, ca in enumerate(a, start=1):
+        cur = [i] + [0] * lb
+        for j, cb in enumerate(b, start=1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return prev[lb]
+
+
+def _norm_alias_name(name: str) -> str:
+    """비교 전용 정규화(공백 제거 + casefold) — 저장은 항상 원표기를 쓴다."""
+    return re.sub(r"\s+", "", name).strip().casefold()
+
+
+def _prefix_pairs(names: list[str]) -> list[tuple[str, str]]:
+    """한쪽이 다른 쪽의 **엄격한** 접두사인 쌍(공백제거+casefold 비교).
+
+    동일 이름은 쌍이 아니다(그건 같은 행일 뿐 별칭 후보가 아니다). ~600개 이름 규모에서
+    전수 O(n²) 비교는 관대해서(측정: amos 460개 이름), 접두 판정은 버킷을 따로 안 나눈다
+    — 편집거리 쪽만 버킷팅한다(그쪽은 매 쌍마다 행렬 계산이 붙어 더 비싸다).
+    """
+    norm = {n: _norm_alias_name(n) for n in names}
+    ordered = sorted((n for n in names if norm[n]), key=lambda n: len(norm[n]))
+    pairs = []
+    for i, a in enumerate(ordered):
+        na = norm[a]
+        for b in ordered[i + 1:]:
+            nb = norm[b]
+            if nb != na and nb.startswith(na):
+                pairs.append((a, b))
+    return pairs
+
+
+def _edit1_pairs(names: list[str]) -> list[tuple[str, str]]:
+    """편집거리 정확히 1인 쌍(`진저브레드`/`진저브래드`류, `버건디`/`버건드`류).
+
+    비용 가드: 정규화 **첫 글자**로 먼저 버킷을 나누고, 그 안에서도 **길이차 ≤1** 인
+    쌍만 `_levenshtein` 을 부른다 — 대부분의 쌍은 첫 글자부터 달라서 이 두 필터만으로
+    실제 행렬 계산은 극소수로 줄어든다(~600개 이름에서 버킷 하나가 대개 한 자릿수).
+    절충: 어두(첫 글자)에서 삽입/삭제가 일어난 오타(예: 이름 앞에 글자 하나 붙는 경우)는
+    버킷이 갈려 이 생성기가 놓친다 — 표기 변형은 보통 어중·어말에서 일어난다는 관찰에
+    기댄 의도적 절충이다.
+    """
+    norm = {n: _norm_alias_name(n) for n in names}
+    buckets: dict[str, list[str]] = {}
+    for n in names:
+        nn = norm[n]
+        if nn:
+            buckets.setdefault(nn[0], []).append(n)
+    pairs = []
+    for group in buckets.values():
+        ordered = sorted(group, key=lambda n: len(norm[n]))
+        for i, a in enumerate(ordered):
+            na = norm[a]
+            for b in ordered[i + 1:]:
+                nb = norm[b]
+                if na == nb or abs(len(na) - len(nb)) > 1:
+                    continue
+                if _levenshtein(na, nb) == 1:
+                    pairs.append((a, b))
+    return pairs
+
+
+def _alias_pair_entry(kind: str, a: str, b: str, name_stats: dict[str, dict]) -> dict:
+    sa = name_stats.get(a, {"n_reviews": 0, "markets": []})
+    sb = name_stats.get(b, {"n_reviews": 0, "markets": []})
+    return {"kind": kind, "name_a": a, "name_b": b,
+            "n_reviews_a": sa["n_reviews"], "n_reviews_b": sb["n_reviews"],
+            "markets_a": sa["markets"] or None, "markets_b": sb["markets"] or None}
+
+
+def _alias_candidates(name_stats: dict[str, dict],
+                      registry_lookup: dict[str, list[str]] | None = None) -> list[dict]:
+    """순수 함수: 이름→통계에서 별칭 후보 3종을 만든다. **DB 무의존** — 게이트가 여길 겨냥한다.
+
+    name_stats: `{이름: {"n_reviews": int, "markets": [마켓…]}}` — `reviews.product` 분포.
+    registry_lookup: `{이름: [마켓…]}` — 1층 `specs` ∪ `load_product_registry()` 합집합
+      (이름 하나가 두 곳 모두에서 나오면 마켓 집합을 합친다). 정확히 마켓 하나에서만
+      그 표기가 등장하면 '레지스트리 조회' 후보로 낸다 — 다른 이름과의 병합을 제안하는 게
+      아니라, **이 표기가 어느 마켓 소속인지** 정규 출처로 확인해 주는 자리다.
+    """
+    names = sorted(name_stats)
+    out: list[dict] = []
+    for a, b in _prefix_pairs(names):
+        out.append(_alias_pair_entry("prefix", a, b, name_stats))
+    for a, b in _edit1_pairs(names):
+        out.append(_alias_pair_entry("edit1", a, b, name_stats))
+    for name, markets in (registry_lookup or {}).items():
+        if len(markets) == 1:
+            stats = name_stats.get(name, {"n_reviews": 0, "markets": []})
+            out.append({"kind": "registry", "name_a": name, "name_b": name,
+                       "n_reviews_a": stats["n_reviews"], "n_reviews_b": stats["n_reviews"],
+                       "markets_a": stats["markets"] or None, "markets_b": list(markets),
+                       "registry_market": markets[0]})
+    out.sort(key=lambda c: (c["kind"], c["name_a"], c["name_b"]))
+    return out
+
+
+def derive_alias_candidates(*, dry_run: bool = True) -> dict:
+    """`reviews.product` 표면형 → **별칭 후보** 3종(접두 포함·편집거리1·레지스트리 조회).
+
+    LLM 0회, DB **읽기 전용**. `market_tag_candidates` 와 같은 가족이다 — 후보를
+    **분리만** 하고 자동 승격하지 않는다.
+
+    [배경 2026-08-10] `evals/audit_attribution.py` 실측: amos 후기 460개 서로 다른 이름 /
+    729행, 그중 380행이 `specs` 어디와도 조인되지 않는다. 원인의 일부는 표기 변형이다
+    (`빠코볼`/`빠코볼미니`, `진저브레드`/`진저브래드`) — 같은 제품이 다른 이름으로 쪼개져
+    `UNIQUE(source, post_id, product)` 가 별개 행으로 본다.
+
+    ⚠️ **자동 병합 절대 금지**(쿨라임 교훈, MEMORY.md) — 같은 원리로 잘못 합치면 서로
+      다른 제품이 한 이름으로 뭉개진다(`repair_product_attribution` 이 이미 접기를 정확한
+      키로만 하는 것과 같은 경계). 그래서 이 함수는 `data/product_aliases.json` 을 **절대
+      쓰지 않는다** — 후보는 `product_alias_candidates_path` 로만 나가고, 승격(같은 제품
+      확정)은 사람이 `product_aliases.json` 을 마켓 스코프로 손으로 고쳐서 한다.
+    ⚠️ 산출물에 **원문 본문을 담지 않는다** — 이름·건수·마켓뿐이라 커밋 가능하다(ADR-0013).
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT product, market FROM reviews WHERE product IS NOT NULL").fetchall()
+        spec_pairs = conn.execute("SELECT market, product FROM specs").fetchall()
+
+    name_stats: dict[str, dict] = {}
+    for product, market in rows:
+        rec = name_stats.setdefault(product, {"n_reviews": 0, "markets": set()})
+        rec["n_reviews"] += 1
+        if market:
+            rec["markets"].add(market)
+    name_stats = {n: {"n_reviews": s["n_reviews"], "markets": sorted(s["markets"])}
+                  for n, s in name_stats.items()}
+
+    registry_lookup: dict[str, set[str]] = {}
+    for market, product in spec_pairs:
+        registry_lookup.setdefault(product, set()).add(market)
+    for market, products in load_product_registry().items():
+        for p in products:
+            registry_lookup.setdefault(p, set()).add(market)
+    registry_lookup = {n: sorted(m) for n, m in registry_lookup.items()}
+
+    candidates = _alias_candidates(name_stats, registry_lookup)
+    by_kind: dict[str, int] = {}
+    for c in candidates:
+        by_kind[c["kind"]] = by_kind.get(c["kind"], 0) + 1
+
+    out = {"dry_run": dry_run, "names": len(name_stats), "candidates": len(candidates),
+           "by_kind": by_kind, "path": None}
+    if dry_run:
+        log.info("derive_alias_candidates(dry): %s",
+                 {k: out[k] for k in ("names", "candidates", "by_kind")})
+        return out
+
+    doc = {
+        "_note": ("`reviews.product` 표면형에서 유도한 별칭 후보(무과금 파생물, LLM 0회, "
+                  "사람 검수 입력). 자동 병합 없음 — 승격은 `data/product_aliases.json` 을 "
+                  "사람이 마켓 스코프로 손으로 고쳐서 한다(쿨라임 교훈, MEMORY.md)."),
+        "_source": "reviews.product (DISTINCT) + specs + load_product_registry()",
+        "_rule": ("prefix=공백제거+casefold 엄격 접두 · edit1=Levenshtein 거리 1(첫 글자 "
+                  "동일 & 길이차 ≤1 버킷만 비교) · registry=specs∪레지스트리에서 마켓 "
+                  "정확히 하나에만 등장(정규 표기 확인용, 병합 제안 아님)."),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "candidates": candidates,
+    }
+    settings.product_alias_candidates_path.write_text(
+        json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    out["path"] = str(settings.product_alias_candidates_path)
+    log.info("별칭 후보 기록: %s (%d건, %s)",
+             settings.product_alias_candidates_path, len(candidates), by_kind)
+    return out
+
+
+def market_inversion_index(conn=None, *, include_registry: bool = False) -> linking.MarketInversion:
+    """제품→마켓 역인덱스를 만든다(**LLM 0회**, DB 왕복 1회 + 파일 둘).
+
+    ⚠️ **레지스트리 층은 기본으로 꺼져 있다**(`include_registry=False`). 수집 경로는 사람이
+      안 보는 사이에 무한정 도는데, 레지스트리는 사람이 승격한 목록이 아니라 해시태그
+      빈도로 **유도된 후보**라 잡음이 섞인다(실측: 늪지의 `액괴`·`워터글루`). 백필은
+      `dry_run` + 사람 검수(A4)로 막혀 있는데 **같은 추론이 수집 때만 무검수로 도는** 비대칭을
+      두면, 오귀속이 자라는 속도를 사람이 따라잡을 수 없다(제외 목록은 늘 사후다).
+      이 저장소는 거울 방향으로 이미 같은 판정을 했다 — `derive_product_registry` 는
+      고빈도 태그를 자동 배제하지 않고 `market_tag_candidates` 로 빼서 **사람이 승격**한다.
+      대가는 작고 실측됐다: 레지스트리 층은 107행 중 6행(5.6%)이고 1층 층이 94%를 낸다.
+      켜려면 명시적으로 `include_registry=True`, 되돌리려면
+      `revert_market_inversion(tier="registry")`.
+
+    `linking` 은 DB 무의존이 계약이라 1층 쌍을 **여기서** 읽어 주입한다
+    (`load_product_aliases`·`load_kb` 가 디스크만 읽는 것과 같은 경계).
+
+    왜 유료 호출 앞에서 한 번만 만드나: 조각마다 만들면 `specs` 를 조각 수만큼 다시 읽는다.
+    그리고 한 런 안에서 인덱스가 바뀌면 같은 이름이 조각마다 다른 마켓을 받을 수 있다 —
+    귀속이 **수집 순서에 의존**하게 되는 종류의 결함이라, 런 시작 시점의 스냅샷 하나로 고정한다.
+    """
+    close = conn is None
+    conn = conn or connect()
+    try:
+        pairs = conn.execute("SELECT market, product FROM specs").fetchall()
+    finally:
+        if close:
+            conn.close()
+    inv = linking.build_market_inversion(
+        pairs, load_product_registry() if include_registry else {})
+    log.info("제품→마켓 역인덱스: 1층 %d개(유일소유 %d) · 레지스트리 %d개(유일소유 %d, %s) · 제외 %d개",
+             len(inv.spec), sum(1 for v in inv.spec.values() if v),
+             len(inv.registry), sum(1 for v in inv.registry.values() if v),
+             "켬" if include_registry else "끔(기본)", len(inv.excludes))
+    return inv
+
+
+def known_product_names(conn=None) -> set[str]:
+    """1층 `specs` + 레지스트리의 제품명 전량(마켓 무관). `extract.is_non_product_label` 재료.
+
+    `dcinside_product_vocab` 이 이 집합을 **표면형으로 확장**해(초성·약칭) 프롬프트 사전을
+    만든다. 둘을 갈라 둔 이유는 소비가 다르기 때문이다 — 저긴 '이 표기를 제품으로 **인식**
+    시키는' 재료라 확장이 이득이고, 여긴 '이 표기가 누군가의 제품명으로 **실재**하는가'만
+    묻는 평평한 집합이라 확장이 섞이면 라벨 판정이 약칭까지 제품으로 본다.
+    """
+    close = conn is None
+    conn = conn or connect()
+    try:
+        names = {r[0] for r in conn.execute(
+            "SELECT DISTINCT product FROM specs WHERE product IS NOT NULL").fetchall() if r[0]}
+    finally:
+        if close:
+            conn.close()
+    for _market, products in load_product_registry().items():
+        names.update(p for p in products if p)
+    return names
 
 
 def _raw_seller_posts(targets: list[tuple[str, str]]) -> list:
@@ -1240,7 +1515,20 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
 
     # 신규 조각이 0건이면 LLM 을 **만들지도** 않는다 — 생성자가 API 키를 요구하고, 부를 일도 없다.
     llm = LLM() if batch_input else None
-    pairs = extract.extract_collected(batch_input, llm, settings.model_extract) if batch_input else []
+    # 제품 어휘는 **유료 호출 앞**에서 한 번만 만든다(무과금 — DB 한 번 + 파일 둘).
+    vocab = dcinside_product_vocab() if batch_input else {}
+    counts["product_vocab"] = len(vocab)
+    # 제품→마켓 역인덱스도 같은 자리에서 한 번만(무과금). 디시가 이 기능의 본체다 —
+    # 실측 813행 중 365행이 market NULL 이고 그 대부분이 '원문에 마켓이 없음'이다.
+    inversion = market_inversion_index() if batch_input else None
+    # 라벨 판정 재료는 `vocab` 과 **다른 집합**이다 — `vocab` 은 프롬프트에 실을 표면형
+    # 사전(초성·약칭 확장 + 스레드 본문 등장분으로 다시 좁혀진다)이고, 이건 '이 표기가
+    # 누군가의 제품명으로 실재하는가'만 묻는 평평한 전량이다. 좁은 쪽을 넘기면 진짜 제품이
+    # '증거 있는데 불일치'로 읽혀 지워진다(`extract_thread` 주석).
+    label_known = known_product_names() if batch_input else set()
+    pairs = extract.extract_collected(batch_input, llm, settings.model_extract,
+                                      product_vocab=vocab,
+                                      label_known=label_known) if batch_input else []
     n_rows = n_ref = n_noref = n_no_cno = n_context_skip = 0   # 관측성 카운터
     with connect() as conn:
         for raw, doc in pairs:
@@ -1265,7 +1553,8 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
             ref = source_links.build_source_ref("dcinside", raw.url, raw.meta)
             rows = index.index_post(doc, source="amos", post_id=post_id, conn=conn,
                                     relevance_meta=raw.meta.get("relevance"), source_ref=ref,
-                                    raw=raw)           # 원문 본문·작성 메타 동반 적재(ADR-0013)
+                                    raw=raw,           # 원문 본문·작성 메타 동반 적재(ADR-0013)
+                                    inversion=inversion)
             n_rows += rows
             if ref:
                 n_ref += rows
@@ -1442,7 +1731,162 @@ def repair_product_attribution(*, dry_run: bool = True) -> dict:
     return out
 
 
+def dc_attribution_target(product, market, kb) -> tuple:
+    """저장된 디시 행 하나의 목표값 — `(제품명|None, 사유, 새 마켓|None, 새 확신도|None)`.
+
+    `repair_dc_attribution` 의 판정 **단일 출처**이자 순수 함수(무LLM·무DB). 규칙을 함수로
+    빼 둔 이유는 이게 오프라인으로 게이트할 수 있는 유일한 형태이기 때문이다 — DB 왕복
+    안에 묻어 두면 아래 순서 규칙이 회귀해도 아무도 못 잡는다.
+
+    ⚠️ **순서가 규칙의 일부다.** 마켓 접두 분리가 **먼저**고, 비제품 단어 게이트는 **뗀 나머지**
+      에 건다. 뒤집으면 `ㅇㅊ`·`ㅁㅁㄴ` 같은 맨몸 마켓 표기가 '자모뿐인 이름' 으로 먼저 걸려
+      제품만 비워지고 **그 안의 마켓 신호가 통째로 버려진다**(실측: 그렇게 짰다가 마켓 교정
+      10건 중 8건을 놓쳤다).
+    """
+    from . import extract
+
+    if not product:
+        return None, "unchanged", None, None
+    target, why = product, "unchanged"
+    new_market = new_conf = None
+    hint, rest = linking.split_market_prefix(product, kb)
+    if hint:
+        target = rest
+        why = "market_token_bare" if rest is None else "market_token_split"
+        # 접두 마켓은 **항목 자신의 증거**라 저장된 마켓보다 강하다 — 디시 행의 마켓은
+        # `extract_collected` 의 스레드 도장이라 형제 조각에서 온 값이다(그 덮어쓰기를
+        # 없앤 게 Phase 1.1 이고, 이건 이미 적재된 행에 같은 판단을 적용하는 자리다).
+        # 실측(2026-08-10): 10행이 여기 걸리는데 전부 같은 사고다 — 스레드 201175 는 댓글
+        # 여섯이 각자 다른 마켓(`ㅇㅇㅈ`·`ㅁㅁㄴ`·`ㅂㅇㅍ`)을 말하는데 전부 `봄` 으로 찍혀
+        # 있었다. 남의 마켓 후기로 집계되는 건 출처 편향(1급 기능)의 왜곡이다.
+        # ⚠️ 그래서 전용 확신도를 함께 쓴다 — `ㅈㄴ`(존나) 같은 동음이의가 실재하므로
+        #   덮어쓴 행은 전량 식별해 되돌릴 수 있어야 한다.
+        hits, _conf, how = kb.resolve_market(hint)
+        if len(hits) == 1 and hits[0]["market_word"] != market:
+            new_market = hits[0]["market_word"]
+            new_conf = (linking.PREFIX_CONF_SURFACE if how == "표면형"
+                        else linking.PREFIX_CONF_CHOSEONG)
+    # 접두를 뗀 **나머지**에 단어 게이트를 건다 — `ㅂㅇㅍ 빨대` 의 `빨대` 는 종류어다.
+    if target and extract.is_non_product_word(target):
+        target = None
+        why = "non_product_word" if why == "unchanged" else f"{why}+non_product_word"
+    return target, why, new_market, new_conf
+
+
+def repair_dc_attribution(*, dry_run: bool = True, source: str = "amos") -> dict:
+    """기존 디시 행의 `product` 를 **수집 경로와 같은 규칙으로** 제자리 복구한다(**LLM 0회**).
+
+    `repair_product_attribution` 의 디시판이다. 저쪽은 캡션 해시태그 게이트(인스타 전용)를
+    다시 돌리지만, 디시엔 해시태그가 없어 그 경로가 `no_tags` 로 즉시 반환한다. 여기서 다시
+    거는 규칙은 셋이고 **전부 수집 경로와 한 벌**이다(갈리면 백필과 수집이 같은 원문에 다른
+    이름을 붙인다):
+      ① `extract.is_non_product_word` — 종류어·재료어·조각난 이름·자모뿐인 이름 → 보류.
+      ② `linking.split_market_prefix` — 제품명에 섞인 마켓 표기를 떼고, **마켓이 비어 있을
+         때만** 그 표기를 마켓으로 승격한다(전용 확신도 `PREFIX_CONFS` 로 되돌릴 수 있게).
+      ③ 말더듬 접기 — 같은 조각의 보류 행 중 **내용이 완전히 같은** 것만 한 행으로.
+
+    **아무것도 지우지 않는다 — 접기만 지운다.** 제품명은 NULL 이 되고 행은 남는다(원칙 2:
+    미언급 → null 이지 드롭이 아니다). 그 조각의 배송·CS 는 마켓 축(ADR-0015)에 그대로 남아야 한다.
+
+    ⚠️ 접기 키는 `UNIQUE(source, post_id, product)` 와 **정확히 같다**. 마켓을 키에 넣으면
+      제약이 안 보는 축으로 접게 되어 갱신이 제약 위반으로 죽는다.
+    ⚠️ 이름이 바뀌면 `evidence`·`tokens`·`embedding` 을 함께 다시 만든다 — `render_review` 가
+      제품명과 마켓을 검색 텍스트에 굽는다. 재임베딩은 로컬 BGE-M3 라 무과금이다.
+    """
+    from . import extract
+
+    kb = linking.load_kb()
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, post_id, market, product, attributes FROM reviews "
+            "WHERE source=%s ORDER BY id", (source,)).fetchall()
+
+    plan: list[dict] = []
+    for rid, post_id, market, product, attrs in rows:
+        target, why, new_market, new_conf = dc_attribution_target(product, market, kb)
+        plan.append({"id": rid, "post_id": post_id, "market": market, "from": product,
+                     "to": target, "why": why, "new_market": new_market, "new_conf": new_conf,
+                     "attrs": attrs or {}, "score": extract._filled_score(attrs or {})})
+
+    # 접기 — 이름 있는 충돌은 제약 키로, 보류분은 **내용 지문**으로(말더듬만).
+    drops: list[dict] = []
+    named: dict[tuple, list[dict]] = {}
+    held: dict[tuple, list[dict]] = {}
+    for p in plan:
+        if p["to"] is not None:
+            named.setdefault((p["post_id"], p["to"]), []).append(p)
+        elif p["score"]:                       # 내용 없는 보류는 접지 않는다(구분 재료가 없다)
+            held.setdefault((p["post_id"], extract._held_fingerprint(p["attrs"])), []).append(p)
+    for members in (*named.values(), *held.values()):
+        if len(members) < 2:
+            continue
+        members.sort(key=lambda m: (-m["score"], m["id"]))   # 많이 찬 쪽을 남긴다
+        drops.extend(members[1:])
+    drop_ids = {d["id"] for d in drops}
+
+    writes = [p for p in plan if p["id"] not in drop_ids
+              and (p["to"] != p["from"] or p["new_market"])]
+
+    def _brief(p, keys):
+        return {k: p[k] for k in keys}
+
+    out = {"dry_run": dry_run, "source": source, "scanned": len(plan), "writes": len(writes),
+           "folded": len(drops),
+           "holds": sum(1 for p in writes if p["to"] is None),
+           "renames": sum(1 for p in writes if p["to"] is not None and p["to"] != p["from"]),
+           # 빈 칸을 채운 것과 **이미 있던 값을 고친 것**은 따로 센다 — 성격이 다르고,
+           # 합치면 '스레드 도장을 몇 건 되돌렸나'를 사후에 못 가른다.
+           "markets_promoted": sum(1 for p in writes if p["new_market"] and not p["market"]),
+           "markets_corrected": sum(1 for p in writes if p["new_market"] and p["market"]),
+           "unchanged": sum(1 for p in plan if p["to"] == p["from"] and not p["new_market"]),
+           "by_reason": {w: sum(1 for p in plan if p["why"] == w)
+                         for w in sorted({p["why"] for p in plan})},
+           "write_list": [_brief(w, ("id", "post_id", "market", "from", "to", "why",
+                                     "new_market")) for w in writes],
+           "fold_list": [_brief(d, ("id", "post_id", "from", "to")) for d in drops]}
+    if dry_run:
+        log.info("repair_dc_attribution(dry): %s", {k: out[k] for k in
+                 ("scanned", "writes", "renames", "holds", "folded", "markets_promoted", "markets_corrected")})
+        return out
+
+    changed = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            if drop_ids:                        # 접기 삭제가 **먼저** — 나중이면 개명이 제약 위반
+                cur.execute("DELETE FROM reviews WHERE id = ANY(%s)", (list(drop_ids),))
+            for w in writes:
+                market = w["new_market"] or w["market"]
+                text = index.render_review(market, w["to"], w["attrs"])
+                vec = index.embed([text])[0]    # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET product=%s, market=%s, "
+                    "market_confidence=COALESCE(%s, market_confidence), "
+                    "evidence=%s, tokens=%s, embedding=%s WHERE id=%s",
+                    (w["to"], market, w["new_conf"], text, index._tokenize(text), vec, w["id"]))
+                changed += 1
+        conn.commit()
+    out.update({"deleted": len(drop_ids), "updated": changed})
+    log.info("repair_dc_attribution 완료: %s", {k: out[k] for k in
+             ("scanned", "updated", "deleted", "holds", "markets_promoted", "markets_corrected")})
+    return out
+
+
 # ---------------------------------------------------------------- 후처리(무과금)
+# 백필이 채운 마켓의 확신도. `linking` 의 눈금(표면형 0.95 · 초성 0.85 · 접두 0.92/0.82 ·
+# 역인덱스 0.80/0.65) 위에 얹는다 — 여기 근거는 개체연결이 **보류한 뒤** 다른 재료로 채운
+# 것이라 직접 매칭보다 아래다.
+#   · `spec_unique`(0.90) — 1층에 그 제품명이 정확히 한 마켓에만 있다. 판매자 본인 캡션에서
+#     온 값이라 근거가 강하다. 초성 직접 매칭(0.85)보다 위인 건 의도적이다: 초성은 충돌·
+#     동음이의(`ㅈㄴ`=존나)가 실재하지만 1층 유일소유는 그렇지 않다.
+#   · `caption`(0.70) — 원문에 그 마켓 표면형이 등장했다. 같은 글에 여러 마켓이 나올 수 있어
+#     약하다. 역인덱스 1층(0.80)보다 아래, 레지스트리(0.65)보다 위.
+# ⚠️ 다른 채움 경로와 **값을 겹치지 말 것** — `market_confidence` 가 provenance 를 담는
+#   유일한 칸이라(reason 은 DB 에 안 남는다), 값이 겹치면 그 층만 골라 되돌릴 수 없다.
+BACKFILL_CONF_SPEC = 0.90
+BACKFILL_CONF_CAPTION = 0.70
+BACKFILL_CONFS = {"spec_unique": BACKFILL_CONF_SPEC, "caption": BACKFILL_CONF_CAPTION}
+
+
 def backfill_review_markets(*, dry_run: bool = True) -> dict:
     """`market` 이 비어 있는 후기 행에 마켓을 채운다(**LLM 0회**). 반환: 카운트.
 
@@ -1460,6 +1904,13 @@ def backfill_review_markets(*, dry_run: bool = True) -> dict:
       ② 원문 캡션에 그 마켓의 표면형이 있으면 그 마켓이다(`_market_from_caption`).
     ①이 우선이다 — 1층은 판매자 본인 글에서 왔고 캡션 언급보다 강한 증거다.
     두 근거가 **엇갈리면 채우지 않는다**(`conflicts` 로 드러낸다). 보류가 오귀속보다 낫다.
+
+    ⚠️ **`backfill_market_from_product` 를 먼저 돌려라.** 저쪽이 같은 1층 유일소유 규칙을
+      전용 확신도와 함께 적용하므로, 순서만 지키면 여기 남는 대상은 이 함수의 고유 근거
+      (캡션 표면형)에 가깝게 좁혀진다. 순서를 어겨도 되돌릴 수는 있다 — 이제 이 함수도
+      근거별 전용 확신도(`BACKFILL_CONFS`)를 남기기 때문이다. 예전엔 0.0 을 그대로 둬서
+      '채웠는데 표식이 없는' 행이 생겼고, 그게 아래 `backfill_market_confidence` 가
+      치우는 유산이다.
 
     ⚠️ `render_review` 가 마켓을 검색 텍스트에 **굽는다**. 그래서 `market` 만 바꾸면
       `evidence`·`tokens`·`embedding` 이 옛 값('[None 빠코볼] …')을 가리킨 채 남는다 —
@@ -1484,6 +1935,15 @@ def backfill_review_markets(*, dry_run: bool = True) -> dict:
             conflicts += 1                       # 엇갈리면 채우지 않는다(무음 추측 금지)
             continue
         target = spec_mk or cap_mk
+        # ⛔ **'본문이 다른 마켓을 말했으면 채우지 마라'를 넣지 말 것.** 개발 중 실제로 넣었다가
+        #   되돌렸다(2026-08-10). 비교글에서 마켓이 여럿 등장하는 건 정상이고, 그중 하나를
+        #   제품명으로만 가리키는 것도 정상이다 — 표기되지 않았다고 모순이 아니다. 실측 3건 전부
+        #   그 가드에 걸렸는데 셋 다 채운 값이 **맞았다**:
+        #     · `빠코볼, ㅂㅇㅍ 빨대 이런거였음` — `ㅂㅇㅍ` 는 **다른 제품**의 마켓이다.
+        #     · `첫 빠코시리즈로 빠코팝 만졌는데 … ㅂ이랑 ㅅㅈㄴ 개시중` — 마켓 셋이 한 줄에 있다.
+        #     · `ㅅㅈㄴ 첨삭` — `ㅅㅈㄴ` 는 별칭 `슬지나` 의 초성이라 **그 글이 곧 지나 글**인데,
+        #       `KB._choseong_forms` 가 별칭을 초성으로 환원하지 않아 스캔이 못 알아본다.
+        #   막는 쪽 손실은 화면에 안 보인다(후기가 마켓 없이 남아 종합뷰에서 사라진다).
         if not target:
             n_nospec += int(not from_spec)
             n_nocaption += int(cap_mk is None)
@@ -1507,14 +1967,422 @@ def backfill_review_markets(*, dry_run: bool = True) -> dict:
                 text = index.render_review(p["market"], p["product"], p["attributes"] or {})
                 vec = index.embed([text])[0]     # 로컬 BGE-M3 — 무과금
                 cur.execute(
-                    "UPDATE reviews SET market=%s, evidence=%s, tokens=%s, embedding=%s "
-                    "WHERE id=%s",
-                    (p["market"], text, index._tokenize(text), vec, p["id"]))
+                    "UPDATE reviews SET market=%s, market_confidence=%s, "
+                    "evidence=%s, tokens=%s, embedding=%s WHERE id=%s",
+                    (p["market"], BACKFILL_CONFS[p["why"]],
+                     text, index._tokenize(text), vec, p["id"]))
                 changed += 1
         conn.commit()
         out["joined_now"] = join_specs(conn)      # 마켓이 찼으니 1층 조인을 다시 시도한다
     out["updated"] = changed
     log.info("backfill_review_markets: %s", out)
+    return out
+
+
+def backfill_market_confidence(*, dry_run: bool = True) -> dict:
+    """`market` 은 찼는데 `market_confidence` 가 0 인 행을 메운다(**LLM 0회**). 반환: 카운트.
+
+    '마켓이 있는데 확신도 0' 은 그 자체로 모순이다 — 0 은 보류선(0.6) 아래라 '이 행은
+    마켓을 못 정했다'는 뜻인데 칸은 차 있다. 실측(2026-08-10): 273행(아모스갤 53 · 인스타 220).
+    유산의 출처는 확신도를 안 쓰던 시절의 `backfill_review_markets` 다.
+
+    ⚠️ **값을 지어내지 않는다.** 저장된 마켓을 그대로 두고, 그 마켓이 지금 **어떤 근거로
+      재도출되는지**만 다시 계산해 그 근거의 확신도를 적는다(`BACKFILL_CONFS`). 근거가
+      저장값과 **엇갈리면 건드리지 않는다** — 확신도 백필이 오귀속을 승인 도장처럼 덮어
+      주면 안 된다. 실측으로 인스타 2행이 여기 걸린다(`conflicts`).
+    ⚠️ 근거가 아예 없으면 그것도 **건드리지 않는다**(`no_evidence`). 모순을 지우려고
+      임의값을 넣으면 provenance 칸이 거짓말을 시작한다.
+    ⚠️ `market` 은 안 바뀌므로 `evidence`·`tokens`·`embedding` 재생성은 필요 없다 —
+      `render_review` 는 확신도를 굽지 않는다.
+    """
+    kb = linking.load_kb()
+    with connect() as conn:
+        by_product: dict[str, set] = {}
+        for mk, pr in conn.execute("SELECT market, product FROM specs").fetchall():
+            by_product.setdefault(pr, set()).add(mk)
+        rows = conn.execute(
+            "SELECT id, market, product, body FROM reviews "
+            "WHERE market IS NOT NULL AND market_confidence = 0 ORDER BY id").fetchall()
+
+    plan, conflicts, no_evidence = [], 0, 0
+    for rid, market, product, body in rows:
+        owners = by_product.get(product) or set()
+        spec_mk = next(iter(owners)) if len(owners) == 1 else None
+        cap_mk = _market_from_caption(kb, body) if body else None
+        if spec_mk == market:
+            plan.append((rid, "spec_unique"))
+        elif cap_mk == market:
+            plan.append((rid, "caption"))
+        elif spec_mk or cap_mk:
+            conflicts += 1                       # 재도출이 저장값과 다르다 → 승인하지 않는다
+        else:
+            no_evidence += 1
+
+    out = {"dry_run": dry_run, "scanned": len(rows), "fillable": len(plan),
+           "conflicts": conflicts, "no_evidence": no_evidence,
+           "by_reason": {w: sum(1 for _, why in plan if why == w)
+                         for w in ("spec_unique", "caption")}}
+    if dry_run or not plan:
+        log.info("backfill_market_confidence(dry): %s", out)
+        return out
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for rid, why in plan:
+                cur.execute("UPDATE reviews SET market_confidence=%s WHERE id=%s",
+                            (BACKFILL_CONFS[why], rid))
+        conn.commit()
+    out["updated"] = len(plan)
+    log.info("backfill_market_confidence: %s", out)
+    return out
+
+
+def repair_evidence_headers(*, dry_run: bool = True) -> dict:
+    """`market` 은 찼는데 `evidence` 머리말이 아직 `[마켓미상 …]` 인 행을 다시 렌더한다.
+
+    `index.render_review` 가 마켓을 검색 텍스트의 **머리말로 굽기** 때문에, 마켓을 나중에
+    채운 행은 본문이 옛 값을 가리킨 채 남는다. 두 방향으로 나쁘다:
+      ① `evidence` 는 **사용자에게 보이는 인용**이라 화면이 '마켓미상'이라고 거짓말한다.
+      ② `tokens`·`embedding` 이 같은 옛 텍스트에서 나와 **검색이 그 행을 못 찾는다**.
+    실측(2026-08-10): 27행(아모스갤 15 · 인스타 12).
+
+    ⚠️ 셋을 **함께** 다시 만든다 — 하나만 고치면 인용과 검색이 서로 다른 텍스트를 가리킨다
+      (`backfill_review_markets`·`repair_product_attribution` 이 같은 규칙을 쓴다).
+      재임베딩은 로컬 BGE-M3 라 무과금이다.
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, market, product, attributes FROM reviews "
+            "WHERE market IS NOT NULL AND evidence LIKE %s ORDER BY id",
+            ("[마켓미상%",)).fetchall()
+
+    out = {"dry_run": dry_run, "scanned": len(rows)}
+    if dry_run or not rows:
+        log.info("repair_evidence_headers(dry): %s", out)
+        return out
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for rid, market, product, attrs in rows:
+                text = index.render_review(market, product, attrs or {})
+                vec = index.embed([text])[0]     # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET evidence=%s, tokens=%s, embedding=%s WHERE id=%s",
+                    (text, index._tokenize(text), vec, rid))
+        conn.commit()
+    out["updated"] = len(rows)
+    log.info("repair_evidence_headers: %s", out)
+    return out
+
+
+def backfill_market_from_product(*, dry_run: bool = True, sources=("amos", "instagram"),
+                                 limit_names=None, tier: str | None = None) -> dict:
+    """`market` 이 빈 행을 **제품명으로** 채운다 — 제품→마켓 역인덱스 백필(**LLM 0회**).
+
+    왜 별도 함수인가: 색인은 `UNIQUE(source, post_id, product)` + `ON CONFLICT DO NOTHING`
+    이라 **재수집으로는 기존 행이 안 바뀐다**(멱등성은 지켜야 할 성질이지 우회할 대상이 아니다).
+    그래서 이미 적재된 행을 고치는 일은 '무엇을 덮는지 이름으로 말하는' 함수가 맡는다.
+
+    `backfill_review_markets` 와 무엇이 다른가:
+      · 저건 1층 유일소유 **또는 캡션 표면형**으로 채운다 — 캡션 근거는 인스타 전용이고,
+        채운 뒤에도 `market_confidence` 를 손대지 않아 **사후 식별이 안 된다.**
+      · 이건 제품명만 근거로 하되 **1층 → 레지스트리 2단**이고(A2), 채운 행에 전용
+        `market_confidence` 를 박아 `revert_market_inversion` 으로 전량 롤백이 가능하다(A3).
+        레지스트리 층은 사람이 승격한 목록이 아니라 유도된 후보라, 이 롤백 경로가
+        **없으면 이 기능을 켜면 안 된다.**
+
+    ⚠️ **둘의 실행 순서가 롤백 가능성을 좌우한다 — 이 함수를 먼저 돌려라.**
+      겹치는 행이 없다는 건 맞지만(둘 다 `market IS NULL` 만 본다) 그게 곧 안전은 아니다:
+      `backfill_review_markets` 를 먼저 돌리면 1층 유일소유 규칙으로 같은 ~101행을 채우면서
+      `market_confidence` 는 0.0 그대로 둔다. 그러면 그 행들은 **직접 매칭과 구분되지 않고**,
+      나중에 잘못된 귀속이 드러나도 되돌릴 표식이 없다. 순서가 뒤집히면 A3 가 조용히 깨진다.
+
+    ⚠️ **A1(발동 조건)을 DB 만으로는 완전히 재현할 수 없다.** `link()` 는 '마켓 미언급'과
+      '언급했으나 해소 실패'를 구분하지만 `reviews` 에 남는 건 숫자뿐이다:
+        · 초성 충돌 보류 → `market_confidence = 1/후보수 > 0` → **아래 쿼리가 제외한다.**
+        · 미발견 보류    → 0.0 → 마켓 미언급과 **구분 불가**(원문에 마켓어가 있었는지 알 수 없다).
+      후자는 남는 위험이고, `_market_from_caption` 충돌 검사가 부분적으로만 덮는다
+      (해시태그만 읽으므로 디시 본문에는 사실상 안 걸린다 — 실측 320행 중 충돌 1건, 그것도
+      인스타). 그래서 `dry_run` 이 기본이고 사람 검수(A4)가 전제다.
+
+    ⚠️ `render_review` 가 마켓을 검색 텍스트에 **굽는다**. `market` 만 바꾸면
+      `evidence`·`tokens`·`embedding` 이 옛 값(`[None 빠코볼] …`)을 가리킨 채 남아
+      검색이 유령을 계속 맞힌다 — 셋을 함께 다시 만든다(재임베딩은 로컬 BGE-M3, 무과금).
+
+    tier: `"spec"` / `"registry"` / None(둘 다). **검수를 층 단위로 나눠 받기 위한 인자**다 —
+      1층 층은 판매자 본인 캡션에서 온 값이라 근거가 강하고, 레지스트리 층은 유도된 후보라
+      이름 하나씩 봐야 한다(계획 A4·R1). 층을 못 나누면 사람이 43개를 다 볼 때까지 101행이
+      묶여 있게 된다. 되돌리기도 같은 축이다(`revert_market_inversion(tier=...)`).
+    limit_names: 지정하면 그 이름들만 처리한다(검수 결과를 조금씩 반영하는 용도).
+    반환: 카운트 + `plan`(이름별 내역). **해소량과 미해소량을 둘 다** 싣는다 — 침묵 절단 금지.
+    """
+    # 백필은 `dry_run` 기본 + 사람 검수(A4) + 층 선택(`tier`)이 앞을 막고 있으므로 두 층을
+    # 다 만든다 — 수집 경로와 달리 여기선 사람이 무엇을 채울지 보고 고른다.
+    inv = market_inversion_index(include_registry=True)
+    kb = linking.load_kb()
+    only = {n.replace(" ", "").lower() for n in limit_names} if limit_names else None
+
+    with connect() as conn:
+        rows = conn.execute(
+            # `coalesce(market_confidence,0) = 0` 이 A1 의 DB 쪽 절반이다 — 초성 충돌로
+            # 보류된 행은 확신도가 0 보다 커서 여기서 빠진다(개체연결의 보류를 제품명으로
+            # 뒤집지 않는다). 미발견 보류는 0.0 이라 못 가른다(위 독스트링의 남는 위험).
+            "SELECT id, source, product, body, attributes FROM reviews "
+            "WHERE market IS NULL AND product IS NOT NULL AND source = ANY(%s) "
+            "  AND coalesce(market_confidence, 0) = 0::real ORDER BY id",
+            (list(sources),)).fetchall()
+
+    plan: list[dict] = []
+    by_name: dict[str, dict] = {}
+    unresolved: dict[str, int] = {}
+    conflicts: list[dict] = []
+    held_by_tier: dict[str, int] = {}          # tier 로 걸러 **보류한** 행 — 침묵 절단 금지
+    for rid, src, product, body, attrs in rows:
+        if only is not None and product.replace(" ", "").lower() not in only:
+            continue
+        market, conf, why = inv.market_for(product)
+        if not market:
+            # 왜 못 채웠는지를 사유별로 센다. '107행 중 몇 행'만 보고하면 나머지가
+            # 제외 때문인지 다중소유 때문인지 그냥 모르는 이름인지 구분이 사라진다(R5).
+            unresolved[why or "미등재"] = unresolved.get(why or "미등재", 0) + 1
+            continue
+        # 원문이 **다른 마켓**을 가리키면 채우지 않는다 — `backfill_review_markets` 와 같은
+        # 규칙이다(두 근거가 엇갈리면 보류). 두 백필이 같은 칸을 쓰면서 충돌 규칙만 다르면
+        # 어느 쪽이 먼저 돌았느냐로 결과가 갈린다.
+        # ⚠️ 이 가드는 **보수적으로 틀릴 수 있다.** 실측 유일 사례(id=705)는 베이퍼 게시물에서
+        #   `빠코볼`(지나 제품)을 비교 언급한 글이라, 사실 지나로 채우는 게 맞았을 가능성이
+        #   높다. 그래도 자동으로 채우지 않고 `conflict_list` 로 **내보내** 사람이 판단하게
+        #   둔다 — 조용히 채우면 반대 방향(진짜 오귀속)도 같이 통과한다.
+        cap_mk = _market_from_caption(kb, body) if body else None
+        if cap_mk and cap_mk != market:
+            conflicts.append({"id": rid, "source": src, "product": product,
+                              "inversion": market, "caption": cap_mk})
+            continue
+        row_tier = "spec" if conf == linking.INVERSION_CONF_SPEC else "registry"
+        if tier and row_tier != tier:
+            held_by_tier[row_tier] = held_by_tier.get(row_tier, 0) + 1
+            continue
+        plan.append({"id": rid, "source": src, "product": product, "market": market,
+                     "confidence": conf, "tier": row_tier, "attributes": attrs})
+        e = by_name.setdefault(product, {"product": product, "market": market,
+                                         "tier": row_tier, "rows": 0})
+        e["rows"] += 1
+
+    out = {"dry_run": dry_run, "scanned": len(rows), "fillable": len(plan),
+           "names": len(by_name),
+           "by_tier": {t: sum(1 for p in plan if p["tier"] == t) for t in ("spec", "registry")},
+           "unresolved_rows": sum(unresolved.values()), "unresolved_by_reason": unresolved,
+           "caption_conflicts": len(conflicts), "conflict_list": conflicts,
+           # 층 필터로 **미룬** 행. 0 이 아니면 '아직 검수 안 된 근거가 남아 있다'는 뜻이고,
+           # 안 내보내면 그 잔량이 '해소 불가'와 구분되지 않는다(R5 — 침묵 절단 금지).
+           "tier_filter": tier, "held_by_tier": held_by_tier,
+           "excluded_names": len(inv.excludes),
+           "name_list": sorted(by_name.values(), key=lambda e: (-e["rows"], e["product"]))}
+    if dry_run or not plan:
+        log.info("backfill_market_from_product(dry): %s",
+                 {k: out[k] for k in ("scanned", "fillable", "names", "by_tier",
+                                      "unresolved_rows", "caption_conflicts")})
+        return out
+
+    changed = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for p in plan:
+                text = index.render_review(p["market"], p["product"], p["attributes"] or {})
+                vec = index.embed([text])[0]         # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET market=%s, market_confidence=%s, evidence=%s, "
+                    "tokens=%s, embedding=%s WHERE id=%s AND market IS NULL",
+                    (p["market"], p["confidence"], text, index._tokenize(text), vec, p["id"]))
+                changed += cur.rowcount             # `AND market IS NULL` 로 경쟁 갱신 방어
+        conn.commit()
+        out["joined_now"] = join_specs(conn)        # 마켓이 찼으니 1층 조인을 다시 시도한다
+    out["updated"] = changed
+    log.info("backfill_market_from_product 완료: %s",
+             {k: out[k] for k in ("updated", "by_tier", "unresolved_rows",
+                                  "caption_conflicts", "joined_now")})
+    return out
+
+
+# 역인덱스로 채운 행을 찾는 **정본 조건절**. `::real` 이 이 문자열의 존재 이유다 —
+# `reviews.market_confidence` 는 REAL 인데 바인딩 파라미터는 float8 이라, 캐스트를 빼면
+# 리터럴도 `%s` 도 **한 행도 안 맞는다**(실측: `= 0.85` 0행 vs `= 0.85::real` 397행).
+# 조용히 빈 결과가 나오므로 '되돌릴 게 없다'로 읽힌다. 게이트: `test_rollback_predicate_casts_to_real`.
+INVERSION_ROLLBACK_WHERE = "market_confidence = ANY(%s::real[])"
+
+
+def revert_market_inversion(*, dry_run: bool = True, tier: str | None = None) -> dict:
+    """역인덱스가 채운 마켓을 **되돌린다**(`market`→NULL, 확신도 0). LLM 0회.
+
+    A3 가 약속한 롤백 경로의 실행 가능한 정본이다. 문서에 SQL 을 적어 두는 것으로는
+    부족했다 — 적어 둔 조건절이 REAL 비교 때문에 0행을 돌려주는데, 그건 '되돌릴 게
+    없다'와 구분되지 않는다.
+
+    tier: `"spec"` / `"registry"` / None(둘 다). **레지스트리 층만 골라 되돌릴 수 있는 것**이
+      두 확신도를 가른 이유다 — 잡음은 그쪽에 있고(사람이 승격한 목록이 아니라 유도된 후보),
+      1층 층까지 같이 날리면 멀쩡한 귀속을 잃는다.
+
+    ⚠️ `render_review` 가 마켓을 굽기 때문에 `evidence`·`tokens`·`embedding` 을 함께 되돌린다.
+    ⚠️ 되돌린 뒤에도 `spec_id` 조인은 남는다(마켓이 NULL 이면 다음 `join_specs` 에서 자연히
+      안 붙지만, 이미 붙은 값은 이 함수가 건드리지 않는다) — 필요하면 `join_specs` 를 다시 돈다.
+    """
+    tiers = {"spec": [linking.INVERSION_CONF_SPEC],
+             "registry": [linking.INVERSION_CONF_REGISTRY],
+             None: list(linking.INVERSION_CONFS)}
+    if tier not in tiers:
+        # 조용히 KeyError 로 죽으면 오타(`"Spec"`)가 '되돌릴 게 없다'와 구분이 안 된다 —
+        # 되돌리기는 사고 대응 경로라 실패 이유가 즉시 읽혀야 한다.
+        raise ValueError(f"tier 는 {sorted(k for k in tiers if k)} 또는 None 이어야 한다: {tier!r}")
+    confs = tiers[tier]
+    with connect() as conn:
+        rows = conn.execute(
+            f"SELECT id, product, market, market_confidence, attributes FROM reviews "
+            f"WHERE {INVERSION_ROLLBACK_WHERE} ORDER BY id", (confs,)).fetchall()
+    out = {"dry_run": dry_run, "tier": tier or "all", "matched": len(rows),
+           "by_market": {}, "rows": [{"id": r[0], "product": r[1], "market": r[2]}
+                                     for r in rows]}
+    for r in rows:
+        out["by_market"][r[2]] = out["by_market"].get(r[2], 0) + 1
+    if dry_run or not rows:
+        log.info("revert_market_inversion(dry): %s",
+                 {k: out[k] for k in ("tier", "matched", "by_market")})
+        return out
+
+    reverted = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for rid, product, _mk, _conf, attrs in rows:
+                text = index.render_review(None, product, attrs or {})
+                vec = index.embed([text])[0]         # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET market=NULL, market_confidence=0, evidence=%s, "
+                    "tokens=%s, embedding=%s WHERE id=%s",
+                    (text, index._tokenize(text), vec, rid))
+                reverted += cur.rowcount
+        conn.commit()
+    out["reverted"] = reverted
+    log.info("revert_market_inversion 완료: %d행 되돌림(tier=%s)", reverted, tier or "all")
+    return out
+
+
+def market_inversion_review(names=None, *, tier: str | None = "registry",
+                            sources=("amos", "instagram")) -> list[dict]:
+    """역인덱스가 채우려는 이름들의 **검수 자료**를 모은다(LLM 0회 · HTTP 0회 · 무과금).
+
+    계획 A4 는 '이름을 사람이 검수하라'고만 하는데, 그 사람에게 permalink 목록만 주면
+    브라우저를 14개 열어야 한다. 판단에 필요한 건 실은 세 가지고 **전부 디스크에 있다**:
+
+      ① **판매자 쪽 근거** — 그 해시태그가 실제로 그 마켓 피드에 붙어 있었나.
+         원문은 `data/raw/ig_profile_feed/<handle>/` 에 있다(수집 때 이미 샀다).
+      ② **충돌** — 같은 태그가 **다른 마켓** 피드에도 붙어 있나. 있으면 유일소유가
+         깨진 것이고, 그건 채우면 안 되는 이름이라는 뜻이다(제외 목록 후보).
+      ③ **후기 쪽** — 이 마켓이 붙을 행들이 실제로 무슨 얘기를 하고 있나.
+         ①이 맞아도 후기가 딴 마켓 얘기면 그 행은 오귀속이다.
+
+    ⚠️ 반환값에 **캡션 본문 발췌가 들어간다**. 화면·커밋 산출물이 아니라 **사람이 터미널에서
+      읽는 처리 단계**다(ADR-0013: 저장·처리는 허용, 배포가 금지). 이 결과를 파일로 커밋하지
+      말 것 — `data/product_registry.json` 이 이름·개수·주소만 담고 캡션을 뺀 이유와 같다.
+    """
+    from . import extract, rawstore
+
+    plan = backfill_market_from_product(dry_run=True, sources=sources, tier=tier)
+    targets = {e["product"]: e for e in plan["name_list"]
+               if names is None or e["product"] in set(names)}
+    if not targets:
+        return []
+
+    kb = linking.load_kb()
+    handles = {m["market_word"]: m["handle"] for m in kb.markets if m.get("handle")}
+    wanted = {extract._norm_tag(n) for n in targets}
+
+    # 전 마켓 피드를 한 번만 훑는다 — 이름마다 훑으면 14핸들 × N이름이 된다.
+    # 태그가 **어느 마켓 피드에 몇 번** 나오는지가 ①과 ②를 동시에 답한다.
+    seen: dict[str, dict[str, list[dict]]] = {}
+    for market_word, handle in handles.items():
+        for item in rawstore.latest_items("ig_profile_feed", handle):
+            caption = item.get("caption") or ""
+            if not caption:
+                continue
+            for tag in extract.product_hashtags(caption):
+                key = extract._norm_tag(tag)
+                if key in wanted:
+                    seen.setdefault(key, {}).setdefault(market_word, []).append({
+                        "url": item.get("url") or item.get("shortCode"),
+                        "date": (item.get("timestamp") or "")[:10],
+                        "caption": caption[:160].replace("\n", " "),
+                    })
+
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT product, id, source, body FROM reviews "
+            "WHERE market IS NULL AND product = ANY(%s) ORDER BY product, id",
+            (list(targets),)).fetchall()
+    by_product: dict[str, list[dict]] = {}
+    for product, rid, src, body in rows:
+        by_product.setdefault(product, []).append({
+            "id": rid, "source": src,
+            "excerpt": (body or "")[:150].replace("\n", " ") or "(본문 없음)"})
+
+    out = []
+    for name, e in sorted(targets.items(), key=lambda kv: -kv[1]["rows"]):
+        owners = seen.get(extract._norm_tag(name), {})
+        out.append({
+            "product": name, "market": e["market"], "tier": e["tier"], "rows": e["rows"],
+            "seller_posts": owners.get(e["market"], []),
+            # 비어 있지 않으면 **유일소유가 깨진 것** — 제외 목록 1순위다.
+            "other_markets": {m: len(v) for m, v in owners.items() if m != e["market"]},
+            "review_rows": by_product.get(name, []),
+        })
+    return out
+
+
+def backfill_non_product_labels(*, dry_run: bool = True) -> dict:
+    """제품명 칸에 들어간 **비제품 라벨**(`비매품 1번`·`이번차수`)을 `None` 으로 비운다.
+
+    **LLM 0회.** 판정은 `extract.is_non_product_label` 한 벌이고, 여기서 규칙을 다시 쓰지
+    않는다 — 수집 경로와 백필이 규칙을 따로 가지면 같은 이름에 서로 다른 판정이 붙는다
+    (`resolve_product_name` 을 한 벌로 모은 것과 같은 이유).
+
+    ⚠️ 행을 지우지 않는다. 후기 자체는 남고 제품 귀속만 빈다 — 그 조각의 배송·CS 는
+      마켓 축 집계에 그대로 들어가야 한다(ADR-0015).
+    ⚠️ `render_review` 가 제품명도 굽기 때문에 `evidence`·`tokens`·`embedding` 을 함께
+      다시 만든다(`backfill_market_from_product` 와 같은 함정).
+    ⚠️ 접기(fold)를 하지 않는다. 같은 조각의 두 행이 나란히 `product=NULL` 이 되어도
+      `UNIQUE(source, post_id, product)` 는 NULL 을 서로 다른 값으로 보므로 제약에 안 걸린다.
+      내용이 다른 두 후기를 이름이 비었다는 이유로 합치면 진짜 후기가 사라진다.
+    """
+    from . import extract
+
+    known = known_product_names()
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, source, market, product, attributes FROM reviews "
+            "WHERE product IS NOT NULL ORDER BY id").fetchall()
+
+    plan = [{"id": rid, "source": src, "market": mk, "product": pr, "attributes": attrs}
+            for rid, src, mk, pr, attrs in rows
+            if extract.is_non_product_label(pr, known)]
+    out = {"dry_run": dry_run, "scanned": len(rows), "cleared": len(plan),
+           "names": sorted({p["product"] for p in plan}),
+           "rows": [{k: p[k] for k in ("id", "source", "market", "product")} for p in plan]}
+    if dry_run or not plan:
+        log.info("backfill_non_product_labels(dry): %d행 / %d개 이름 %s",
+                 out["cleared"], len(out["names"]), out["names"])
+        return out
+
+    changed = 0
+    with connect() as conn:
+        with conn.cursor() as cur:
+            for p in plan:
+                text = index.render_review(p["market"], None, p["attributes"] or {})
+                vec = index.embed([text])[0]         # 로컬 BGE-M3 — 무과금
+                cur.execute(
+                    "UPDATE reviews SET product=NULL, evidence=%s, tokens=%s, embedding=%s "
+                    "WHERE id=%s", (text, index._tokenize(text), vec, p["id"]))
+                changed += cur.rowcount
+        conn.commit()
+    out["updated"] = changed
+    log.info("backfill_non_product_labels 완료: %d행 비움", changed)
     return out
 
 

@@ -169,7 +169,7 @@ def _sent(review: dict, block: str) -> str | None:
 def index_post(doc: dict, *, source: str, post_id: str | None = None,
                aliases: dict[str, str] | None = None, review_class: str = "genuine",
                relevance_meta: dict | None = None, source_ref: dict | None = None,
-               raw=None, conn=None) -> int:
+               raw=None, conn=None, inversion=None) -> int:
     """
     추출 후기 1건(doc) → 제품별로 연결·렌더·임베딩 후 reviews 테이블에 적재.
     review_class='genuine'|'promo' — 홍보성 후기는 종합뷰에서 실사용과 분리 집계된다.
@@ -181,6 +181,10 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
     (`source_links.evidence_group_key`). 안 하면 한 조각이 제품 수만큼 링크로 도배된다.
     raw — 원본 RawReview(선택). 주면 원문 본문·작성 메타를 함께 적재한다(ADR-0013).
     안 주면 해당 컬럼은 NULL — 골드 시드처럼 RawReview 가 없는 경로가 그렇다.
+    inversion — 제품→마켓 역인덱스(`linking.MarketInversion`, 선택). 원문이 마켓을 아예
+    말하지 않은 조각의 `market` 을 제품명으로 채운다. **미주입이면 이 기능이 없던 것과
+    똑같이 동작한다** — 1층 맵이 DB 에서 와야 해서 여기서 만들 수 없고(이 함수는 conn 을
+    빌려 쓸 뿐 소유하지 않는다), 무엇보다 유료 호출 앞에서 **한 번만** 만드는 게 맞다.
     반환: **실제로 적재된** 행 수(중복 스킵분 제외).
 
     멱등성은 `UNIQUE (source, post_id, product)` + `ON CONFLICT DO NOTHING` 이 **DB에서**
@@ -195,7 +199,7 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
       호출부가 조각 식별자를 항상 넘기는 게 전제다.
     """
     kb = linking.load_kb()
-    links = linking.link_post(doc, kb=kb, aliases=aliases)
+    links = linking.link_post(doc, kb=kb, aliases=aliases, inversion=inversion)
     reviews = doc.get("reviews", [])
     # shipping_cs 는 후기(주문) 단위 사실이라 doc 최상위에 산다(ADR-0005) — 제품 항목엔 없다.
     # 그런데 attributes 에 들어가는 건 제품 항목뿐이라, 복제하지 않으면 종합뷰의

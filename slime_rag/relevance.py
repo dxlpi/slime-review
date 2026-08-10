@@ -44,12 +44,25 @@ log = logging.getLogger("relevance")
 # τ_topic 는 골드셋 보정(evals/calibrate_relevance.py) 산출값으로 갱신한다. 아래는 보정 전
 # 잠정 기본값 — 게이트 로직/카운트/랜박 테스트는 이 값으로 동작하지만, precision/recall
 # 하드게이트(AC4)는 보정 후에만 유효. margin = 경계(near_boundary) 폭(보수적 KEEP 마킹).
+# `drop_axes` = 그 플랫폼에서 **드롭 권한을 가진 축**. 여기 없는 축은 판정을 계속 계산하고
+# `relevance_meta` 에 기록하되 DROP 하지 않는다 — 값은 순위(`_rank_key`)와 사후 분석으로만 쓰인다.
+# 기본값은 전 축 드롭(하위호환) — 새 플랫폼은 명시하지 않으면 예전과 똑같이 동작한다.
+DROP_AXES_DEFAULT: tuple[str, ...] = ("topic", "domain", "meta", "e_union")
+
 RELEVANCE_CONF: dict[str, dict] = {
     # dcinside target_scope: 정책 C(ADR-0007)는 market 이나, 보정 실측에서 market 앵커("봄 슬라임")가
     # τ 실현 불가(keep/drop 평균 0.402/0.370, AC4 recall 상한 0.516)로 판명 → 재판정 전까지
     # product 로 운용(계획 리스크표의 per-platform revert 경로). "market" 전환은 keep 재판정 +
     # 재보정(relevance_tau.json 스코프 바인딩) 후에만.
-    "dcinside":  {"tau_topic": 0.45, "mqe_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment"), "target_scope": "product"},
+    #
+    # drop_axes=("meta",) — **M 만 드롭**(ADR-0017, 사용자 재판정 2026-08-09). 원문 저장소 948조각
+    # 실측이 근거다: M 이 지운 건 4건인데 topic 이 433건, e_union 이 281건을 지웠다. 둘을 끄면
+    # 신규 877건이 추출에 닿고 비용은 $0.51 — 배치 추출이라 조각 5배가 콜 2배가 안 된다.
+    # e_union 은 문서화된 계약 위반(ADR-0007 D2)이었고, topic 은 설계된 동작이지만 **디시에선**
+    # 포럼 약칭·생략 지시("이거") 때문에 진짜 후기를 임베딩이 못 알아본다.
+    # ⚠️ 대가는 명시적이다: 제품 A 얘기가 제품 B 수집에도 남는다. 귀속은 추출기가 조각 단위로
+    #   하고(`extract.resolve_product_name`), 의견이 없는 조각은 `reviews: []` 로 스스로 빠진다.
+    "dcinside":  {"tau_topic": 0.45, "mqe_axis": True,  "domain_gate": False, "margin": 0.05, "types": ("post", "comment"), "target_scope": "product", "drop_axes": ("meta",)},
     "instagram": {"tau_topic": 0.45, "mqe_axis": False, "domain_gate": True,  "margin": 0.05, "types": ("post",), "target_scope": "product"},
 }
 
@@ -117,6 +130,11 @@ class RelevanceVerdict:
     rank: int = -1            # 배치 내 순위(예산 절단 기준). 게이트가 채운다.
     unprocessed: bool = False # 예산 초과 — **드롭이 아니라 미처리**(AC10, 침묵 절단 금지)
     near_boundary: bool = False
+    # 드롭 권한이 없는 축이 '탈락'이라 본 항목 — KEEP 이지만 그 사실을 기록해 둔다(ADR-0017).
+    # 이게 없으면 `drop_axes` 축소가 곧 관측 손실이 된다: 화면엔 그냥 후기가 늘어난 것처럼 보이고
+    # 어떤 조각이 예전 규칙이면 죽었을 조각인지 사후에 못 가른다.
+    below_tau: bool = False   # topic_score < τ 인데 topic 에 드롭 권한이 없어 살아남음
+    low_e: bool = False       # E 합집합 음성인데 e_union 에 드롭 권한이 없어 살아남음
     reason: str = ""
 
     @property
@@ -308,43 +326,50 @@ def _verdict(chunk_vecs: np.ndarray, anchor_vec: np.ndarray, conf: dict,
     tau = conf.get("tau_topic", 0.45)
     margin = conf.get("margin", 0.05)
     domain_gate = conf.get("domain_gate", False)
+    drops = set(conf.get("drop_axes", DROP_AXES_DEFAULT))   # 드롭 권한을 가진 축(ADR-0017)
 
     if len(chunk_vecs) == 0:
+        # 빈 텍스트는 축 판정이 아니라 입력 부재다 — `drop_axes` 와 무관하게 버린다.
         return RelevanceVerdict(False, "topic", 0.0, reason="빈 텍스트")
 
     # Axis 1 — 온토픽(양쪽 소스). 도메인 인식 앵커라 비슬라임 글은 대개 여기서 걸린다.
     topic_score = _max_cosine(chunk_vecs, anchor_vec)
     near = abs(topic_score - tau) < margin
-    if topic_score < tau:
+    below_tau = bool(topic_score < tau)
+    if below_tau and "topic" in drops:
         return RelevanceVerdict(False, "topic", topic_score,
-                                near_boundary=near, reason=f"topic<{tau:.2f}")
+                                near_boundary=near, below_tau=True, reason=f"topic<{tau:.2f}")
 
     # Axis 0 — 슬라임 도메인 centroid(인스타 폴백, 기본 OFF).
-    if domain_gate == "centroid":
+    if domain_gate == "centroid" and "domain" in drops:
         dom = load_domain_prototypes()
         if dom:
             mean_vec = _normalize(np.asarray(chunk_vecs, dtype=float)).mean(axis=0)
             if _nearest_centroid(mean_vec, dom) == "not_slime":
                 return RelevanceVerdict(False, "domain", topic_score,
-                                        near_boundary=near, reason="비슬라임(domain centroid)")
+                                        near_boundary=near, below_tau=below_tau,
+                                        reason="비슬라임(domain centroid)")
 
     # Axis 2 — M/Q/E 이진 3축(주로 디시). **M 만 DROP 사유**다.
     # Q(질문)는 드롭도 순위 조정도 하지 않는 **순수 관측 축**이다(정렬 키에 안 들어간다).
     # 질문글이 뒤로 밀리는 건 Q 때문이 아니라 그런 글이 대개 E=0 이라서다 — 배타 4분류에서 질문을 KEEP/DROP 으로 가르던
     # 설계가 §1-B 의 근본 문제였다.
     if not conf.get("mqe_axis"):
-        return RelevanceVerdict(True, "none", topic_score, near_boundary=near, reason="keep")
+        return RelevanceVerdict(True, "none", topic_score, near_boundary=near,
+                                below_tau=below_tau, reason="keep")
 
     sig = mqe_signals(text, _normalize(np.asarray(chunk_vecs, dtype=float)).mean(axis=0), conf)
-    if sig["M"]:
+    if sig["M"] and "meta" in drops:
         return RelevanceVerdict(False, "meta", topic_score, M=1, Q=sig["Q"], E=0,
-                                near_boundary=near, reason="meta/noise")
-    keep = sig["candidate"]
+                                near_boundary=near, below_tau=below_tau, reason="meta/noise")
+    cand = bool(sig["candidate"])
+    keep = cand or "e_union" not in drops
     return RelevanceVerdict(
         keep, "none" if keep else "e_union", topic_score,
-        M=0, Q=sig["Q"], E=sig["E"], e_rule=sig["e_rule"], e_probe=sig["e_probe"],
+        M=sig["M"], Q=sig["Q"], E=sig["E"], e_rule=sig["e_rule"], e_probe=sig["e_probe"],
         e_bucket=sig["e_bucket"], bias_hold=sig["bias_hold"], near_boundary=near,
-        reason="keep" if keep else "E 합집합 음성")
+        below_tau=below_tau, low_e=not cand,
+        reason="keep" if cand else ("E 합집합 음성(순위 꼬리)" if keep else "E 합집합 음성"))
 
 
 def classify_batch(reviews: list[RawReview], target: dict, conf: dict) -> list[RelevanceVerdict]:

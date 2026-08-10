@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria, human-in-the-loop spec review)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria, human-in-the-loop spec review, meta-only drop authority)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -216,8 +216,14 @@ something to correct for** — never average it; show it per source, plus the ga
   identical 10 candidates with no network. Gate: `eval/test_dcinside_rawstore.py`.
   ⚠️ **343KB per thread** measured (mostly HTML) — ~19MB for the 56 threads already in the DB, ~340MB
   for a 1,000-thread sweep. Gitignored (ADR-0013), but check disk before a full sweep.
-  ⚠️ The store is **empty except that one probe thread** — everything collected before today was a
-  one-pass scrape with no snapshot, so the existing 222 `amos` rows have no raw behind them.
+  ✅ **The store is now full**: a live sweep landed **172 threads (948 pieces, 180MB)** on
+  2026-08-09. That is what made [ADR-0017](docs/adr/0017-meta-only-drop-authority.md) measurable —
+  re-running the gate at eight τ values cost **$0** because the relevance model is local BGE-M3 and
+  the bytes were already on disk. Before the store existed, that experiment *was* an HTTP re-scrape.
+  ⚠️ The 222 `amos` rows indexed **before** the store still have no raw behind them.
+  ⚠️ Measuring a store while a sweep is still writing gives moving numbers — a first count read
+  151 threads/857 pieces mid-run and the final figures are 172/948. Check `rawstore.manifest()`
+  timestamps before treating a count as final.
 - **The 1층 spec blanks are now a human's job, and that judgment lives outside the DB** (2026-08-09,
   [ADR-0016](docs/adr/0016-human-in-the-loop-spec-review.md)). The first-class rule (unmentioned →
   null, never invent) has a necessary consequence: if the seller didn't write 재료·향·종류·질감 in
@@ -252,6 +258,82 @@ something to correct for** — never average it; show it per source, plus the ga
     contract** and local-only: `/api/admin/*` routes are **not registered** without `ADMIN_ENABLED=1`,
     so they are 404, and CORS write methods follow the same gate. Verified live: queue 39, embed
     available on 32, `/api/page` returns the typed value with no read-path change.
+- **후기가 제품 화면에 닿지 못하던 절반이 회수된다 — 제품→마켓 역인덱스**(2026-08-10).
+  `consolidated_for(market, product)` 는 두 키를 **모두** 요구하는데, 디시 후기 813행 중
+  **365행(45%)이 `market IS NULL`** 이었다. 원인은 추출 실패가 아니라 **원문에 마켓이 없는 것**
+  이고(`linking.link` 가 `mentioned_market` 이 비면 즉시 보류), 그 결과는 화면에 '후기가 없음'
+  으로만 보이는 **조용한 손실**이다. 그런데 **제품명은 마켓을 함의한다** —
+  `data/product_registry.json` 의 제품명 2,372개 중 2,349개가 정확히 한 마켓에만 속한다.
+  · `linking.build_market_inversion` 이 **두 층을 끝까지 갈라** 만든다(`MarketInversion.spec` /
+    `.registry`). **합집합 금지** — 합치면 1층에서 정확히 하나이던 판정이 레지스트리 후보
+    때문에 보류로 **퇴화**한다(`resolve_product_name` 의 ③′와 같은 금지). 1층이 그 이름을
+    **알기만 하면** 거기서 끝나고, 모호해도 레지스트리로 내려가지 않는다.
+  · **발동 조건이 좁다**: `mentioned_market` 이 **애초에 비어 있던** 경우만이다. 원문이 마켓을
+    말했는데 초성 충돌·미발견으로 보류된 행은 **건드리지 않는다** — 거긴 증거가 갈렸다는 뜻이고,
+    제품명이 개체연결의 보류 판정을 뒤집을 권한은 없다.
+  · **전용 `market_confidence` 가 롤백의 유일한 열쇠다**(`INVERSION_CONF_SPEC` 0.80 /
+    `INVERSION_CONF_REGISTRY` 0.65 — 직접 매칭 0.95·0.85 와 다르고 서로도 다르다).
+    레지스트리는 사람이 승격한 목록이 아니라 유도된 후보라, **잡음 층만 골라 되돌릴 수 있어야**
+    이 기능을 켤 수 있다. `data/market_inversion_excludes.json` 은 그 위의 사람 판단 오버레이다
+    (`data/product_aliases.json`·`data/spec_overrides.json` 과 같은 가족).
+  · **검수는 permalink 를 브라우저로 여는 일이 아니다** — `pipeline.market_inversion_review()`
+    가 판단 재료를 디스크에서 모아 준다(LLM·HTTP 0회): ① 그 태그가 실제로 그 마켓 피드에
+    붙어 있었나(`data/raw/ig_profile_feed/` 캡션) · ② **다른 마켓 피드에도 있나**(있으면
+    유일소유가 깨진 것) · ③ 이 마켓이 붙을 후기 본문이 무슨 얘기를 하나. 계획 A4 가
+    '사람이 검수하라'고만 하고 절차를 안 정해서, 절차를 함수로 고정했다.
+    ⚠️ 반환값에 **캡션 발췌가 들어간다** — 터미널에서 읽는 처리 단계이지 산출물이 아니다.
+    파일로 커밋하지 말 것(ADR-0013 · `data/product_registry.json` 이 캡션을 뺀 이유와 같다).
+    실측 1회차(2026-08-10, 레지스트리 5개): **4 통과 · 1 탈락**. 탈락한 `디폼클리어` 는
+    제품명이 아니라 **종류어**였다 — 늪지 글의 꼬리 분류 태그 무더기(`#클리어디폼
+    #디폼크런치 #디폼클리어 #클리어슬라임`)에 섞여 있었고 그 글의 실제 제품은 `#꼬도독닭발`
+    이며, 후기 쪽은 `ㅁㅁ`(**머머**)라고 썼다. 판매자·후기 양방향으로 늪지가 아니다.
+    통과분도 `_rulings._passed` 에 근거를 남긴다 — 안 남기면 다음 사람이 같은 검수를 다시 한다.
+    ⚠️ 검수 중 드러난 KB 구멍: `ㅋㄹㅇ`(쿨라임 = 지나 별칭)이 `choseong_aliases` 에 없어
+    개체연결이 보류한다. 넣으면 그 행은 **추론 없이 직접 매칭**되므로 역인덱스보다 낫다.
+  · `linking` 은 여전히 **DB 무의존**이다 — 1층 쌍은 `pipeline.market_inversion_index()` 가
+    주입한다(`SELECT market, product FROM specs` 1회, 무과금). 인덱스는 **유료 호출 앞에서
+    런당 한 번**만 만든다: 조각마다 만들면 귀속이 수집 순서에 의존하게 된다.
+  · 백필은 `pipeline.backfill_market_from_product(dry_run=True, tier=…)` — **별도 함수**다.
+    색인은 `ON CONFLICT DO NOTHING` 멱등이라 재수집으로는 기존 행이 안 바뀐다. **LLM 0회.**
+    최초 실측 dry(2026-08-10): 채울 수 있는 107행 · 이름 49개(**1층 101 / 레지스트리 6**),
+    미해소 212행은 사유별 카운터로 드러난다(미등재 209 · 다중소유 3).
+    ⚠️ 그중 **1층 101행은 `backfill_review_markets` 가 먼저 채웠다** — 같은 1층 유일소유
+    규칙을 쓰되 자기 확신도(`BACKFILL_CONF_SPEC` 0.90 · `BACKFILL_CONF_CAPTION` 0.70)를
+    남긴다. 그래서 이 함수의 `tier="spec"` 는 지금 대상이 0이고, **남은 건 레지스트리 6행**
+    (사람 검수 대기)이다. 두 함수는 겹치지 않지만(둘 다 `market IS NULL` 만 본다) **실행
+    순서가 표식을 정한다** — 먼저 도는 쪽의 확신도가 그 행에 남는다.
+    실측 경과: `market IS NULL AND product IS NOT NULL` 312 → **208**(레지스트리 6행까지
+    채우면 202). 목표선 205는 그 6행에 달려 있다.
+  ⚠️ 계획서가 오답으로 의심한 `봄날의배달부 → 지나` 는 **검수 결과 정답**이다 — `specs` 에
+    지나 본인 게시물(`DXa7OoRAXrE`)에서 온 행이 있고 레지스트리 소유도 지나 단독이다.
+    '봄날의'는 제품명 테마지 마켓 `봄` 이 아니다.
+  ⚠️ 원문이 **다른 마켓**을 가리키면 채우지 않고 `conflict_list` 로 내보낸다
+    (`backfill_review_markets` 와 같은 충돌 규칙 — 두 백필이 같은 칸을 쓰면서 충돌 규칙만
+    다르면 어느 쪽이 먼저 도느냐로 결과가 갈린다). 실측 유일 사례 id=705 는 베이퍼 게시물이
+    지나의 `빠코볼` 을 비교 언급한 글이라 **사실 채우는 게 맞았을 가능성이 높다** — 그래도
+    자동으로 채우지 않고 사람에게 넘긴다. 가드는 반대 방향(진짜 오귀속)도 같이 막는다.
+- **`비매품`은 제품명이 아니다 — 다만 `연찌비매17`은 제품이다**(2026-08-10). 추출기가 판매
+  **형식**을 제품명으로 들어올려 `비매품 1번`·`이번차수` 같은 행이 생겼다(실측 11행 / 8개 이름).
+  `extract.is_non_product_label` 이 순수 함수로 판정하고 `drop_non_product_labels` 가 이름만
+  비운다 — **후기 항목은 버리지 않는다**(1급 규칙은 '미언급 → null' 이지 드롭이 아니고, 그 조각의
+  배송·CS 는 마켓 축에 남아야 한다).
+  ⚠️ **부분일치로 만들면 안 된다**, 반례가 둘 다 실재한다: ① `나비매듭`·`말차수플레` 처럼 진짜
+    제품명이 라벨어를 품는다 · ② **`연찌비매17`·`푸딩비매품`·`웨이즈1월비매` 는 1층 `specs` 에
+    실재하는 제품**이다(64행). 연찌·웨이즈는 비매품에 번호를 붙여 해시태그로 판다 — 계획서가
+    예상 못 한 실측이고, 부분일치였다면 그 제품들이 통째로 사라졌을 것이다(화면에 안 보이는 손실).
+    그래서 판정이 두 갈래다: **맨몸 라벨**(`비매`·`비매품 1번`·`이번차수`)은 무조건 비제품이고,
+    **수식된 라벨**(`베이퍼비매`)은 1층/레지스트리가 모르는 이름일 때만 비제품이다. 증거를 안
+    주면 건드리지 않는다(페일세이프).
+  ⚠️ 적용 자리는 **해시태그 게이트 앞**이다 — `repair_product_names` 는 태그가 없으면 즉시
+    반환하므로, 뒤에 두면 디시엔 아예 안 돈다(그래서 `비매품 1번` 이 살아남았다). 디시는
+    `extract_thread` 가 `enforce_product_vocab` **앞에서** 같은 함수를 부른다: 라벨은 대개 본문에
+    그대로 있어 어휘 검사를 그냥 통과한다(근거는 있는데 제품이 아닌 경우라 두 검사가 서로를
+    대신하지 못한다). 백필 `pipeline.backfill_non_product_labels` 는 **실행 완료**(2026-08-10,
+    11행 / 8개 이름 · 행 삭제 없음 · 재실행 대상 0). 되돌릴 목록은
+    `.omc/state/sessions/<id>/label_backfill_rollback.json` 에 id·이름까지 남겼다.
+    ⚠️ 접기(fold)는 하지 않는다 — 같은 조각의 두 행이 나란히 `product=NULL` 이 되어도
+    `UNIQUE(source, post_id, product)` 는 NULL 을 서로 다른 값으로 보므로 제약에 안 걸리고,
+    내용이 다른 두 후기를 이름이 비었다는 이유로 합치면 진짜 후기가 사라진다.
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
@@ -277,7 +359,14 @@ python -m eval.test_consolidated_sections # 6기준 요약 계약 (CRITERIA 공�
 python -m eval.test_source_links && python -m eval.test_post_columns   # 링크 정책 · 원문 메타 매핑
 python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인 멱등성 · 1층 수집 누적성
 python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
-python -m eval.test_product_repair                             # 제품명 귀속 복구(유령 vs 진짜 제품)
+python -m eval.test_product_repair                             # 제품명 귀속 복구 + 비제품 라벨·단어 게이트
+python -m eval.test_market_prefix && python -m eval.test_market_backfill  # 마켓 접두 분리 · 백필/복구 위생
+python -m eval.test_alias_candidates                           # 약칭 후보 유도(자동 병합 금지)
+OPENAI_API_KEY="" python evals/audit_attribution.py            # 마켓/제품 귀속 감사(무과금·읽기전용)
+python -m eval.test_market_inversion                           # 제품→마켓 역인덱스(1층 우선·보류 불가침·롤백)
+python -c "from slime_rag import pipeline as p; [print(e) for e in p.market_inversion_review()]"  # 역인덱스 사람 검수 자료(무과금)
+python -c "from slime_rag import pipeline as p; print({k:v for k,v in p.backfill_market_from_product().items() if k!='name_list'})"  # 역인덱스 백필 규모(무과금)
+python -c "from slime_rag import pipeline as p; print(p.backfill_non_product_labels()['names'])"   # 비제품 라벨 대상(무과금)
 python -m eval.test_rawstore && python -m eval.test_product_registry  # 원문 저장소 · 제품 후보 유도
 python -m eval.test_dcinside_rawstore                          # 디시 스레드 원문 저장·재처리(HTTP 0회)
 python -m eval.test_spec_overrides                             # 1층 스펙 사람 검수 오버레이(ADR-0016)
@@ -311,9 +400,17 @@ enforced by [.githooks/commit-msg](.githooks/commit-msg).
 - **Only `M` (meta/noise) may drop an item.** Questions and low-E items are ranked to the tail, never
   filtered out; anything past the budget is logged as `unprocessed`, not dropped. Negative-sentiment
   items stay in the candidate set regardless of `E` — that is the source-bias hard gate.
-  (Known divergence, ruled intentional: the shipped gate also excludes negative-`e_union`
-  non-`bias_hold` items from candidacy — D2, [ADR-0007](docs/adr/0007-collected-for-target-policy.md);
-  re-ruling it to match this rule verbatim is option 1 there.)
+  **The code now matches this text** ([ADR-0017](docs/adr/0017-meta-only-drop-authority.md), 2026-08-09):
+  `RELEVANCE_CONF` carries **`drop_axes`** — the axes with drop authority — and dcinside's is `("meta",)`.
+  ADR-0007's D2 divergence (`e_union` dropping non-`bias_hold` items) is **closed** via its option 1.
+  `topic` also lost drop authority **on dcinside only**; that half is a design change, not a rule fix,
+  and its warrant is measured: of 948 stored pieces `M` dropped **4** while `topic` dropped 433 and
+  `e_union` 281. Forum 초성 (`ㅂㅇㅍ`) and ellipsis ("이거") put real reviews below τ, and it is **not**
+  an anchor-quality problem — the most specific product anchor (`ㅈㄴ 아몬드바나나브레드`) had the
+  *lowest* keep rate, 13.0%. Instagram is untouched (no key → all axes drop; its `domain` gate is the
+  name-collision defence). Cost was never the constraint — batching makes 175→877 pieces $0.11→$0.51.
+  Pieces that survive only because an axis lost authority carry `relevance_meta.below_tau` / `.low_e`;
+  those two fields **are** the rollback path.
 - **Label source bias; never average.** Scent mismatches, source gaps, and **which side of a
   criterion is the majority** come from joins/aggregation (`consolidated_view.py`), not from the LLM.
 A summary sentence carries *content only*; counts and gaps are aggregation, and the LLM is not

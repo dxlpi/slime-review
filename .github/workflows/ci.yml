@@ -52,6 +52,11 @@ jobs:
           python -m eval.test_source_links
           python -m eval.test_post_columns
           python -m eval.test_spec_overrides
+          # 제품 귀속 두 벌 — 둘 다 순수 함수 게이트라 torch·DB·키가 필요 없다.
+          # test_product_repair 는 원래 로컬에만 있었는데, 유령 제품과 **비제품 라벨**의
+          # 과잉 차단 회귀를 함께 지키므로(양방향으로 조용히 부서지는 자리) CI 로 올린다.
+          python -m eval.test_product_repair
+          python -m eval.test_market_inversion
 
       - name: Eval pass-rate gate
         run: python -m evals.run --min 1.0

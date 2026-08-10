@@ -17,6 +17,7 @@
 | `train_e_probe.py` | E 프로브 오프라인 학습 → `gold/e_probe.npz` (numpy only, 런타임 학습 없음) |
 | `calibrate_relevance.py` | τ_topic 보정 + M/Q/E 축 리포트(AC8 편향 보존·AC9 거짓DROP·버킷 순도) |
 | `cost_profile.py` | 추출 호출 비용 구조 실측(AC11) + 프롬프트 캐싱 확인(AC14). `--thread` = 스레드 경로 n∈{12,16,20,24} 실측 → `results/cost_profile_thread.json`(배치 캡 결정 근거, ADR-0007 교차 참조) |
+| `audit_attribution.py` | **마켓/제품 귀속 감사**(Phase 0 기준선) — 소스별 agree/mismatch/fillable/multi · 제품명에 낀 마켓 표기(bare/compound) · 종류어·재료어·조각 제품명 · NULL-product 중복(**내용까지 동일한 잉여행**이 실결함) · 접두-포함 별칭 후보쌍 · evidence 헤더 모순 · `market_confidence=0`-with-market. **LLM 0회·DB 읽기전용**(commit 없음) |
 | `simulate_c_prime.py` | C′(keep/rank 분리) 오프라인 시뮬레이션 — ADR-0007 기각 근거 재현(무 LLM) |
 | `gold/thread_map.json` | 관련성 골드 71건 ↔ 디시 스레드 URL 조인(9스레드) — 시뮬레이션 재현용 |
 | `results/latest.json` | 최근 실행 지표(자동 생성) |

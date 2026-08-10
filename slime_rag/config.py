@@ -81,6 +81,10 @@ class Settings:
     # 해시태그에서 유도한 마켓별 제품 후보 레지스트리(무과금 파생물). 이름·건수·날짜·URL 만
     # 담고 캡션 본문은 담지 않아 커밋 가능하다(ADR-0013).
     product_registry_path: Path = DATA_DIR / "product_registry.json"
+    # `reviews.product` 표면형에서 유도한 별칭 후보(무과금 파생물, 사람 검수용).
+    # 이름·건수·마켓만 담고 원문 본문은 담지 않아 커밋 가능하다(ADR-0013). 승격은 사람이
+    # `data/product_aliases.json` 을 손으로 고쳐서 한다 — 이 파일은 절대 자동 병합하지 않는다.
+    product_alias_candidates_path: Path = DATA_DIR / "product_alias_candidates.json"
 
 
 settings = Settings()

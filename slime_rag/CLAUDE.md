@@ -69,12 +69,16 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
   → `extract.drop_hearsay_reviews` 가 `firsthand_evidence` 없는 항목을 코드로 버린다.
   **Note:** 그 게이트는 이제 **다섯 겹**이다 — 빈 근거 · 지어낸 인용 · 전언 표지 ·
   **구매 예정 표지**(`relevance_rules.is_candidate_span`) · **제품명 반복**
-  (`_evidence_is_just_the_name`). 마지막 겹은 근거에서 **제품명을 뺀 나머지가 2자 미만**이면
-  버린다 — `firsthand_evidence='바질토마토블렌디드'` 는 제품명을 다시 적은 것이지 써 봤다는
+  (`_evidence_is_just_the_name`). 마지막 겹은 근거에서 **제품명을 빼면 아무것도 안 남을 때**만
+  버린다(`_EVIDENCE_MIN_RESIDUE = 1`, 잔여 0자) — `firsthand_evidence='바질토마토블렌디드'`
+  는 제품명을 다시 적은 것이지 써 봤다는
   근거가 아닌데, 제품명은 당연히 원문에 있고 전언·구매예정 표지와도 무관해서 **앞의 네 겹을
   전부 통과**한다(실측 30행).
   **Don't:** 그 컷을 '제품명 포함'으로 넓히지 말 것 — `새튀반 좋았고`·`카피바라 조음` 은
   정상 근거이고 제품명+4자 이내가 **116행**이다. 기준은 길이지 포함 여부가 아니다.
+  **Don't:** `_EVIDENCE_MIN_RESIDUE` 를 **2로 올리지 말 것** — 1음절 평점(`잭두콩 썸`·
+  `핑키별 쏘쏘`)의 잔여가 정확히 1자라 8행이 통째로 죽는다. 실측으로 확인된 자리이고
+  게이트가 있다(`eval/test_extract_hearsay.py::test_single_syllable_ratings_survive_the_name_restatement_gate`).
   실측: `담았는데 우뗘??` 한 조각이
   사지도 않은 제품 6행을 냈다. **축이 아니다** — 관련성 게이트가 이걸로 조각을 버리면 첨삭
   스레드가 후보에서 빠지는데, 거기 달린 **댓글**엔 남이 쓴 진짜 후기가 있다.
@@ -394,6 +398,22 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
   `extract_collected(counts=...)` → `counts["market_inherited"]` 로 드러난다(무음 금지 —
   없으면 커버리지가 움직였을 때 '원문이 말한 마켓'과 '물려받은 마켓'을 사후에 못 가른다).
   게이트: `eval/test_market_attribution.py`(AC1 덮어쓰기 금지 · AC2 댓글 전파 금지).
+  **Important:** 상속으로 채운 마켓은 **전용 확신도 `linking.INHERIT_CONF`(0.75)**를 단다
+  (2026-08-10). 그전엔 물려받은 값이 원문이 직접 말한 마켓과 **바이트 단위로 같아서**(0.95/0.85)
+  오귀속이 드러나도 행을 골라낼 수 없었다 — 이 저장소의 다른 채움 경로는 전부 전용 값을 갖는데
+  (PREFIX 0.92/0.82 · INVERSION 0.80/0.65 · `pipeline.BACKFILL_CONFS` 0.90/0.70) 상속만 없었다.
+  `counts["market_inherited"]` 는 **런 집계**라 '몇 건'만 알려 주고 행을 못 짚는다.
+  경로는 `extract_collected` 가 doc 에 다는 비공개 표식 `_market_inherited` →
+  `linking.link_post` → `link(inherited=True)` 다.
+  **Don't:** 그 표식을 없애고 `doc["market"]` 을 다른 키로 **옮기지 말 것** — 그 칸은 이미
+  여러 곳이 읽는 계약이라 옮기면 상속분이 조용히 사라진다.
+  **Don't:** 확신도 값을 다른 다섯 상수와 겹치게 두지 말 것(게이트:
+  `test_fill_path_confidences_never_collide` — 9개 값이 전부 고유여야 한다).
+  **Note:** 이 숫자들은 provenance 표식이지 **티어 정렬 키가 아니다.** 어느 근거가 이기는지는
+  `link()` 의 분기 순서가 정한다 — 현재 역인덱스는 `surface` 가 비어 있을 때만 돌아서
+  상속으로 채워진 행에는 닿지 않는다(상속이 역인덱스보다 앞선다). 비교 스레드에선 제품명
+  소유관계가 더 맞을 수 있어 **재검토 여지가 있는 순서**이나, 바꾸면 많은 행의 마켓이 움직이므로
+  측정 없이 건드리지 말 것.
 - **Important:** 같은 조각의 제품명 **포함관계는 자동으로 접지 않는다** —
   `pipeline.product_containment_candidates`(LLM 0회·DB 읽기 전용, 2026-08-10)가 후보만 뽑는다.
   `derive_alias_candidates` 와 **신호가 다르다**: 저건 코퍼스 전체의 엄격 **접두** 규칙이라

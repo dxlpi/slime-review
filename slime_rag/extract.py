@@ -692,7 +692,7 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
          댔다면 그건 본인 경험의 근거가 아니다.
       4) 근거 조각이 **구매 예정 표지**를 담고 있으면 폐기 — `담았는데 우뗘??` 를 근거로 댄
          항목은 장바구니 목록이지 후기가 아니다(실측 아모스갤: 그 한 조각이 제품 6행을 냈다).
-      5) 근거에서 **제품명을 뺀 나머지가 2자 미만**이면 폐기 — 제품명을 다시 적은 건 근거가
+      5) 근거가 **제품명을 다시 적은 것뿐**이면(잔여 0자) 폐기 — 제품명을 다시 적은 건 근거가
          아니다(`_evidence_is_just_the_name`, 실측 30행). 앞의 넷을 전부 통과하는 모양이라
          따로 있어야 한다.
     source_text 를 안 넘기면 2)는 건너뛴다(원문을 모르는 호출부 하위호환).
@@ -1280,6 +1280,12 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
             # 그건 1급 기능인 출처 편향의 왜곡이다(틀린 마켓은 NULL 보다 나쁘다).
             if market and not doc.get("market"):
                 doc["market"] = market
+                # 비공개 표식 — `linking.link_post` 가 읽어 이 행의 확신도를
+                # `INHERIT_CONF` 로 낮춘다. **값을 옮기지 않고 표식만** 다는 이유는
+                # `doc["market"]` 이 이미 계약이라 옮기면 상속분이 조용히 사라져서다.
+                # 런 집계(`market_inherited`)는 '몇 건'만 알려 주고 **행을 못 짚는다** —
+                # 되돌리려면 행마다 근거가 남아야 한다(다른 채움 경로가 전부 그렇다).
+                doc["_market_inherited"] = True
                 inherited += 1
             out.append((raw, doc))
     if inherited and counts is not None:

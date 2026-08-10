@@ -368,7 +368,8 @@ python -c "from slime_rag import pipeline as p; [print(e) for e in p.market_inve
 python -c "from slime_rag import pipeline as p; print({k:v for k,v in p.backfill_market_from_product().items() if k!='name_list'})"  # 역인덱스 백필 규모(무과금)
 python -c "from slime_rag import pipeline as p; print(p.backfill_non_product_labels()['names'])"   # 비제품 라벨 대상(무과금)
 python -m eval.test_rawstore && python -m eval.test_product_registry  # 원문 저장소 · 제품 후보 유도
-python -m eval.test_market_attribution                         # 디시 마켓 귀속(상속 권위 · 접두 분리 · 근거 품질)
+python -m eval.test_market_attribution                         # 디시 마켓 귀속(상속 권위 · 접두 분리 · 근거 품질 · 포함관계 후보)
+python -c "from slime_rag import pipeline as p; print(p.product_containment_candidates()['n_pairs'])"  # 제품명 포함관계 후보(LLM 0회 · 읽기전용)
 python -m eval.test_dcinside_rawstore                          # 디시 스레드 원문 저장·재처리(HTTP 0회)
 python -m eval.test_spec_overrides                             # 1층 스펙 사람 검수 오버레이(ADR-0016)
 python -c "from slime_rag import pipeline as p; print(len(p.spec_review_queue()))"   # 검수 대기 건수(무과금)

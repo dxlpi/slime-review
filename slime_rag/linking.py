@@ -89,6 +89,19 @@ PREFIX_CONFS = (PREFIX_CONF_SURFACE, PREFIX_CONF_CHOSEONG)
 
 REASON_PREFIX = "제품명 접두"
 
+# 스레드 **글 마켓 상속**으로 채워진 행의 확신도. 다른 채움 경로가 전부 전용 값을 갖는데
+# (PREFIX 0.92/0.82 · INVERSION 0.80/0.65 · `pipeline.BACKFILL_CONFS` 0.90/0.70) 상속만
+# 없어서, 물려받은 마켓이 **원문이 직접 말한 마켓과 바이트 단위로 같았다**(0.95/0.85).
+# 그러면 `extract.py` 자신이 다른 자리에서 "되돌릴 표식 없는 오귀속은 NULL 보다 나쁘다"고
+# 적어 둔 상태가 상속에만 그대로 남는다. `counts["market_inherited"]` 는 **런 집계**라
+# 행을 짚지 못한다 — 되돌리려면 `WHERE market_confidence = 0.75` 처럼 행을 골라야 한다.
+# 값의 배치: `link_abstain_threshold`(0.6)보다 높고 직접 매칭·접두보다 낮다.
+# ⚠️ 이 숫자는 **provenance 표식이지 티어 정렬 키가 아니다.** 어느 근거가 이기는지는 아래
+#   코드의 분기 순서가 정하고, 숫자는 '어디서 왔는가'만 기록한다. 값을 바꾸려면 다른 다섯
+#   상수와 겹치지 않는지 먼저 확인할 것(겹치면 층별 롤백이 그 순간 불가능해진다).
+INHERIT_CONF = 0.75
+REASON_INHERIT = "글 마켓 상속"
+
 REASON_INVERSION_SPEC = "제품→마켓 역인덱스(1층)"
 REASON_INVERSION_REGISTRY = "제품→마켓 역인덱스(레지스트리)"
 REASON_INVERSION_AMBIGUOUS = "제품→마켓 역인덱스 다중소유→보류"
@@ -341,6 +354,7 @@ def link(
     aliases: Optional[dict[str, str]] = None,
     inversion: Optional[MarketInversion] = None,
     fallback_market: Optional[str] = None,
+    inherited: bool = False,
 ) -> LinkResult:
     """
     (mentioned_market, mentioned_product) → LinkResult.
@@ -410,10 +424,16 @@ def link(
     else:
         hits, mconf, how = kb.resolve_market(surface)
         candidates = [m["market_word"] for m in hits]
+        # 이 값이 **글에서 물려받은 것**인가 — 항목도 접두도 말한 게 없어 `fallback_market`
+        # 으로 떨어졌고, 그 값이 조각 자신의 추출물이 아니라 스레드 상속분일 때만 참이다.
+        from_inherit = inherited and not mentioned_market and not prefix_hint
         if from_prefix and len(hits) == 1:
             # 전용 확신도로 갈아 끼운다 — 롤백의 유일한 열쇠(위 `PREFIX_CONFS` 주석).
             mconf = PREFIX_CONF_SURFACE if how == "표면형" else PREFIX_CONF_CHOSEONG
-        how = f"{REASON_PREFIX} {how}" if from_prefix else how
+        elif from_inherit and len(hits) == 1:
+            mconf = INHERIT_CONF          # 같은 이유의 전용 값(위 `INHERIT_CONF` 주석)
+        how = (f"{REASON_PREFIX} {how}" if from_prefix else
+               f"{REASON_INHERIT} {how}" if from_inherit else how)
         if len(hits) == 1 and mconf >= threshold:
             market, reason = hits[0]["market_word"], f"{how} 단일매칭"
         elif len(hits) > 1:
@@ -467,8 +487,14 @@ def link_post(doc: dict, *, kb: KB, aliases: Optional[dict[str, str]] = None,
       마켓이 붙는다. 그게 옳다: 그런 글의 각 항목은 실제로 서로 다른 마켓의 제품이다.
     """
     market = doc.get("market")
+    # `_market_inherited` 는 `extract.extract_collected` 가 다는 **비공개 표식**이다 —
+    # 이 doc 의 market 이 조각 자신의 추출물이 아니라 스레드 글에서 물려받은 값이라는 뜻.
+    # 값을 옮기지 않고 표식만 다는 이유: `doc["market"]` 은 이미 여러 곳이 읽는 계약이고,
+    # 옮기면 상속분이 조용히 사라진다(그 회귀는 `eval/test_extract_thread.py` 가 잡는다).
+    inherited = bool(doc.get("_market_inherited"))
     return [link(r.get("mentioned_market"), r.get("mentioned_product"), kb=kb,
-                 aliases=aliases, inversion=inversion, fallback_market=market)
+                 aliases=aliases, inversion=inversion, fallback_market=market,
+                 inherited=inherited)
             for r in doc.get("reviews", [])]
 
 

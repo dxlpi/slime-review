@@ -63,8 +63,13 @@ jobs:
           #   두 함수를 따로 보는 테스트는 **전부 통과한 채로** 그렇게 된다(실측 회귀).
           # test_market_backfill 은 채움 경로별 `market_confidence` 값이 안 겹치는지 본다 —
           #   그 숫자가 provenance 이자 롤백의 유일한 열쇠라 겹치면 층별로 못 되돌린다.
+          # test_market_attribution 은 **상속 권위**를 지킨다: 스레드 마켓은 글 본문에서만
+          #   오고 댓글 마켓은 전파되지 않는다(AC2). 이게 CI 밖에 있으면 `next((d.get(
+          #   "market") …))` 폴백을 되살려도 test_extract_thread 는 **통과한 채로** 남는다
+          #   (실측 확인) — 19행짜리 `빈짱` 오귀속을 낸 바로 그 규칙이라 여기 있어야 한다.
           python -m eval.test_market_prefix
           python -m eval.test_market_backfill
+          python -m eval.test_market_attribution
           python -m eval.test_alias_candidates
 
       - name: Eval pass-rate gate

@@ -283,8 +283,11 @@ def test_ac7_evidence_that_is_just_the_product_name_is_dropped():
 def test_ac8_product_name_plus_evaluation_survives():
     """AC8 **과잉 폐기 회귀** — 제품명+평가어는 정상 근거다.
 
-    컷 기준은 '제품명 제외 **잔여 2자 미만**'이지 '제품명 포함'이 아니다. 실측상 제품명 정확
-    일치는 30행이지만 제품명+4자 이내는 116행 — **후자를 자르면 진짜 후기가 죽는다.**
+    컷 기준은 '제품명을 빼면 **아무것도 안 남는다**'(`_EVIDENCE_MIN_RESIDUE = 1`)이지
+    '제품명 포함'이 아니다. 실측상 제품명 정확 일치는 30행이지만 제품명+4자 이내는 116행 —
+    **후자를 자르면 진짜 후기가 죽는다.**
+    ⚠️ 임계를 2로 올리면 1음절 평점(`잭두콩 썸`)의 잔여가 1자라 8행이 죽는다 —
+      그 회귀는 `eval/test_extract_hearsay.py` 가 지킨다.
     """
     cases = [("새튀반", "새튀반 좋았고"), ("카피바라", "카피바라 조음"),
              ("빠코볼", "빠코볼 개좋았음")]
@@ -330,6 +333,119 @@ def test_existing_three_layers_still_hold():
     print("✓ 기존 3중 검사(빈 근거·지어낸 인용·전언) 유지 OK")
 
 
+def test_inherited_market_carries_its_own_confidence():
+    """상속으로 채워진 마켓은 **전용 확신도**를 단다 — 행 단위 롤백의 유일한 열쇠.
+
+    `counts["market_inherited"]` 는 런 집계라 '몇 건'만 알려 주고 **행을 못 짚는다.**
+    상속분이 직접 매칭과 같은 0.95/0.85 로 들어가면, 나중에 오귀속이 드러나도
+    `WHERE market_confidence = …` 로 골라낼 수 없다 — 이 저장소의 다른 채움 경로
+    (PREFIX·INVERSION·BACKFILL)가 전부 전용 값을 갖는 이유와 같다.
+    """
+    kb = _kb()
+    own = linking.link_post({"market": "ㅂㅉ", "reviews": [
+        {"mentioned_product": "한줌", "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
+    inh = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True, "reviews": [
+        {"mentioned_product": "한줌", "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
+
+    assert own.market == inh.market == "빈짱", (own.market, inh.market)
+    assert inh.market_confidence == linking.INHERIT_CONF, \
+        f"상속분이 전용 확신도를 안 달았다: {inh.market_confidence}"
+    assert own.market_confidence != inh.market_confidence, \
+        "조각 자신의 마켓과 상속분이 같은 값 — 사후에 못 가른다"
+    assert linking.REASON_INHERIT in inh.reason, inh.reason
+
+    # 항목이 자기 마켓을 말했으면 상속 표식이 있어도 그건 상속이 아니다.
+    said = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True, "reviews": [
+        {"mentioned_market": "ㅇㅉ", "mentioned_product": "한줌",
+         "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
+    assert said.market == "연찌" and said.market_confidence != linking.INHERIT_CONF, \
+        f"항목이 말한 마켓에 상속 표식이 잘못 붙었다: {said.market} {said.market_confidence}"
+    print("✓ 상속 마켓 전용 확신도(행 단위 롤백 키) OK")
+
+
+def test_fill_path_confidences_never_collide():
+    """채움 경로별 확신도가 **서로 겹치지 않는다** — 겹치면 층별 롤백이 불가능해진다."""
+    from slime_rag import pipeline
+
+    vals = {"prefix_surface": linking.PREFIX_CONF_SURFACE,
+            "prefix_choseong": linking.PREFIX_CONF_CHOSEONG,
+            "inversion_spec": linking.INVERSION_CONF_SPEC,
+            "inversion_registry": linking.INVERSION_CONF_REGISTRY,
+            "inherit": linking.INHERIT_CONF,
+            **{f"backfill_{k}": v for k, v in pipeline.BACKFILL_CONFS.items()}}
+    # 직접 매칭 두 값(표면형 0.95 · 초성 0.85)과도 겹치면 안 된다.
+    vals["direct_surface"], vals["direct_choseong"] = 0.95, 0.85
+    assert len(set(vals.values())) == len(vals), f"확신도 충돌: {vals}"
+    assert linking.INHERIT_CONF > 0.6, "보류 임계 아래면 '채웠는데 보류'인 모순 행이 남는다"
+    print(f"✓ 채움 경로 확신도 {len(vals)}개 전부 고유 OK")
+
+
+# ---------------------------------------------------------------- ③ 포함관계 후보(대역 conn)
+class _FakeConn:
+    """`pipeline.connect()` 대역 — `product_containment_candidates` 는 SELECT 하나뿐이다."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.sql: list[str] = []
+        self.committed = False
+
+    def execute(self, sql, *_a, **_k):
+        self.sql.append(sql)
+        return self
+
+    def fetchall(self):
+        return self._rows
+
+    def commit(self):
+        self.committed = True
+
+    def close(self):
+        pass
+
+
+def test_containment_candidates_are_reported_not_merged():
+    """③ 잔여 포함관계는 **후보로만** 나온다 — 자동 병합·개명 없음.
+
+    같은 조각의 `빠코볼`/`미니빠코볼` 은 진짜 다른 제품이라(202004 실측) 포함관계만으로
+    접으면 유령 제품 복구 때 `빠코폼` 을 지웠던 실패를 반대 방향으로 반복한다.
+    """
+    from slime_rag import pipeline
+
+    rows = [
+        ("p1", "지나", "빠코볼"), ("p1", "지나", "미니빠코볼"),   # 한 조각 안의 포함관계
+        ("p2", "예찬", "밀키크림파르페"), ("p2", None, "요아곰 밀키크림파르페"),
+        ("p3", "봄", "빠코볼"), ("p4", "빈짱", "미니빠코볼"),      # 서로 다른 조각 → 쌍 아님
+    ]
+    conn = _FakeConn(rows)
+    rep = pipeline.product_containment_candidates(conn=conn)
+
+    assert all(s.strip().upper().startswith("SELECT") for s in conn.sql), \
+        f"읽기 전용이어야 하는데 SELECT 아닌 쿼리가 있다: {conn.sql}"
+    assert conn.committed is False, "커밋이 나갔다 — 읽기 전용 계약 위반"
+
+    got = {(e["outer"], e["inner"]) for e in rep["pairs"]}
+    assert ("미니빠코볼", "빠코볼") in got, f"같은 조각의 포함관계를 못 잡았다: {got}"
+    assert ("요아곰 밀키크림파르페", "밀키크림파르페") in got, got
+    # 방향은 하나뿐 — 짧은 쪽이 inner 다.
+    assert ("빠코볼", "미니빠코볼") not in got, "역방향까지 보고하면 사람이 정규형을 못 고른다"
+    # 조각이 다르면 쌍이 아니다(p3·p4 는 한 조각에 같이 있지 않다).
+    assert rep["n_pairs"] == 2, f"조각 경계를 안 지켰다: {rep['pairs']}"
+    # 마켓은 **그 쌍의 이름들이 실제로 단 것**만.
+    pair = next(e for e in rep["pairs"] if e["inner"] == "밀키크림파르페")
+    assert pair["markets"] == ["예찬"], f"쌍과 무관한 마켓이 섞였다: {pair['markets']}"
+    print("✓ ③ 포함관계: 후보만 · 읽기 전용 · 한 방향 · 조각 스코프 OK")
+
+
+def test_containment_output_carries_no_source_text():
+    """산출물에 원문 본문이 없다 — 이름·건수·마켓뿐이라 커밋 가능하다(ADR-0013)."""
+    from slime_rag import pipeline
+
+    rep = pipeline.product_containment_candidates(
+        conn=_FakeConn([("p1", "지나", "빠코볼"), ("p1", "지나", "미니빠코볼")]))
+    assert set(rep["pairs"][0]) == {"outer", "inner", "pieces", "markets"}, rep["pairs"][0]
+    print("✓ ③ 산출물에 원문 본문 미포함(ADR-0013) OK")
+
+
 if __name__ == "__main__":
     test_ac3_choseong_prefix_is_split()
     test_ac4_whole_name_market_holds_product()
@@ -346,4 +462,8 @@ if __name__ == "__main__":
     test_ac8_product_name_plus_evaluation_survives()
     test_purchase_intent_evidence_is_dropped()
     test_existing_three_layers_still_hold()
+    test_inherited_market_carries_its_own_confidence()
+    test_fill_path_confidences_never_collide()
+    test_containment_candidates_are_reported_not_merged()
+    test_containment_output_carries_no_source_text()
     print("\n모든 마켓 귀속 테스트 통과 (LLM·DB·네트워크 미접촉)")

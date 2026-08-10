@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import re
@@ -1138,27 +1139,31 @@ def product_containment_candidates(source: str = "amos", conn=None) -> dict:
         if own:
             conn.close()
 
-    by_piece: dict[str, list[tuple[str, str | None]]] = {}
+    by_piece: dict[str, dict[str, set]] = {}
     for post_id, market, product in rows:
-        by_piece.setdefault(post_id, []).append((product, market))
+        by_piece.setdefault(post_id, {}).setdefault(product, set())
+        if market:
+            by_piece[post_id][product].add(market)
 
     pairs: dict[tuple[str, str], dict] = {}
-    for items in by_piece.values():
-        names = {p for p, _ in items}
-        if len(names) < 2:
+    for by_name in by_piece.values():
+        if len(by_name) < 2:
             continue
-        markets = {m for _, m in items if m}
-        for outer in names:
-            for inner in names:
-                # 정규화 후 진부분문자열일 때만. `_norm_alias_name` 은 공백·대소문자만 접는다
-                # (편집거리처럼 이름을 바꾸지 않는다) — 판정 근거가 눈으로 확인 가능해야 한다.
-                if outer == inner or not _norm_alias_name(inner):
-                    continue
-                if _norm_alias_name(inner) in _norm_alias_name(outer):
-                    e = pairs.setdefault((outer, inner), {"outer": outer, "inner": inner,
-                                                          "pieces": 0, "markets": set()})
-                    e["pieces"] += 1
-                    e["markets"] |= markets
+        for outer, inner in itertools.permutations(by_name, 2):
+            a, b = _norm_alias_name(outer), _norm_alias_name(inner)
+            # 정규화 후 **진부분문자열**일 때만. `_norm_alias_name` 은 공백·대소문자만 접는다
+            # (편집거리처럼 이름을 바꾸지 않는다) — 판정 근거가 눈으로 확인 가능해야 한다.
+            # ⚠️ `len(b) < len(a)` 가 필요하다. 이게 없으면 `빠코 볼`/`빠코볼` 처럼 **공백만
+            #   다른** 두 표기가 정규화 후 같아져 양방향 다 참이 되고, 신호 하나가 방향 없는
+            #   두 줄로 보고된다(사람이 어느 쪽을 정규 표기로 승격할지 못 고른다).
+            if not b or len(b) >= len(a) or b not in a:
+                continue
+            e = pairs.setdefault((outer, inner), {"outer": outer, "inner": inner,
+                                                  "pieces": 0, "markets": set()})
+            e["pieces"] += 1
+            # 마켓은 **그 쌍의 두 이름이 실제로 달고 있는 것**만. 조각 전체의 마켓을 담으면
+            # 3마켓 비교 조각에서 쌍과 무관한 마켓이 후보에 붙어 사람 판단을 흐린다.
+            e["markets"] |= by_name[outer] | by_name[inner]
     out = sorted(({**e, "markets": sorted(e["markets"])} for e in pairs.values()),
                  key=lambda e: (-e["pieces"], e["outer"]))
     log.info("제품명 포함관계 후보 %d쌍(source=%s) — 자동 병합 없음", len(out), source)
@@ -1596,6 +1601,10 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     # 제품 어휘는 **유료 호출 앞**에서 한 번만 만든다(무과금 — DB 한 번 + 파일 둘).
     vocab = dcinside_product_vocab() if batch_input else {}
     counts["product_vocab"] = len(vocab)
+    # 상속 카운터는 **키를 먼저 깔아 둔다.** `extract_collected` 는 `batch_input` 이 비면
+    # 아예 안 불리는데, 그때 이 키만 dict 에서 사라지면 형제 카운터(전부 0 으로 떨어진다)와
+    # 모양이 갈려 '상속 0건'과 '안 재봤음'을 사후에 못 가른다(무음 금지).
+    counts.setdefault("market_inherited", 0)
     # 제품→마켓 역인덱스도 같은 자리에서 한 번만(무과금). 디시가 이 기능의 본체다 —
     # 실측 813행 중 365행이 market NULL 이고 그 대부분이 '원문에 마켓이 없음'이다.
     inversion = market_inversion_index() if batch_input else None

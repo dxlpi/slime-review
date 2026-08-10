@@ -135,6 +135,30 @@ def test_candidate_span_gate_keeps_terse_ownership_ratings():
     print("✓ AC15 4번째 겹 과교정 방지(짧은 평점·순위·구매 후 서술 보존) OK")
 
 
+def test_single_syllable_ratings_survive_the_name_restatement_gate():
+    """⛔ **회귀 게이트: 1음절 평점.** `_EVIDENCE_MIN_RESIDUE` 를 2로 올리면 여기서 죽는다.
+
+    근거가 제품명 재기입인지 보는 게이트는 '잔여 길이'로 판정하는데, 이 갤의 평점 어휘엔
+    **1음절**이 있다. 실측(2026-08-10 아모스갤, 저장된 근거 전량): 아래 7행이 잔여 1자인데
+    전부 진짜 보유 평가다. 임계가 2면 이것들만 사라지고 같은 글의 `쏘쏘`(2음절)는 살아남아
+    **한 평점 나열의 절반만** 없어진다 — 조용하고 앞뒤가 안 맞는 손실이다.
+    계획서의 구속 정정(스레드 142738 = `이렇개 만져봤고` 라고 밝힌 보유 평가글)이 이 자리다.
+    """
+    real = [("잭두콩", "잭두콩 썸"), ("허밍", "허밍 썸"), ("미봉", "미봉 썸"),
+            ("베스", "베스 썸"), ("밀키휘핑", "밀키휘핑 썸"), ("코코바게트", "코코바게트 썸"),
+            ("디스코팡", "디스코팡 썸"), ("핑키별", "핑키별 쏘쏘")]
+    src = " ".join(ev for _p, ev in real) + " 이렇개 만져봤고"
+    doc = {"reviews": [{"mentioned_product": p, "firsthand_evidence": ev} for p, ev in real]}
+    kept = [r["mentioned_product"] for r in drop_hearsay_reviews(doc, src)["reviews"]]
+    assert kept == [p for p, _ev in real], f"1음절 평점이 죽었다: {kept}"
+
+    # 반대 방향은 그대로 — 제품명을 **그대로 다시 적은** 근거(잔여 0자)는 여전히 버린다.
+    doc2 = {"reviews": [{"mentioned_product": "헝잭버거", "firsthand_evidence": "헝잭버거"}]}
+    assert drop_hearsay_reviews(doc2, "헝잭버거 먹어봄")["reviews"] == [], \
+        "제품명 재기입 근거가 살아남았다(게이트가 꺼졌다)"
+    print("✓ AC15 1음절 평점 보존 + 제품명 재기입 폐기 OK")
+
+
 def test_candidate_gate_is_not_an_axis():
     """구매 예정 판정은 **관련성 축이 아니다** — 게이트가 이걸로 조각을 버리면 안 된다.
 
@@ -205,6 +229,7 @@ if __name__ == "__main__":
     test_deterministic_firsthand_gate()
     test_candidate_span_gate_drops_shopping_lists()
     test_candidate_span_gate_keeps_terse_ownership_ratings()
+    test_single_syllable_ratings_survive_the_name_restatement_gate()
     test_candidate_gate_is_not_an_axis()
     test_doc_shape_unchanged_by_hardening()
     test_live_hearsay_dropped()

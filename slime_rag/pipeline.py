@@ -1008,8 +1008,13 @@ def _alias_candidates(name_stats: dict[str, dict],
     for a, b in _edit1_pairs(names):
         out.append(_alias_pair_entry("edit1", a, b, name_stats))
     for name, markets in (registry_lookup or {}).items():
-        if len(markets) == 1:
-            stats = name_stats.get(name, {"n_reviews": 0, "markets": []})
+        # ⚠️ **후기에 실제로 쓰인 이름만** 낸다. 레지스트리 전량을 도는 게 아니다 — 그러면
+        #   후기가 한 번도 안 쓴 이름까지 자기 자신과 짝지은 항목이 쏟아진다. 실측(2026-08-10):
+        #   그렇게 뽑았더니 2,442건 중 **2,358건(97%)이 후기 0건짜리 자기짝**이었고, 파일이
+        #   660KB/29,800줄로 부풀어 정작 볼 가치가 있는 84건(prefix 52 · edit1 32)을 덮었다.
+        #   이 파일의 존재 이유는 **사람이 훑어 승격하는 것**이라, 훑을 수 없으면 기능이 없는 것과 같다.
+        stats = name_stats.get(name)
+        if len(markets) == 1 and stats and stats["n_reviews"]:
             out.append({"kind": "registry", "name_a": name, "name_b": name,
                        "n_reviews_a": stats["n_reviews"], "n_reviews_b": stats["n_reviews"],
                        "markets_a": stats["markets"] or None, "markets_b": list(markets),
@@ -1035,6 +1040,19 @@ def derive_alias_candidates(*, dry_run: bool = True) -> dict:
       쓰지 않는다** — 후보는 `product_alias_candidates_path` 로만 나가고, 승격(같은 제품
       확정)은 사람이 `product_aliases.json` 을 마켓 스코프로 손으로 고쳐서 한다.
     ⚠️ 산출물에 **원문 본문을 담지 않는다** — 이름·건수·마켓뿐이라 커밋 가능하다(ADR-0013).
+
+    ⛔ **`registry` 종류를 '레지스트리 전량'으로 되돌리지 말 것.** 예전엔 그랬는데, 후기가
+      한 번도 안 쓴 이름까지 **자기 자신과 짝지은** 항목이 쏟아져 2,442건 중 2,358건(97%)이
+      그 모양이었다(파일 660KB). 그건 크기 문제만이 아니다 — 약칭 조회 키는 **추출기가 실제로
+      내놓은 표기**이므로(`linking.link` 의 `aliases.get(제품명)`), 후기 0건짜리 이름은 애초에
+      키가 될 수 없고, 게다가 자기짝이라 제안하는 매핑도 없다. 승격 가능성이 **구조적으로 0**이다.
+
+    ⚠️ 그러니까 지금 **빠져 있는** 건 따로 있다: 후보 3종은 전부 `name_stats`(후기 쪽 이름)
+      안에서만 쌍을 만들어서, 가장 값어치 있을 `후기 표기 → 레지스트리/1층 정규명` 쌍을
+      **한 번도 제안하지 않는다**(실측: 아모스갤 서로 다른 이름 417개 중 312개가 `specs` 와
+      조인 0). 지운 `registry` 행들이 레지스트리 이름을 달고 있어서 **그 기능처럼 보이지만**
+      아니다 — 그건 자기짝이었다. 이 구멍을 메우려면 두 집합을 가로지르는 **새 생성기**를
+      짜야지, 지운 걸 되살리면 안 된다.
     """
     with connect() as conn:
         rows = conn.execute(
@@ -1087,6 +1105,66 @@ def derive_alias_candidates(*, dry_run: bool = True) -> dict:
     log.info("별칭 후보 기록: %s (%d건, %s)",
              settings.product_alias_candidates_path, len(candidates), by_kind)
     return out
+
+
+def product_containment_candidates(source: str = "amos", conn=None) -> dict:
+    """**같은 조각 안에서** 한 제품명이 다른 제품명을 포함하는 쌍. LLM 0회 · DB 읽기 전용.
+
+    `derive_alias_candidates` 와 **다른 신호**다. 저건 코퍼스 전체에서 이름 두 개를 비교하는
+    엄격 **접두** 규칙이라 `미니빠코볼` ⊃ `빠코볼` 이나 `요아곰 밀키크림파르페` ⊃
+    `밀키크림파르페` 같은 **접미·중간** 포함을 원리적으로 못 잡는다. 여기서 보는 건 한 조각이
+    같은 문장을 두 입도로 내보낸 흔적이라, 범위를 조각으로 좁히는 대신 포함 방향을 전부 본다.
+
+    [배경 2026-08-10] 원문 대조에서 결함 ③(같은 문장이 두 입도로 중복). `ㅁㅁㄴ 새튀반` 과
+    `새튀반` 이 서로 다른 `product` 라 `UNIQUE(source, post_id, product)` 를 나란히 통과했다.
+    그 모양은 마켓 접두 분리(`linking.split_market_prefix`)가 이미 접지만, 접두가 마켓이
+    아닌 잔여분은 남는다.
+
+    ⛔ **자동 병합하지 않는다.** 같은 조각의 `빠코볼`/`미니빠코볼` 은 **진짜 다른 제품**이다
+      (202004 실측). 포함관계만으로 접으면 유령 제품 복구 때 `빠코폼` 을 지웠던 실패를 반대
+      방향으로 반복한다 — `extract` 의 `keep_distinct` 가드가 그 흉터다. 그리고 **과잉 병합의
+      손실은 화면에 안 보인다**(후기 두 건이 한 건이 될 뿐 빈칸이 안 생긴다). 그래서 이 함수는
+      후보만 만들고, 승격은 사람이 `data/product_aliases.json` 을 고쳐서 한다
+      (`market_tag_candidates`·`derive_alias_candidates` 와 같은 패턴).
+    ⚠️ 산출물에 원문 본문이 없다 — 이름·건수·마켓뿐이다(ADR-0013).
+    """
+    own = conn is None
+    conn = conn or connect()
+    try:
+        rows = conn.execute(
+            "SELECT post_id, market, product FROM reviews "
+            "WHERE source=%s AND product IS NOT NULL", (source,)).fetchall()
+    finally:
+        if own:
+            conn.close()
+
+    by_piece: dict[str, list[tuple[str, str | None]]] = {}
+    for post_id, market, product in rows:
+        by_piece.setdefault(post_id, []).append((product, market))
+
+    pairs: dict[tuple[str, str], dict] = {}
+    for items in by_piece.values():
+        names = {p for p, _ in items}
+        if len(names) < 2:
+            continue
+        markets = {m for _, m in items if m}
+        for outer in names:
+            for inner in names:
+                # 정규화 후 진부분문자열일 때만. `_norm_alias_name` 은 공백·대소문자만 접는다
+                # (편집거리처럼 이름을 바꾸지 않는다) — 판정 근거가 눈으로 확인 가능해야 한다.
+                if outer == inner or not _norm_alias_name(inner):
+                    continue
+                if _norm_alias_name(inner) in _norm_alias_name(outer):
+                    e = pairs.setdefault((outer, inner), {"outer": outer, "inner": inner,
+                                                          "pieces": 0, "markets": set()})
+                    e["pieces"] += 1
+                    e["markets"] |= markets
+    out = sorted(({**e, "markets": sorted(e["markets"])} for e in pairs.values()),
+                 key=lambda e: (-e["pieces"], e["outer"]))
+    log.info("제품명 포함관계 후보 %d쌍(source=%s) — 자동 병합 없음", len(out), source)
+    return {"source": source, "n_pairs": len(out), "pairs": out,
+            "_note": ("한 조각 안의 제품명 포함관계. **자동 병합 금지** — "
+                      "`data/product_aliases.json` 사람 시드의 입력 후보일 뿐이다.")}
 
 
 def market_inversion_index(conn=None, *, include_registry: bool = False) -> linking.MarketInversion:
@@ -1527,8 +1605,8 @@ def ingest_dcinside(slime: str, market: str | None = None, aliases: list[str] | 
     # '증거 있는데 불일치'로 읽혀 지워진다(`extract_thread` 주석).
     label_known = known_product_names() if batch_input else set()
     pairs = extract.extract_collected(batch_input, llm, settings.model_extract,
-                                      product_vocab=vocab,
-                                      label_known=label_known) if batch_input else []
+                                      product_vocab=vocab, label_known=label_known,
+                                      counts=counts) if batch_input else []
     n_rows = n_ref = n_noref = n_no_cno = n_context_skip = 0   # 관측성 카운터
     with connect() as conn:
         for raw, doc in pairs:
@@ -1792,6 +1870,11 @@ def repair_dc_attribution(*, dry_run: bool = True, source: str = "amos") -> dict
       제약이 안 보는 축으로 접게 되어 갱신이 제약 위반으로 죽는다.
     ⚠️ 이름이 바뀌면 `evidence`·`tokens`·`embedding` 을 함께 다시 만든다 — `render_review` 가
       제품명과 마켓을 검색 텍스트에 굽는다. 재임베딩은 로컬 BGE-M3 라 무과금이다.
+    ⚠️ `attributes` 는 **일부러 안 고친다.** 그건 추출기가 실제로 뭐라고 했는지의 스냅샷
+      (provenance)이라, 덮으면 '모델이 `ㅇㅊ` 라고 했다'는 사실 자체가 사라진다. 그래서 복구
+      후 `product IS NULL` 인 행의 `attributes->>'mentioned_product'` 는 옛 이름을 그대로
+      갖는다 — 행의 정본은 **컬럼**이지 이 JSONB 가 아니다(`_held_fingerprint` 도 그 키를
+      빼고 계산해서 접기 판정은 영향받지 않는다).
     """
     from . import extract
 

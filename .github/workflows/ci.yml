@@ -57,6 +57,15 @@ jobs:
           # 과잉 차단 회귀를 함께 지키므로(양방향으로 조용히 부서지는 자리) CI 로 올린다.
           python -m eval.test_product_repair
           python -m eval.test_market_inversion
+          # 마켓 귀속 세 벌 — 같은 이유로 순수 함수 게이트다(torch·DB·키 불필요).
+          # test_market_prefix 는 접두 분리 규칙과 **추출→개체연결 합성 순서**를 지킨다.
+          #   그 순서가 틀리면 맨몸 마켓 표기가 스레드 도장 마켓을 0.95 로 물려받는데,
+          #   두 함수를 따로 보는 테스트는 **전부 통과한 채로** 그렇게 된다(실측 회귀).
+          # test_market_backfill 은 채움 경로별 `market_confidence` 값이 안 겹치는지 본다 —
+          #   그 숫자가 provenance 이자 롤백의 유일한 열쇠라 겹치면 층별로 못 되돌린다.
+          python -m eval.test_market_prefix
+          python -m eval.test_market_backfill
+          python -m eval.test_alias_candidates
 
       - name: Eval pass-rate gate
         run: python -m evals.run --min 1.0

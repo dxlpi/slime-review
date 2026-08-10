@@ -78,7 +78,9 @@ def test_alias_candidates_pure_function_labels_kinds():
         "진저브레드": {"n_reviews": 3, "markets": ["봄"]},
         "진저브래드": {"n_reviews": 1, "markets": []},
     }
-    registry_lookup = {"허니푸냥이": ["봄"]}   # reviews 에는 없고 레지스트리에만 있는 이름도 허용
+    # `빠코볼` 은 후기에 쓰인 이름 → 레지스트리 조회 후보가 된다.
+    # `허니푸냥이` 는 레지스트리에만 있고 후기엔 0건 → **후보가 아니다**(아래 케이스 참조).
+    registry_lookup = {"빠코볼": ["지나"], "허니푸냥이": ["봄"]}
     out = pipeline._alias_candidates(name_stats, registry_lookup)
     kinds = {c["kind"] for c in out}
     assert kinds <= {"prefix", "edit1", "registry"}
@@ -87,12 +89,35 @@ def test_alias_candidates_pure_function_labels_kinds():
     registry = [c for c in out if c["kind"] == "registry"]
     assert any(c["name_a"] == "빠코볼" and c["name_b"] == "빠코볼미니" for c in prefix)
     assert any({c["name_a"], c["name_b"]} == {"진저브레드", "진저브래드"} for c in edit1)
-    assert any(c["name_a"] == "허니푸냥이" and c["registry_market"] == "봄" for c in registry)
+    assert any(c["name_a"] == "빠코볼" and c["registry_market"] == "지나" for c in registry)
     # 건수·마켓이 그대로 실렸는지
     p = next(c for c in prefix if c["name_a"] == "빠코볼")
     assert p["n_reviews_a"] == 5 and p["markets_a"] == ["지나"]
     assert p["n_reviews_b"] == 2 and p["markets_b"] is None   # 빈 리스트는 null 로
     print("✓ 순수 후보 생성 3종 라벨링 OK")
+
+
+def test_registry_kind_only_covers_names_reviews_actually_use():
+    """레지스트리 조회 후보는 **후기에 실제로 쓰인 이름**만 낸다.
+
+    ⛔ 되돌리지 말 것 — 레지스트리 전량을 돌면 후기 0건짜리 '자기 자신과의 짝'이 쏟아진다.
+      실측(2026-08-10): 그렇게 뽑았더니 2,442건 중 **2,358건(97%)** 이 그 모양이었고 파일이
+      660KB/29,800줄로 부풀어, 정작 볼 가치가 있는 84건(prefix 52 · edit1 32)을 덮었다.
+      이 파일의 존재 이유는 **사람이 훑어 승격하는 것**이라, 훑을 수 없으면 기능이 없는 것과 같다.
+      (그 표기가 어느 마켓 것인지 '확인'해 주는 게 이 종류의 목적인데, 후기가 한 번도 안 쓴
+       이름은 확인해 줄 대상 자체가 없다.)
+    """
+    name_stats = {"쓰인이름": {"n_reviews": 3, "markets": []}}
+    registry_lookup = {"쓰인이름": ["봄"], "안쓰인이름": ["봄"]}
+    out = pipeline._alias_candidates(name_stats, registry_lookup)
+    names = {c["name_a"] for c in out if c["kind"] == "registry"}
+    assert names == {"쓰인이름"}, f"후기 0건 이름이 후보에 실렸다: {names}"
+
+    # 후기 건수 0 으로 등록된 이름도 제외된다(딕셔너리에 키만 있는 경우).
+    out2 = pipeline._alias_candidates({"영건": {"n_reviews": 0, "markets": []}},
+                                      {"영건": ["봄"]})
+    assert [c for c in out2 if c["kind"] == "registry"] == [], "후기 0건인데 후보가 났다"
+    print("✓ 레지스트리 조회는 후기에 쓰인 이름만 OK")
 
 
 def test_registry_kind_requires_exactly_one_market():
@@ -236,6 +261,7 @@ if __name__ == "__main__":
     test_edit1_pairs_found_edit2_excluded()
     test_edit1_pairs_require_same_first_char_bucket()
     test_alias_candidates_pure_function_labels_kinds()
+    test_registry_kind_only_covers_names_reviews_actually_use()
     test_registry_kind_requires_exactly_one_market()
     test_deterministic_sort_order()
     test_dry_run_default_writes_nothing()

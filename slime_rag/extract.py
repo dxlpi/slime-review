@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -496,9 +497,13 @@ GLUE_WORDS = frozenset({
 })
 # '이름이 기억 안 난다'는 **명시적 표지**. 이게 붙은 이름은 제품 식별자가 아니다.
 FRAGMENT_MARKERS = ("어쩌구", "어쩌고", "어쩍고")
-# 자모만으로 된 이름 — 제품명일 수 없다. KB 에 있는 마켓 초성은 `linking.split_market_prefix`
-# 가 이미 떼고 마켓으로 승격시킨다. 여기 남는 건 KB 밖 자모(`ㅅㄱㄷ`·`ㅇㅍㅋ`·`ㅃㅇ`)인데,
-# 그것도 마켓 표기지 제품명이 아니다 — 어느 쪽이든 제품으로 색인될 값이 아니다.
+# 자모만으로 된 이름 — 제품명일 수 없다(KB 안 `ㅇㅊ` 이든 KB 밖 `ㅅㄱㄷ` 이든).
+# ⚠️ **호출 순서가 이 규칙의 안전조건이다.** 이 함수는 KB 를 모르므로 `ㅇㅊ` 가 마켓 표기라는
+#   걸 알 방법이 없다 — 그냥 비운다. 그래서 **반드시 `linking.split_market_prefix` 로 마켓을
+#   떼어 낸 뒤에** 불러야 한다. 앞에서 부르면 마켓 신호가 통째로 사라지고, 그 행은 스레드
+#   도장 마켓을 0.95 로 물려받는다(되돌릴 표식 없는 오귀속 — NULL 보다 나쁘다).
+#   그 순서를 지키는 곳은 둘뿐이다: `linking.link`(수집 경로) · `pipeline.dc_attribution_target`
+#   (적재분 복구). 그래서 `extract_thread` 는 이 게이트를 **부르지 않는다**.
 _ALL_JAMO_RE = re.compile(r"^[ㄱ-ㅎ\s]+$")
 
 
@@ -639,6 +644,37 @@ def _norm(text: str) -> str:
     return "".join((text or "").split())
 
 
+# 근거가 '제품명 재기입'인지 가르는 잔여 길이 하한. **1** = 제품명과 정확히 같을 때만 버린다.
+# ⚠️ 2 로 올리지 말 것 — 이 갤의 평점 어휘엔 **1음절**이 있다. 실측(2026-08-10 아모스갤):
+#   `잭두콩 썸`·`허밍 썸`·`미봉 썸` 등 **7행**이 잔여 1자인데 전부 진짜 보유 평가다.
+#   2 로 두면 그 7행이 죽는데, 정작 같은 글의 `핑키별 쏘쏘`(2음절)는 살아남아 **한 평점
+#   나열의 절반만 사라진다** — 조용하고 앞뒤가 안 맞는 손실이다.
+#   계획서의 구속 정정(스레드 142738 은 `이렇개 만져봤고` 라고 밝힌 보유 평가글)이 정확히 이 자리다.
+# 이 값이 겨냥하는 실측 대상은 잔여 **0자**(제품명 완전 재기입) 29행이고, 1 이면 그건 그대로 잡는다.
+_EVIDENCE_MIN_RESIDUE = 1
+
+
+def _evidence_is_just_the_name(evidence: str, product: str | None) -> bool:
+    """근거에서 제품명을 뺀 나머지가 `_EVIDENCE_MIN_RESIDUE` 자 미만인가.
+
+    `firsthand_evidence='바질토마토블렌디드'` 는 **제품명을 다시 적은 것**이지 본인이 써 봤다는
+    근거가 아니다. 앞의 세 겹은 이걸 못 잡는다 — 제품명은 당연히 원문에 있고(②를 통과),
+    전언·구매예정 표지도 없다(③④를 통과). 실측(2026-08-10 아모스갤): 근거가 제품명과 **정확히
+    일치**하는 행이 30건이었다.
+
+    ⚠️ **컷 기준은 '잔여 길이'이지 '제품명 포함'이 아니다.** 제품명+평가어(`새튀반 좋았고`,
+      `카피바라 조음`)는 정상 근거이고, 실측상 제품명+4자 이내가 116행이다 — 그쪽을 자르면
+      진짜 후기가 죽는다. 회수 손실은 화면에 안 보이고, 그중 부정 후기의 손실은 1급 기능인
+      출처 편향을 직접 깎는다. 그래서 임계를 **1자**로 둔다(위 `_EVIDENCE_MIN_RESIDUE` 주석 —
+      이 갤 평점 어휘엔 `썸` 같은 1음절이 있어서 2자면 진짜 평가 7행이 죽는다).
+    """
+    ev = _norm(evidence)
+    if not ev:
+        return True
+    residue = ev.replace(_norm(product), "") if product else ev
+    return len(residue) < _EVIDENCE_MIN_RESIDUE
+
+
 def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
     """
     본인 경험 근거를 못 대는 항목 제거 — 전언 차단의 **결정적 게이트**(AC15).
@@ -656,6 +692,9 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
          댔다면 그건 본인 경험의 근거가 아니다.
       4) 근거 조각이 **구매 예정 표지**를 담고 있으면 폐기 — `담았는데 우뗘??` 를 근거로 댄
          항목은 장바구니 목록이지 후기가 아니다(실측 아모스갤: 그 한 조각이 제품 6행을 냈다).
+      5) 근거에서 **제품명을 뺀 나머지가 2자 미만**이면 폐기 — 제품명을 다시 적은 건 근거가
+         아니다(`_evidence_is_just_the_name`, 실측 30행). 앞의 넷을 전부 통과하는 모양이라
+         따로 있어야 한다.
     source_text 를 안 넘기면 2)는 건너뛴다(원문을 모르는 호출부 하위호환).
 
     ⚠️ 4)는 **좁게 유지한다.** 짧은 평점 나열(`잭두콩 썸`)·순위(`1믹스 2허밍`)·표지 없는
@@ -676,6 +715,8 @@ def drop_hearsay_reviews(doc: dict, source_text: str = "") -> dict:
         if rules.is_hearsay_span(ev):
             continue
         if rules.is_candidate_span(ev):
+            continue
+        if _evidence_is_just_the_name(ev, r.get("mentioned_product")):
             continue
         kept.append(r)
     doc["reviews"] = kept
@@ -698,7 +739,6 @@ def _held_fingerprint(item: dict) -> str:
     제품명을 뺀 나머지 전부를 정렬된 JSON 으로 굳힌다. 키 순서가 달라도 같은 내용이면 같은
     지문이 나오게(`sort_keys`) 해야, 배치 응답의 키 순서 흔들림이 말더듬을 못 접게 만들지 않는다.
     """
-    import json
     return json.dumps({k: v for k, v in item.items() if k != "mentioned_product"},
                       sort_keys=True, ensure_ascii=False)
 
@@ -1150,7 +1190,7 @@ def count_thread_batches(raws: list, batch_size: int = MAX_THREAD_SOURCES) -> in
 def extract_collected(raws: list, llm: LLM, model: str | None = None,
                       batch_size: int = MAX_THREAD_SOURCES,
                       product_vocab: dict[str, list[str]] | None = None,
-                      label_known=None) -> list[tuple]:
+                      label_known=None, counts: dict | None = None) -> list[tuple]:
     """
     수집된 RawReview(글 + 댓글)를 **스레드 단위 배치**로 추출한다(계획 C-1).
     이 갤은 후기가 댓글에 많아(sources.py 주석) 댓글도 1급 후기로 취급한다.
@@ -1163,9 +1203,14 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
     부수 이득(AC13): 같은 호출 안에 형제 댓글이 있으므로 **제품명을 생략한 댓글의 귀속**이 가능해진다.
     per-comment 경로에서는 원리적으로 불가능했던 케이스다.
 
-    market 상속은 유지하되 **채우기 전용**이다 — 댓글 단독 추출은 'ㅂ슬라임' 등으로 흔들려
-    개체연결을 막으므로 마켓을 말하지 않은 조각엔 스레드 값을 물려주지만, 자기 마켓을 뽑은
-    조각은 그대로 둔다(덮어쓰면 비교 스레드에서 남의 마켓 후기가 된다 — 아래 실측 주석).
+    market 상속은 유지하되 **채우기 전용**이고 **출처는 글 본문 하나**다 — 댓글 단독 추출은
+    'ㅂ슬라임' 등으로 흔들려 개체연결을 막으므로 마켓을 말하지 않은 조각엔 글의 값을
+    물려주지만, ①자기 마켓을 뽑은 조각은 그대로 두고(덮어쓰면 비교 스레드에서 남의 마켓
+    후기가 된다) ②**댓글의 마켓은 스레드로 승격되지 않는다**(아래 실측 주석 둘).
+
+    counts: 주면 `counts["market_inherited"]` 에 상속이 걸린 조각 수를 쓴다(관측용, 선택).
+      반환값을 안 바꾸는 out-파라미터인 건 호출부 무변경을 지키기 위해서다 — 이 함수의
+      반환은 `index_post` 입력으로 바로 흘러가는 자리라 튜플을 늘리면 소비처가 전부 깨진다.
 
     반환: [(raw, doc), ...] — index.index_post 입력으로 그대로 사용(호출부 무변경).
     """
@@ -1173,6 +1218,7 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
 
     out: list[tuple] = []
     failed = 0                       # 실패한 배치 수 — 무음 유실 금지(아래에서 로그로 드러낸다)
+    inherited = 0                    # 글 마켓을 물려받은 조각 수 → counts["market_inherited"]
     for _, thread in threads.items():
         post, cmts = thread["post"], thread["comments"]
         title = (post.raw_title if post else None) or \
@@ -1214,10 +1260,17 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
                 chunk_docs = [_empty_doc() for _ in texts]
             docs.extend(chunk_docs[1:] if ctx_post is not None else chunk_docs)
 
-        # 스레드 market 은 글에서 뽑은 것이 권위. 없으면 댓글 중 처음 잡힌 것.
+        # 스레드 market 의 권위는 **글 본문뿐**이다. 댓글 폴백은 없다.
+        # ⛔ **되돌리지 말 것 — `next(d.get("market") for d in docs …)` 를 다시 넣지 마라.**
+        #   댓글의 마켓은 **그 댓글 작성자의 것**이지 스레드의 것이 아니다. 예전 폴백은 글이
+        #   마켓을 안 밝히면 아무 댓글의 마켓이나 집어 스레드 전체에 물려줬다. 실측
+        #   (2026-08-10, 아모스갤 813행): `빈짱` 21행 중 **19행이 한 스레드**에서 나왔고,
+        #   그 출처는 댓글 하나의 `ㅂㅉ` 였다. 마켓이 붙은 스레드 95/95(100%)가 단일 마켓인데,
+        #   원문 대조 결과 그 갤의 지배적 형태는 **한 글에 여러 마켓이 나열되는 추천/첨삭 글**이다
+        #   — 100% 는 물리적으로 나올 수 없는 값이라 그 자체가 폴백의 증거였다.
+        #   틀린 마켓은 NULL 보다 나쁘다(남의 마켓 후기로 집계된다 = 1급 기능인 출처 편향 왜곡).
+        #   항목별 마켓이 필요하면 폴백이 아니라 `reviews[].mentioned_market` 이 자리다.
         market = docs[0].get("market") if post and docs else None
-        if not market:
-            market = next((d.get("market") for d in docs if d.get("market")), None)
         for raw, doc in zip(members, docs):
             # **채우기만 한다 — 덮어쓰지 않는다.** 조각이 자기 마켓을 뽑았으면 그게 그 조각의
             # 사실이고, 스레드 값은 마켓을 말하지 않은 형제를 위한 폴백일 뿐이다.
@@ -1227,14 +1280,21 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
             # 그건 1급 기능인 출처 편향의 왜곡이다(틀린 마켓은 NULL 보다 나쁘다).
             if market and not doc.get("market"):
                 doc["market"] = market
+                inherited += 1
             out.append((raw, doc))
+    if inherited and counts is not None:
+        # 무음 금지 — 상속이 **몇 건 걸렸는지**가 없으면 마켓 커버리지가 움직였을 때
+        # '원문이 말한 마켓'과 '글에서 물려받은 마켓'을 사후에 못 가른다. 절감 카운터를
+        # `llm_calls_saved` / `llm_calls_saved_by_dedup` 으로 가른 것과 같은 이유다.
+        log.info("스레드 글 마켓 상속: %d조각", inherited)
+    if counts is not None:
+        counts["market_inherited"] = inherited
     if failed:
         log.error("스레드 배치 %d개 추출 실패 — 그 조각들은 행이 안 남아 다음 런이 재시도한다", failed)
     return out
 
 
 if __name__ == "__main__":
-    import json
     import logging
     from .sources import DCInsideSource, collect_all, expand_queries
     from .llm_ops import summary

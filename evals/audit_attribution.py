@@ -31,18 +31,18 @@ from pathlib import Path
 # 직접 실행(python evals/audit_attribution.py) 시 repo 루트를 경로에 추가(-m 없이도 동작).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from slime_rag import extract
+from slime_rag import extract, pipeline
 from slime_rag.db import connect
 from slime_rag.linking import KB, load_kb, split_market_prefix
 
 SOURCES = ("amos", "instagram")
 
-# 계획 §Phase2 가 지정한 접착제/베이스 재료 어휘(1층 base_combo 어휘에서 소싱) — 정확일치만.
-GLUE_WORDS = frozenset({
-    "글루올", "택키", "아마존", "우드", "우마존", "생베", "점토", "화이트글루", "글리",
-})
-# "이름을 까먹었다" 명시 마커 — 부분일치(포함)로 잡는다.
-FRAGMENT_MARKERS = ("어쩌구", "어쩌고", "어쩍고")
+# ⚠️ 어휘를 여기서 **다시 선언하지 않는다** — 게이트가 쓰는 정본을 그대로 읽는다.
+#   복사해 두면 `extract.GLUE_WORDS` 에 단어가 하나 늘었을 때 감사만 옛 목록으로 재서
+#   '이미 0건'이라고 **깨끗하게 거짓말**한다. `split_market_prefix`·`TYPE_ENUM`·
+#   `_held_fingerprint` 를 재구현하지 않는 것과 같은 이유(위 "재구현 금지" 주석).
+GLUE_WORDS = extract.GLUE_WORDS
+FRAGMENT_MARKERS = extract.FRAGMENT_MARKERS
 
 # 붙여 쓴 호환 자모(초성) 런 스캔 — `linking._JAMO_RUN_RE`(^로 시작만 봄)와 달리 텍스트
 # 어디에 있든 전부 찾아야 하므로 앵커 없이 별도 정의한다.
@@ -92,22 +92,17 @@ def _markets_in_text(text: str, kb: KB, forms: list[str]) -> set[str]:
 def _prefix_containment_pairs(products: list[str]) -> int:
     """distinct 제품명 중 한쪽이 다른쪽의 strict prefix 인 쌍의 수(무순서쌍, 1회만 계산).
 
-    비교는 공백제거+casefold 정규화 후 수행한다(표기 흔들림 흡수) — "요아곰 밀키크림파르페"
-    vs "요아곰밀키크림파르페" 같은 공백차만 있는 쌍도 여기서 걸린다.
+    ⚠️ 규칙을 여기서 **다시 구현하지 않는다** — 별칭 후보를 실제로 만드는
+    `pipeline._prefix_pairs` 를 그대로 부른다(`split_market_prefix`·`TYPE_ENUM`·
+    `GLUE_WORDS` 를 재구현하지 않는 것과 같은 이유). 실제로 갈라져 있었다: 자체 구현일 때
+    아모스갤 **44건**이던 값이 정본 함수로 바꾸자 **46건**이 됐다.
+
+    ⚠️ 그래도 `derive_alias_candidates` 의 `prefix` 건수(코퍼스 전체 52)와는 **여전히 다르다** —
+    이건 **규칙 차이가 아니라 범위 차이**다. 여기는 소스별로 세고(아모스갤 46 · 인스타 0),
+    저긴 `reviews.product` 전량을 한 풀로 본다. 차이 6건은 아모스갤↔인스타 이름을 가로지르는
+    쌍이다. 이 숫자가 안 맞는다고 규칙을 다시 맞추려 들지 말 것(실제로 맞는 상태다).
     """
-    norm = sorted({_strip(p).casefold() for p in products if p})
-    n = len(norm)
-    pairs = 0
-    for i in range(n):
-        a = norm[i]
-        for j in range(i + 1, n):
-            b = norm[j]
-            if a == b or not a:
-                continue
-            shorter, longer = (a, b) if len(a) < len(b) else (b, a)
-            if shorter and longer.startswith(shorter):
-                pairs += 1
-    return pairs
+    return len(pipeline._prefix_pairs(sorted({p for p in products if p})))
 
 
 def audit_source(conn, source: str, kb: KB, forms: list[str], specs_products: set[str]) -> dict:
@@ -269,7 +264,7 @@ def print_report(results: dict[str, dict]) -> None:
     if len(results) == len(SOURCES):
         total_evidence = sum(results[s]["evidence_header_contradictions"] for s in SOURCES)
         total_conf_zero = sum(results[s]["market_confidence_zero_with_market"] for s in SOURCES)
-        print(f"\n[합계 — 소스 무관 교차성 결함]")
+        print("\n[합계 — 소스 무관 교차성 결함]")
         label = "evidence 헤더 모순([마켓미상 인데 market 有)"
         print(f"  {label:<{_LABEL_WIDTH}} : {total_evidence}")
         label = "market_confidence=0 인데 market 有"

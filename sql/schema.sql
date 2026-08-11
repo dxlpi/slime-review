@@ -99,6 +99,18 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment_count INTEGER;    -- 디시
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_up     INTEGER;     -- 디시 추천
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS votes_down   INTEGER;     -- 디시 비추천(화면 미표시, 무손실 보관)
 
+-- 감정 축 **수리 사이드카**(2026-08-11, 계획 Phase 5 · ADR-0018).
+-- `attributes` 는 추출기가 실제로 뭐라고 했는지의 **provenance 스냅샷**이라 제자리에서 고칠 수
+-- 없다(`repair_dc_attribution` 이 그 칸을 일부러 안 고치는 것과 같은 이유). 그런데 잘못 배치된
+-- 판정을 그냥 두면 **유료 요약을 재생성할 때마다 다시 오염된다** — 7행이 작아 보여도 비용은
+-- 반복적이다. 그래서 `relevance_meta` 선례를 따라 **별도 칸**에 수리 기록만 남기고,
+-- `consolidated_view._source_material` 이 재료를 모을 때 그 기록을 우선 적용한다.
+--   모양: {"sound": {"action": "drop", "why": "…", "at": "…"}}
+-- ⚠️ 별도 컬럼인 이유가 하나 더 있다: 감사 골드의 안정 키가
+--   `attributes->>'mentioned_product'` 이고 그 계약의 전제가 "이 JSONB 는 불변"이다.
+--   `attributes` 안에 예약 네임스페이스를 파면 그 전제가 약해진다.
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS attribute_repairs JSONB;
+
 -- 기존 배포 DB 멱등 마이그레이션(2026-08-07): 디시 **댓글** post_id 를 런 의존 enumerate 인덱스
 -- → 안정 comment_no 로 재작성. 옛 형식은 `…#cmt:{parent_no}:{i}` 였고 `i` 가 그 런의 리스트
 -- 위치라, 수집 결과가 한 건만 달라져도 같은 댓글이 **다른 post_id** 로 들어갔다 →

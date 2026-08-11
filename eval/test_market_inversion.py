@@ -39,12 +39,20 @@ def _kb() -> linking.KB:
 
 
 KB = _kb()
-# 1층: 지나가 빠코볼을, 늪지가 디폼클리어를 판다. `한줌` 은 두 마켓이 같은 이름을 쓴다.
-SPEC_PAIRS = [("지나", "빠코볼"), ("늪지", "디폼클리어"), ("머머", "한줌"), ("미미", "한줌")]
+# 1층: 지나가 빠코볼을, 늪지가 간배괴물을 판다. `한줌` 은 두 마켓이 같은 이름을 쓴다.
+# ⚠️ 늪지 쪽 이름은 예전에 `디폼클리어` 였는데 2026-08-11 에 그 말이 비제품 어휘가 됐다
+#   (사람 검수 판정: 제품명이 아니라 종류어). 픽스처 이름은 **제품명 모양**이어야 한다 —
+#   아니면 역인덱스에 닿기 전에 단어 게이트가 먼저 비워서 이 파일이 무언 통과한다.
+SPEC_PAIRS = [("지나", "빠코볼"), ("늪지", "간배괴물"), ("머머", "한줌"), ("미미", "한줌")]
 # 레지스트리: 1층보다 넓다. `빠코볼` 을 **다른 마켓**으로도 갖고 있어 A2 회귀를 만든다.
 REGISTRY = {"지나": ["아생케", "먹구름큐브"], "봄": ["허니넛츠시리얼", "빠코볼"],
             "늪지": ["액괴"], "머머": ["액괴"]}
-INV = linking.build_market_inversion(SPEC_PAIRS, REGISTRY, excludes=["액괴"])
+# ⚠️ 제외 케이스의 이름은 **제품명 모양이어야** 한다. 예전엔 `액괴` 였는데, 2026-08-11 에
+#   그 말이 `data/non_product_words.json` 의 맨몸 어휘가 되면서 `link()` 안에서 **더 앞의
+#   게이트**(비제품 단어)에 먼저 걸린다 — 결과는 같지만(안 채운다) 사유가 '마켓 미언급'이라
+#   제외 목록이 일했는지 알 수 없다. `먹구름큐브` 는 실제 오버레이 파일에 있는 이름이고
+#   (인수 이전 마켓 쿨라임의 제품), 제품명 모양이라 여기까지 도달한다.
+INV = linking.build_market_inversion(SPEC_PAIRS, REGISTRY, excludes=["먹구름큐브"])
 
 
 def _link(mentioned_market, product, inversion=INV):
@@ -212,10 +220,18 @@ def test_the_registry_tier_is_off_by_default_at_ingest():
 
 # ------------------------------------------------------------------ 제외 목록
 def test_excluded_names_are_never_filled():
-    """사람이 검수해서 뺀 이름은 어느 층에서도 안 채운다(A4 의 집행 장치)."""
-    r = _link(None, "액괴")
+    """사람이 검수해서 뺀 이름은 어느 층에서도 안 채운다(A4 의 집행 장치).
+
+    ⚠️ 이름은 **제품명 모양**이어야 한다 — 종류어를 쓰면 `link()` 안의 더 앞선 게이트
+      (비제품 단어)가 먼저 제품을 비워서, 결과는 같지만 **제외 목록이 일했는지 알 수 없다**
+      (위 `INV` 주석 참조). 무언 통과는 게이트가 아무것도 안 지키는 상태와 구분이 안 된다.
+    """
+    r = _link(None, "먹구름큐브")
     assert r.market is None, f"제외 목록이 무시됐다: {r.market}"
     assert linking.REASON_INVERSION_EXCLUDED in r.reason, r.reason
+    # 제외 목록이 없으면 채워지는 이름이라야 이 케이스가 무언 통과가 아니다.
+    bare = linking.build_market_inversion(SPEC_PAIRS, REGISTRY, excludes=[])
+    assert _link(None, "먹구름큐브", inversion=bare).market == "지나"
     print("✓ 제외 목록 OK")
 
 
@@ -283,7 +299,7 @@ def test_alias_normalised_name_is_the_lookup_key():
 def test_link_post_can_fill_different_markets_per_product():
     """마켓을 안 밝힌 비교글이면 항목마다 다른 마켓이 붙는다 — 그게 옳다."""
     doc = {"market": None, "reviews": [{"mentioned_product": "빠코볼"},
-                                       {"mentioned_product": "디폼클리어"}]}
+                                       {"mentioned_product": "간배괴물"}]}
     got = [lk.market for lk in linking.link_post(doc, kb=KB, inversion=INV)]
     assert got == ["지나", "늪지"], got
     print("✓ 비교글 제품별 마켓 분리 OK")

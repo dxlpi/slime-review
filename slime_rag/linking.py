@@ -102,6 +102,20 @@ REASON_PREFIX = "제품명 접두"
 INHERIT_CONF = 0.75
 REASON_INHERIT = "글 마켓 상속"
 
+# 조각 **본문 스캔**으로 되찾은 마켓(`markets_in_text`).
+# 왜 쌍인가: 표면형(`늪지에서 샀는데`)과 초성(`ㅅㅈㄴ 헝잭버거`)은 오탐 성질이 다르다.
+# 초성은 일반어와 겹치고(`ㅈㄴ`=존나) 표면형은 안 겹친다 — 나중에 초성 층만 골라
+# 되돌릴 수 있어야 한다(`PREFIX_CONFS` 를 쌍으로 둔 것과 정확히 같은 이유).
+# 값의 배치: 접두(0.92/0.82)보다 **아래**다 — 접두는 추출기가 제품명 칸에 넣은 표기라
+# 위치가 특정되지만, 이건 본문 어디에나 있을 수 있어 근접성 근거가 한 겹 약하다.
+# 역인덱스(0.80/0.65)보다는 위다 — 저건 원문이 마켓을 한 번도 말한 적 없는 행이다.
+# ⚠️ 이 숫자도 provenance 표식이지 티어 정렬 키가 아니다(위 `INHERIT_CONF` 주석과 같다).
+#   실제 서열은 아래 `link()` 의 분기 순서가 정한다.
+REPAIR_CONF_PIECE_SURFACE = 0.88
+REPAIR_CONF_PIECE_CHOSEONG = 0.83
+REPAIR_PIECE_CONFS = (REPAIR_CONF_PIECE_SURFACE, REPAIR_CONF_PIECE_CHOSEONG)
+REASON_PIECE_SCAN = "조각 본문 스캔"
+
 REASON_INVERSION_SPEC = "제품→마켓 역인덱스(1층)"
 REASON_INVERSION_REGISTRY = "제품→마켓 역인덱스(레지스트리)"
 REASON_INVERSION_AMBIGUOUS = "제품→마켓 역인덱스 다중소유→보류"
@@ -208,6 +222,45 @@ def load_market_inversion_excludes() -> set[str]:
     return {_strip(n).lower() for n in (names or []) if isinstance(n, str) and n}
 
 
+UNREGISTERED_MARKET_TOKENS_PATH = ROOT / "data" / "unregistered_market_tokens.json"
+
+
+def load_unregistered_market_tokens() -> frozenset:
+    """KB **미등재** 마켓 초성 오버레이 → 토큰 집합. 파일이 없으면 빈 집합.
+
+    `load_market_inversion_excludes` 와 같은 가족이고 **같은 실패 정책**이다(깨지면 경고 후
+    빈 집합, 예외로 죽지 않음) — 수집 경로 한복판에서 불리기 때문이다.
+
+    ⚠️ **자모 전용이 아닌 항목은 거부한다.** 완성형 문자열이 들어오면 `_market_token` 이
+      그걸 제품명 접두로 인정해 **진짜 제품명을 잘라 낸다** — `split_market_prefix` 가
+      완성형 초성 환원을 의도적으로 금지한 이유(`포도`→푸딩 · `배`→봄 · `육쩐`→연찌 사고)를
+      오버레이가 우회하는 구멍이 된다. 거부는 **조용히 하지 않는다**(`log.warning`).
+    ⚠️ 여기 쓰는 정규식은 `extract._ALL_JAMO_RE` 의 **더 좁은 쌍둥이**다(공백 불허) —
+      저쪽은 이름 전체가 자모인지를 보고, 여긴 **토큰** 하나를 본다. 토큰에 공백이 있으면
+      접두 분리의 경계 판정이 무의미해진다.
+    """
+    path = UNREGISTERED_MARKET_TOKENS_PATH
+    if not path.exists():
+        return frozenset()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        log.warning("미등재 마켓 토큰 읽기 실패 — 오버레이 없이 진행: %s", e)
+        return frozenset()
+    raw = data.get("tokens") if isinstance(data, dict) else data
+    if isinstance(raw, dict):
+        names = list(raw.keys())
+    else:
+        names = [n for n in (raw or []) if isinstance(n, str)]
+    good, bad = set(), []
+    for n in names:
+        tok = _strip(n or "")
+        (good.add(tok) if tok and _ALL_JAMO_RE.match(tok) else bad.append(n))
+    if bad:
+        log.warning("미등재 마켓 토큰 중 자모 전용이 아닌 %d건을 버렸다: %s", len(bad), bad[:5])
+    return frozenset(good)
+
+
 @dataclass(frozen=True)
 class MarketInversion:
     """제품명 → 마켓 역인덱스. **두 층을 끝까지 갈라 둔다**(합집합 금지).
@@ -273,12 +326,183 @@ def build_market_inversion(spec_pairs=(), registry=None, *, excludes=None) -> Ma
                            excludes=frozenset(ex))
 
 
+# ---------------------------------------------------------------- 조각 스코프 텍스트 스캐너
+# 일반어와 겹쳐 **단독으로는 마켓 근거가 못 되는** 표기. 실측(2026-08-10 아모스갤):
+#   `ㅈㄴ`=존나(빠코볼 25건 중 6건이 부사) · `푸딩`=질감어(`젤리나 푸딩같은 느낌`) ·
+#   `봄`=계절/`보다` · `지나`=`지나면` · `머머`=`ㅁㅁ` 잡음 · `캐치`=일반어.
+# 이 토큰들은 `noisy` 로만 보고하고, **바로 뒤에 아는 제품명이 붙을 때만** `unique` 로 승격한다.
+# ⛔ `kb.resolve_market` 을 이 규칙으로 좁히지 말 것. 저건 추출기가 **이미 마켓 칸에 넣은 값**을
+#   푸는 함수라, 거기서 `푸딩` 을 막으면 `mentioned_market="푸딩"` 인 정상 행이 죽는다.
+#   `_market_token` 이 `resolve_market` 보다 좁은 것과 같은 계층 분리다.
+AMBIGUOUS_SURFACES = frozenset({"푸딩", "봄", "지나", "캐치", "머머", "스르륵"})
+AMBIGUOUS_CHOSEONG = frozenset({"ㅈㄴ"})
+
+# 표면형 매칭의 **경계 규칙**. 부분문자열 매칭만으로는 마켓명이 다른 낱말 속에 묻혀도 잡힌다 —
+# 실측(2026-08-11, 아모스갤 801행): `토끼나마나` 안의 `마나`(마나슬라임) · `포이즈닝` 안의
+# `포이`(포이슬라임). 둘 다 **진짜 제품명**이라, 그대로 두면 제품명이 마켓 근거로 둔갑한다.
+# 그렇다고 양쪽을 다 막으면 안 된다: 한국어는 조사가 이름에 **붙어서** 온다(`늪지에서 샀는데`).
+# 그래서 왼쪽은 음절이면 무조건 거부하고, 오른쪽은 **조사일 때만** 허용한다.
+# ⚠️ 조사 목록은 어휘(데이터)지 구조 규칙이 아니다 — 늘리려면 반례를 먼저 확인할 것.
+_HANGUL_SYLLABLE = re.compile(r"[가-힣]")
+_PARTICLE_HEADS = ("에", "은", "는", "이", "가", "을", "를", "의", "도", "만", "과", "와",
+                   "랑", "로", "으", "서", "부", "까", "보", "처", "같", "한", "께", "네")
+
+_JAMO_RUN_ANY_RE = re.compile(r"[ㄱ-ㅎ]+")
+# 승격 판정에 쓰는 제품명의 최소 길이. 한 글자 이름은 아무 꼬리에나 걸린다.
+_PROMOTE_MIN_NAME = 2
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    """조각 본문/제목이 **마켓 자리로 쓴** 토큰의 분류. 네 갈래가 서로 다른 뜻이다.
+
+    unique    — KB 마켓이고 이 텍스트가 확실히 지목했다. 채움의 근거가 된다.
+    ambiguous — 초성 충돌(후보 2+). 갈린 증거라 채우지 않는다.
+    unknown   — KB **미등재**인데 마켓 자리로 쓰였다. 채우지 않고 **추론을 막는** 재료다.
+    noisy     — 일반어와 겹친다. 단독으로는 근거가 못 된다.
+
+    ⚠️ `unknown` 과 `noisy` 를 합치지 말 것 — 전자는 '진짜 마켓인데 명부에 없다'이고
+      후자는 '마켓이 아닐 수 있다'다. 전자만 상속·역인덱스를 꺼야 한다.
+    """
+    unique: frozenset = frozenset()
+    ambiguous: dict = field(default_factory=dict)
+    unknown: frozenset = frozenset()
+    noisy: frozenset = frozenset()
+    # market_word → "표면형" | "초성". **확신도를 가르는 유일한 재료**다(0.88 vs 0.83):
+    # 초성은 일반어와 겹치고(`ㅈㄴ`=존나) 표면형은 안 겹치므로, 나중에 초성 층만 골라
+    # 되돌릴 수 있어야 한다(`PREFIX_CONFS` 를 쌍으로 둔 것과 정확히 같은 이유).
+    how: dict = field(default_factory=dict)
+
+
+def _scan_tables(kb: KB) -> tuple[dict, dict]:
+    """(초성→[market_word], 표면형→[market_word]). KB 당 한 번 만들어 캐시한다.
+
+    재료는 **`market_word` + `aliases`** 뿐이다 — `handle`(영문)까지 넣으면 영어 단어가
+    스치기만 해도 마켓이 되고, `market`(정식명)은 `market_word` 를 품고 있어 중복이다.
+    감사 스크립트(`evals/review_dcinside_extraction.scan_markets`)가 D3 105·D4 3 이라는
+    숫자를 실제로 만들어 낸 재료와 같은 구성이고, 그게 이 함수의 정본 의미론이다.
+    """
+    cached = getattr(kb, "_scan_tables_cache", None)
+    if cached is not None:
+        return cached
+    cho: dict[str, list[str]] = {}
+    surf: dict[str, list[str]] = {}
+    for m in kb.markets:
+        mw = m["market_word"]
+        for c in [m.get("choseong") or "", *(m.get("choseong_aliases") or [])]:
+            if len(c) >= 2 and mw not in cho.setdefault(c, []):
+                cho[c].append(mw)
+        for f in [mw, *(m.get("aliases") or [])]:
+            f = _strip(f or "")
+            if f and mw not in surf.setdefault(f, []):
+                surf[f].append(mw)
+    kb._scan_tables_cache = (cho, surf)
+    return cho, surf
+
+
+def _surface_occurs(text: str, form: str) -> bool:
+    """`form` 이 **낱말 경계에서** 나타나는가. 순수 함수(위 `_PARTICLE_HEADS` 주석 참조).
+
+    ⛔ 단순 `in` 으로 되돌리지 말 것 — 실측으로 `토끼나마나`·`포이즈닝` 같은 **진짜 제품명**이
+      마켓으로 잡힌다. 그 손실은 반대 방향으로 조용하다: 후기가 남의 마켓에 붙는다.
+    """
+    start = 0
+    while (i := text.find(form, start)) != -1:
+        start = i + 1
+        if i > 0 and _HANGUL_SYLLABLE.match(text[i - 1]):
+            continue                              # 왼쪽이 음절 → 낱말 속에 묻힌 것
+        j = i + len(form)
+        if j < len(text) and _HANGUL_SYLLABLE.match(text[j]) \
+                and not text[j:].startswith(_PARTICLE_HEADS):
+            continue                              # 오른쪽이 조사가 아닌 음절 → 다른 낱말
+        return True
+    return False
+
+
+def _promoted(text: str, token: str, known_norm: frozenset) -> bool:
+    """`token` **바로 뒤**에 아는 제품명이 붙어 있는가 — 모호 토큰의 유일한 승격 경로."""
+    if not known_norm:
+        return False
+    for m in re.finditer(re.escape(token), text):
+        tail = _strip(text[m.end():m.end() + 40]).lower()
+        if any(tail.startswith(k) for k in known_norm):
+            return True
+    return False
+
+
+def markets_in_text(text: str, kb: KB, *, unregistered=frozenset(),
+                    known_products=None) -> ScanResult:
+    """텍스트가 마켓 자리로 쓴 토큰을 분류한다. 순수 함수(무DB·무LLM·무네트워크).
+
+    ⚠️ **이 함수는 `backfill_review_markets` 에 되살아난 옛 가드가 아니다.** 되돌린 것은
+      *행 스코프의 **부정** 가드* — '이미 다른 근거로 정해진 채움을 본문 스캔이 거부한다'였다.
+      실패 모드는 "비교글에 마켓이 여럿 나오는 건 정상인데 그중 하나를 제품명으로만 가리킨
+      것을 모순으로 읽었다"이고, 실측 3건 전부 채운 값이 **맞았다**. 여기는 스코프도 방향도
+      다르다: **조각 스코프**에서 **채움의 근거를 만든다**(긍정). 그리고 되돌림의 진짜 교훈은
+      "본문을 보지 마라"가 아니라 "**막는 판단을 조용히 하지 마라**"였다 —
+      그래서 이 스캐너의 소비처는 충돌을 반드시 `conflict_list` 로 내보낸다
+      (게이트: `test_the_body_scan_conflict_guard_stays_out`).
+
+    ⚠️ 기수성(cardinality)이 그 구분을 기계적으로 보장한다: 이 결과는 `unique` 가 **정확히
+      하나**일 때만 근거가 된다. 옛 가드를 깨뜨린 바로 그 입력(여러 마켓을 나열하는 비교글)
+      에서는 `unique` 가 둘 이상이라 아무것도 만들어 내지 않고 그냥 통과한다.
+
+    unregistered: KB 미등재인데 마켓 자리로 쓰이는 초성 집합
+      (`load_unregistered_market_tokens()`). 미주입이면 `unknown` 은 항상 빈다.
+    known_products: 모호 토큰 승격의 **증거**(`pipeline.known_product_names()`).
+      ⚠️ 미주입이면 승격이 **아예 없다** — 페일세이프이고, 그 상태의 의미론이 감사
+        스크립트 `scan_markets` 와 정확히 같다(그래서 감사 숫자와 대조가 가능하다).
+    """
+    if not text:
+        return ScanResult()
+    cho_tbl, surf_tbl = _scan_tables(kb)
+    known_norm = frozenset(
+        _strip(p).lower() for p in (known_products or ())
+        if p and len(_strip(p)) >= _PROMOTE_MIN_NAME)
+    unique: set[str] = set()
+    ambiguous: dict[str, list[str]] = {}
+    unknown: set[str] = set()
+    noisy: set[str] = set()
+    how: dict[str, str] = {}
+
+    def _hit(mw: str, kind: str) -> None:
+        unique.add(mw)
+        if kind == "표면형" or mw not in how:      # 표면형이 초성을 이긴다(더 특정적)
+            how[mw] = kind
+
+    for run in set(_JAMO_RUN_ANY_RE.findall(text)):
+        hits = cho_tbl.get(run)
+        if run in AMBIGUOUS_CHOSEONG:
+            noisy.add(run)
+            if hits and len(hits) == 1 and _promoted(text, run, known_norm):
+                _hit(hits[0], "초성")
+            continue
+        if hits:
+            (_hit(hits[0], "초성") if len(hits) == 1
+             else ambiguous.setdefault(run, list(hits)))
+        elif run in unregistered:
+            unknown.add(run)
+
+    low = text.lower()
+    for form, hits in surf_tbl.items():
+        if not _surface_occurs(low, form.lower()):
+            continue
+        if form in AMBIGUOUS_SURFACES:
+            noisy.add(form)
+            if len(hits) == 1 and _promoted(text, form, known_norm):
+                _hit(hits[0], "표면형")
+            continue
+        (_hit(hits[0], "표면형") if len(hits) == 1 else ambiguous.setdefault(form, list(hits)))
+
+    return ScanResult(frozenset(unique), ambiguous, frozenset(unknown), frozenset(noisy), how)
+
+
 # ---------------------------------------------------------------- 마켓 접두 분리
 _JAMO_RUN_RE = re.compile(r"^[ㄱ-ㅎ]+")
 _ALL_JAMO_RE = re.compile(r"^[ㄱ-ㅎ]+$")
 
 
-def _market_token(token: str, kb: KB) -> bool:
+def _market_token(token: str, kb: KB, unregistered=frozenset()) -> bool:
     """이 토큰이 **제품명 안에서** 마켓 표기로 인정되는가. 순수 함수.
 
     `kb.resolve_market` 보다 **좁다**. 저건 추출기가 이미 '마켓 칸'에 넣은 값을 푸는 함수라
@@ -293,15 +517,25 @@ def _market_token(token: str, kb: KB) -> bool:
       ① **표면형 완전일치** — 마켓명·표시어·핸들·별칭(`늪지`·`봄`).
       ② **자모만으로 이루어진 토큰**이 KB 초성과 일치(`ㅂㅇㅍ`·`ㅇㅊ`). 호환 자모는 완성형
          제품명의 일부가 될 수 없어 경계가 모호하지 않다.
+      ③ **KB 미등재 마켓 토큰**(`unregistered`) — `ㅅㄱㄷ`·`ㅍㅍㄹ` 처럼 아모스갤이 마켓
+         자리로 쓰는데 명부에 없는 초성. 이것도 **자모 전용일 때만** 인정한다(로더가 이미
+         걸러내지만, 여기서 한 번 더 보는 건 호출부가 임의 집합을 주입할 수 있어서다).
+         ⚠️ 인정한다고 **채우지 않는다** — 떼어 낸 힌트는 `kb.resolve_market` 에서 미발견이라
+           마켓은 NULL 로 남고, 대신 `surface` 가 비지 않아 **상속과 역인덱스가 꺼진다**.
+           그게 이 오버레이의 전부다(ROW#1111 `ㅍㅍㄹ 애플크림머핀`→예찬 오귀속 차단 ·
+           D2c `진저크런키`→지나 차단).
     완성형 음절을 초성으로 환원하는 경로는 **의도적으로 없다**.
     """
+    if unregistered and _ALL_JAMO_RE.match(token) and _strip(token) in unregistered:
+        return True
     hits, _conf, how = kb.resolve_market(token)
     if not hits:
         return False
     return how == "표면형" or bool(_ALL_JAMO_RE.match(token))
 
 
-def split_market_prefix(name: Optional[str], kb: KB) -> tuple[Optional[str], Optional[str]]:
+def split_market_prefix(name: Optional[str], kb: KB,
+                        unregistered=frozenset()) -> tuple[Optional[str], Optional[str]]:
     """제품명 표면형 → `(마켓 힌트, 제품명)`. 순수 함수(무LLM·무DB).
 
     추출 프롬프트는 '제품명에 마켓 초성을 섞지 마라'고 **말만** 하고 강제가 없었다.
@@ -330,17 +564,17 @@ def split_market_prefix(name: Optional[str], kb: KB) -> tuple[Optional[str], Opt
     if not name or not name.strip():
         return None, None
     text = name.strip()
-    if _market_token(text, kb):                  # 전체가 마켓이면 제품명이 아니다 → 보류
+    if _market_token(text, kb, unregistered):    # 전체가 마켓이면 제품명이 아니다 → 보류
         return text, None
 
     head, sep, tail = text.partition(" ")
-    if sep and tail.strip() and _market_token(head, kb):
+    if sep and tail.strip() and _market_token(head, kb, unregistered):
         return head, tail.strip()
 
     # 공백 없이 붙은 자모 접두 — "ㅈㄴ아몬드바나나브레드"
     if (m := _JAMO_RUN_RE.match(text)):
         head, tail = m.group(0), text[m.end():].strip()
-        if tail and _market_token(head, kb):
+        if tail and _market_token(head, kb, unregistered):
             return head, tail
     return None, text
 
@@ -355,6 +589,9 @@ def link(
     inversion: Optional[MarketInversion] = None,
     fallback_market: Optional[str] = None,
     inherited: bool = False,
+    unregistered=frozenset(),
+    known_products=None,
+    text_markets: Optional[ScanResult] = None,
 ) -> LinkResult:
     """
     (mentioned_market, mentioned_product) → LinkResult.
@@ -363,13 +600,32 @@ def link(
     inversion: 제품→마켓 역인덱스(`build_market_inversion`). **마켓을 아무도 말하지 않은
       경우에만** 본다 — 아래 분기 참조. 미주입이면 이 기능 자체가 없던 것과 같다.
 
-    마켓 근거는 **좁은 것부터** 본다 — 세 단계이고 순서가 곧 근거의 세기다:
+    마켓 근거는 **좁은 것부터** 본다 — 다섯 단계이고 순서가 곧 근거의 세기다:
       ① `mentioned_market` — 이 **항목**이 직접 말한 마켓(`reviews[].mentioned_market`).
       ② 제품명 접두(`split_market_prefix`) — 이 항목의 제품명 칸에 섞여 들어온 표기.
-      ③ `fallback_market` — **글/스레드 단위** 값(`doc["market"]`).
-    ⛔ ③을 ①②보다 앞에 두지 말 것. ③은 스레드 상속으로 채워질 수 있어(형제 조각에서 온
+      ③ `text_markets` — 이 **조각 본문**이 유일하게 지목한 마켓(`markets_in_text`).
+      ④ 제품→마켓 역인덱스 **1층만** — 제품명의 1층 유일소유.
+      ⑤ `fallback_market` — **글/스레드 단위** 값(`doc["market"]`).
+
+    ⛔ ⑤를 ①②보다 앞에 두지 말 것. ⑤는 스레드 상속으로 채워질 수 있어(형제 조각에서 온
       값이다) 항목 자신의 증거보다 약하다. 앞에 두면 비교 스레드에서 **남의 마켓 후기**가
       된다 — `extract.extract_collected` 가 상속을 '채우기 전용'으로 바꾼 것과 같은 사고다.
+
+    ⚠️ **④가 ⑤보다 앞이라는 게 2026-08-11 의 변경이다.** 그전엔 역인덱스가
+      `market is None and not surface` 일 때만 돌았고 `surface` 에 `fallback_market` 이
+      섞여 있어서, 상속이 있으면 역인덱스가 **아예 안 돌았다**(상속 > 1층 소유). 사람이
+      만든 전수 감사가 그 순서 때문에 생긴 오귀속을 18행(D2) 짚었다 — `요구르팅` 의 1층
+      소유는 지나인데 늪지 스레드 상속이 덮는 식이다. CLAUDE.md 가 이 순서를 "재검토 여지가
+      있으나 **측정 없이 건드리지 말 것**"으로 봉인했었고, 그 측정이 바로 그 감사다
+      (마켓 축은 `attributes` 에 `mentioned_market` 이 없어 리플레이가 원리적으로 불가능하다).
+
+    ⛔ **불변 유지**: `mentioned_market`/`prefix_hint` 가 **있었는데** 충돌·미발견으로 보류된
+      행에는 ③④⑤ 중 **아무것도** 태우지 않는다. 거긴 '증거가 갈렸다'는 뜻이고, 갈린 증거를
+      본문/제품명/상속으로 덮으면 개체연결이 내린 보류 판정을 조용히 뒤집는 것이 된다.
+      KB 미등재 오버레이가 정확히 이 성질을 이용한다 — `ㅍㅍㄹ 애플크림머핀` 은 접두가
+      떨어져 나가되 해소는 실패하므로, 상속도 역인덱스도 꺼진다.
+    ⛔ 역인덱스는 **1층 층만** 본다(`include_registry=False` 가 수집 경로의 기본) —
+      레지스트리는 사람이 승격한 목록이 아니라 유도된 후보다.
     """
     threshold = settings.link_abstain_threshold
 
@@ -388,7 +644,7 @@ def link(
     pconf = 0.0
     prefix_hint = None
     if mentioned_product:
-        prefix_hint, stripped = split_market_prefix(mentioned_product, kb)
+        prefix_hint, stripped = split_market_prefix(mentioned_product, kb, unregistered)
         if stripped:
             # ⚠️ `aliases` 는 **이미 마켓별로 좁혀진** 표(`load_product_aliases()[market_word]`)다.
             #   이 함수는 그걸 주입받기만 하고 **직접 읽지 않는다** — 마켓을 아는 건 호출부다.
@@ -411,60 +667,80 @@ def link(
         #   이 순서로만** 돈다 — `pipeline.dc_attribution_target`(적재분 복구)도 같은 순서다.
         if product:
             from . import extract          # 지연 임포트 — 이 모듈은 임포트 시점에 무의존이어야 한다
-            if extract.is_non_product_word(product):
+            if extract.is_non_product_word(product, known_products):
                 product = None
 
     # --- 마켓 ---
-    # 원문이 마켓을 말했으면 그게 먼저다. 접두 힌트는 **비어 있을 때만** 승격한다 —
-    # 말한 마켓을 제품명 접두로 덮으면 근거가 약한 쪽이 강한 쪽을 이긴다.
-    surface = mentioned_market or prefix_hint or fallback_market
+    # ①② 항목 자신의 증거. 원문이 마켓을 말했으면 그게 먼저고, 접두 힌트는 **비어 있을
+    # 때만** 승격한다 — 말한 마켓을 제품명 접두로 덮으면 근거가 약한 쪽이 강한 쪽을 이긴다.
+    own = mentioned_market or prefix_hint
     from_prefix = not mentioned_market and bool(prefix_hint)
-    if not surface:
-        market, mconf, candidates, reason = None, 0.0, [], "마켓 미언급"
-    else:
-        hits, mconf, how = kb.resolve_market(surface)
+    market, mconf, candidates, reason = None, 0.0, [], "마켓 미언급"
+    if own:
+        hits, mconf, how = kb.resolve_market(own)
         candidates = [m["market_word"] for m in hits]
-        # 이 값이 **글에서 물려받은 것**인가 — 항목도 접두도 말한 게 없어 `fallback_market`
-        # 으로 떨어졌고, 그 값이 조각 자신의 추출물이 아니라 스레드 상속분일 때만 참이다.
-        from_inherit = inherited and not mentioned_market and not prefix_hint
         if from_prefix and len(hits) == 1:
             # 전용 확신도로 갈아 끼운다 — 롤백의 유일한 열쇠(위 `PREFIX_CONFS` 주석).
             mconf = PREFIX_CONF_SURFACE if how == "표면형" else PREFIX_CONF_CHOSEONG
-        elif from_inherit and len(hits) == 1:
-            mconf = INHERIT_CONF          # 같은 이유의 전용 값(위 `INHERIT_CONF` 주석)
-        how = (f"{REASON_PREFIX} {how}" if from_prefix else
-               f"{REASON_INHERIT} {how}" if from_inherit else how)
+        how = f"{REASON_PREFIX} {how}" if from_prefix else how
         if len(hits) == 1 and mconf >= threshold:
             market, reason = hits[0]["market_word"], f"{how} 단일매칭"
         elif len(hits) > 1:
             # 초성 충돌(`ㅁㅁ`)은 접두에서 왔든 원문에서 왔든 똑같이 보류다 — 접두라고 해서
             # 갈린 증거가 하나로 모이지 않는다. 대신 제품명에서는 이미 떼어 냈다.
-            # ⚠️ 이 경우 `fallback_market`(글 단위 값)은 **다시 보지 않는다** — 항목이 어떤
-            #   마켓을 말하긴 했는데 못 고른 상태라, 글 값으로 메우면 갈린 증거를 상속으로
-            #   덮는 게 된다. 현 KB(14마켓)엔 초성 충돌이 없어 잠재 분기다.
             market, reason = None, f"{how} 충돌({len(hits)}후보)→보류"
         else:
             market, reason = None, "미발견→보류"
 
-    # --- 제품→마켓 역인덱스(A1) ---
-    # 원문이 마켓을 **아예 말하지 않았을 때만** 돈다. `mentioned_market` 이 있었는데 초성
-    # 충돌이나 미발견으로 보류된 경우는 건드리지 않는다 — 거긴 '증거가 갈렸다'는 뜻이고,
-    # 갈린 증거를 제품명으로 덮으면 개체연결이 내린 보류 판정을 조용히 뒤집는 것이 된다.
-    # (실측 근거: 디시 후기 813행 중 365행이 market NULL 이고, 그 대부분은 원문에 마켓이
-    #  없어서다 — 빠코볼 원문 17조각 중 10조각이 마켓 미언급.)
-    # ⚠️ `prefix_hint` 도 '원문이 마켓을 말했다'에 포함된다. 접두가 `ㅁㅁ` 처럼 충돌해서
-    #   보류된 행에 역인덱스를 태우면, 갈린 증거를 제품명 소유관계로 조용히 뒤집는 게 된다 —
-    #   바로 위 문단이 `mentioned_market` 에 대해 금지한 것과 같은 일이다.
-    if market is None and not surface and product and inversion is not None:
-        inv_market, inv_conf, inv_reason = inversion.market_for(product)
-        # **덧붙인다, 갈아치우지 않는다** — 다른 분기가 전부 그렇고(`| 제품:KB미시드…`),
-        # 갈아치우면 '왜 마켓이 비어 있었는가'(미언급)가 사라져 제외·모호로 보류된 행의
-        # 사유가 반쪽만 남는다.
-        if inv_reason:
-            reason = f"{reason} | {inv_reason}"
-        if inv_market:
-            market, mconf = inv_market, inv_conf
-            candidates = [inv_market]
+    # ③④⑤ — **항목이 아무 말도 안 했을 때만** 내려온다.
+    # ⛔ `own` 이 있었는데 보류된 행은 여기 안 들어온다. 그건 '증거가 갈렸다'는 뜻이고,
+    #   갈린 증거를 본문/제품명/상속으로 덮으면 개체연결의 보류 판정을 조용히 뒤집는다.
+    #   KB 미등재 오버레이가 이 성질에 기대어 오귀속을 막는다(§5.2).
+    if not own:
+        # ⓪ 이 **조각 자신의** 글 마켓(상속이 아닌 경우). `doc["market"]` 이 이 조각의 추출물
+        #    이면 그건 항목 증거에 준한다 — 형제 조각에서 온 값이 아니다.
+        if fallback_market and not inherited:
+            hits, mconf, how = kb.resolve_market(fallback_market)
+            candidates = [m["market_word"] for m in hits]
+            if len(hits) == 1 and mconf >= threshold:
+                market, reason = hits[0]["market_word"], f"{how} 단일매칭"
+            elif len(hits) > 1:
+                market, reason = None, f"{how} 충돌({len(hits)}후보)→보류"
+            else:
+                mconf, reason = 0.0, "미발견→보류"
+
+        # ③ 조각 본문이 **정확히 하나**의 마켓을 지목했나. 여럿이면(비교글) 아무것도 안 한다 —
+        #    '막는다'가 아니라 '만들지 않는다'이고, 그게 되돌린 행 스코프 가드와 다른 점이다.
+        if market is None and text_markets is not None and len(text_markets.unique) == 1:
+            mw = next(iter(text_markets.unique))
+            mconf = (REPAIR_CONF_PIECE_SURFACE
+                     if text_markets.how.get(mw) == "표면형" else REPAIR_CONF_PIECE_CHOSEONG)
+            market, candidates = mw, [mw]
+            reason = f"{REASON_PIECE_SCAN} 단일매칭"
+
+        # ④ 제품→마켓 역인덱스(A1). **상속보다 먼저** 본다 — 1층 유일소유는 판매자 본인
+        #    캡션에서 온 값이고, 상속은 형제 조각에서 온 값이다.
+        if market is None and product and inversion is not None:
+            inv_market, inv_conf, inv_reason = inversion.market_for(product)
+            # **덧붙인다, 갈아치우지 않는다** — 갈아치우면 '왜 마켓이 비어 있었는가'(미언급)가
+            # 사라져 제외·모호로 보류된 행의 사유가 반쪽만 남는다.
+            if inv_reason:
+                reason = f"{reason} | {inv_reason}"
+            if inv_market:
+                market, mconf, candidates = inv_market, inv_conf, [inv_market]
+
+        # ⑤ 스레드 상속. `link_post` 가 **제목이 그 마켓을 선언한 글에서만** 넘긴다(§6.3) —
+        #    제목에 마켓이 없는 나열/첨삭 글에서 한 조각의 마켓이 스레드 전체에 도장 찍히는
+        #    사고(스레드 200743, 19행)를 구조적으로 막는 자리다.
+        if market is None and fallback_market and inherited:
+            hits, _c, how = kb.resolve_market(fallback_market)
+            if len(hits) == 1:
+                market, mconf = hits[0]["market_word"], INHERIT_CONF
+                candidates = [market]
+                reason = f"{REASON_INHERIT} {how} 단일매칭"
+            elif len(hits) > 1:
+                candidates = [m["market_word"] for m in hits]
+                reason = f"{REASON_INHERIT} {how} 충돌({len(hits)}후보)→보류"
 
     if product:
         reason += " | 제품:KB미시드→미검증"
@@ -475,13 +751,33 @@ def link(
 
 
 def link_post(doc: dict, *, kb: KB, aliases: Optional[dict[str, str]] = None,
-              inversion: Optional[MarketInversion] = None) -> list[LinkResult]:
+              inversion: Optional[MarketInversion] = None,
+              unregistered=None, known_products=None,
+              text_markets: Optional[ScanResult] = None,
+              title_markets: Optional[ScanResult] = None) -> list[LinkResult]:
     """
     extract.py 의 후기 1건(dict) → 제품별 LinkResult 리스트.
     제품은 reviews[]별로 매핑하고, 마켓도 **항목이 자기 것을 말했으면 그걸 먼저** 쓴다
     (`reviews[].mentioned_market`). 최상위 `doc['market']` 은 그 항목이 아무 말도 안 했을 때의
     폴백이다 — 보통 1주문=1마켓이라 대개 이쪽이 쓰이지만, 여러 마켓을 나열한 글에서는
-    항목 값이 이긴다(`link` 독스트링의 3단 순서 참조).
+    항목 값이 이긴다(`link` 독스트링의 순서 참조).
+
+    **상속 권위는 제목이 갖는다**(2026-08-11). `doc["market"]` 이 스레드 상속분
+    (`_market_inherited`)인데 **제목이 그 마켓을 지목하지 않으면 넘기지 않는다.**
+    실측: 제목에 마켓이 없는 나열 글(스레드 200743 `인생슬 적구 가`)에서 한 댓글의 `ㅂㅉ`
+    하나가 그 글 20행 전부를 빈짱으로 만들었다 — 실제로는 `ㅂㅇㅍ`·`ㅍㅅㅌㄹ`·`ㅅㄹㄹ`·
+    `ㅇㅉ`·`ㅇㅇㅈ`·`ㅇㅊ` 가 섞인 글이고 1층 소유도 넷으로 갈린다.
+    ⚠️ 상속을 **통째로 없애지는 않는다** — 제목이 마켓을 선언한 글(`ㅂㅇㅍ 후기`)에서는
+      마켓을 안 밝힌 댓글이 여전히 글의 값을 받아야 개체연결이 선다
+      (게이트: `test_post_market_still_fills_empty_pieces` 와 같은 방향의 과잉수정 가드).
+
+    text_markets / title_markets: 조각 경계에서 **한 번** 계산한 `markets_in_text` 결과.
+      ⚠️ 파생 계산은 doc 표식이 아니라 **명시 인자**다 — 비공개 표식이 셋 넘어가면 doc 이
+        무엇을 계약하는지가 흐려진다. 추출이 만든 사실(`_market_inherited`·`_thread_title`)
+        만 표식이고, 스캔은 KB 가 필요해 추출층이 만들 수 없다.
+      `text_markets` 는 조각 본문이 필요한데 doc 엔 본문이 없다 → **호출부가 준다**
+        (`index.index_post` 가 `raw.text` 로 만든다). 안 주면 ③ 사다리가 꺼진다(무해).
+      `title_markets` 는 `doc["_thread_title"]` 에서 여기서 만든다.
 
     ⚠️ 역인덱스는 **제품별**로 갈릴 수 있다 — 마켓을 안 밝힌 비교글이면 제품마다 다른
       마켓이 붙는다. 그게 옳다: 그런 글의 각 항목은 실제로 서로 다른 마켓의 제품이다.
@@ -492,9 +788,43 @@ def link_post(doc: dict, *, kb: KB, aliases: Optional[dict[str, str]] = None,
     # 값을 옮기지 않고 표식만 다는 이유: `doc["market"]` 은 이미 여러 곳이 읽는 계약이고,
     # 옮기면 상속분이 조용히 사라진다(그 회귀는 `eval/test_extract_thread.py` 가 잡는다).
     inherited = bool(doc.get("_market_inherited"))
+    unreg = (load_unregistered_market_tokens() if unregistered is None
+             else frozenset(unregistered))
+    if title_markets is None:
+        title_markets = markets_in_text(doc.get("_thread_title") or "", kb,
+                                        unregistered=unreg, known_products=known_products)
+    if inherited and market:
+        # ⚠️ `doc["market"]` 은 추출기 표면형(`ㅂㅉ`)이고 `title_markets.unique` 는 정규
+        #   `market_word`(`빈짱`)다 — 정규화 없이 비교하면 **모든 초성 상속이 차단된다**
+        #   (개발 중 실제로 그렇게 짰다). 못 푸는 표면형은 어차피 `link()` 의 ⑤가 보류하므로
+        #   여기서 막지 않는다 — 막으면 표식이 '제목 때문'이라고 거짓말한다.
+        hits, _c, _h = kb.resolve_market(market)
+        resolved = hits[0]["market_word"] if len(hits) == 1 else None
+        if resolved and resolved not in title_markets.unique:
+            # 제목이 이 마켓을 선언하지 않았다 → 상속 권위 없음. 조용히 버리지 않고 표식을
+            # 남긴다(무음 금지 — 상속 커버리지가 움직였을 때 사후에 못 가른다).
+            doc["_inherit_blocked_by_title"] = market
+            market = None
+
+    # **스레드 단위 차단** — 이 조각(또는 그 스레드 제목)이 가리키는 마켓이 **미등재 토큰뿐**
+    # 이면 제품명으로 마켓을 추론하지 않는다. 감사 D2c 가 정확히 이 자리다: 스레드는 `ㅋㅋㅁ`
+    # 후기인데 `진저크런키` 라는 이름이 지나 1층과 겹쳐 **그 행만** 지나로 채워졌고, 같은 글의
+    # 다른 제품은 전부 NULL 이라 **한 글 안에서 마켓이 갈렸다**.
+    # ⚠️ 접두 분리만으로는 못 막는다 — 그 행의 제품명엔 접두가 없었다(`진저크런키` 뿐이다).
+    #   미등재 신호는 **조각/제목 본문**에만 있으므로 차단도 그 스코프여야 한다.
+    # ⚠️ KB 마켓을 하나라도 지목했으면 차단하지 않는다 — 미등재 마켓 얘기가 스쳐 지나간
+    #   정상 조각까지 끄면 되돌린 가드와 같은 '조용한 차단'이 된다.
+    scans = [s for s in (text_markets, title_markets) if s is not None]
+    if inversion is not None and any(s.unknown for s in scans) \
+            and not any(s.unique for s in scans):
+        doc["_inversion_blocked_by_unregistered"] = sorted(
+            {t for s in scans for t in s.unknown})
+        inversion = None
+
     return [link(r.get("mentioned_market"), r.get("mentioned_product"), kb=kb,
                  aliases=aliases, inversion=inversion, fallback_market=market,
-                 inherited=inherited)
+                 inherited=inherited, unregistered=unreg,
+                 known_products=known_products, text_markets=text_markets)
             for r in doc.get("reviews", [])]
 
 

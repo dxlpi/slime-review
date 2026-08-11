@@ -22,11 +22,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from slime_rag import linking, pipeline                # noqa: E402
 
 
+# ⚠️ **열거 게이트의 목록은 여기 한 곳이다.** 신규 복구 함수를 여기 안 넣으면 그 함수만
+#   규율(dry_run 기본 · LLM 0회 · 마켓 변경 시 3종 재생성) 밖에 남고, 그 사실이 아무 데도
+#   안 드러난다. 목록을 함수마다 흩어 두면 셋 중 하나에만 빠뜨리는 일이 반드시 생긴다.
+DRY_RUN_FNS = (
+    pipeline.backfill_review_markets, pipeline.backfill_market_confidence,
+    pipeline.repair_evidence_headers, pipeline.backfill_market_from_product,
+    pipeline.repair_dc_attribution,
+    pipeline.backfill_dc_market_priority, pipeline.revert_dc_market_priority,
+    pipeline.revert_overlay_blocked_fills, pipeline.revert_market_inversion,
+    pipeline.backfill_product_aliases, pipeline.backfill_review_bodies,
+    pipeline.backfill_sentiment_axis, pipeline.derive_dc_canonical_candidates,
+)
+# 마켓이 바뀌는 경로만. `backfill_market_confidence` 는 마켓을 안 건드리므로 제외이고
+# (`render_review` 는 확신도를 굽지 않는다), 사이드카·원문 백필도 마켓 밖이다.
+RE_RENDER_FNS = (
+    pipeline.backfill_review_markets, pipeline.repair_evidence_headers,
+    pipeline.backfill_market_from_product, pipeline.backfill_dc_market_priority,
+    pipeline.revert_dc_market_priority, pipeline.revert_overlay_blocked_fills,
+    pipeline.revert_market_inversion, pipeline.backfill_product_aliases,
+)
+
+
 def test_backfill_confidences_are_distinct_from_every_other_path():
     """⛔ **값 충돌 금지.** 겹치면 `WHERE market_confidence = ANY(...)` 로 그 층만 못 고른다."""
     others = {0.95, 0.85,                                   # 직접 매칭(표면형·초성)
               *linking.PREFIX_CONFS,                        # 제품명 접두
-              *linking.INVERSION_CONFS}                     # 제품→마켓 역인덱스
+              *linking.INVERSION_CONFS,                     # 제품→마켓 역인덱스
+              *linking.REPAIR_PIECE_CONFS,                  # 조각 본문 스캔
+              pipeline.REVERT_SENTINEL_CONF}                # 되돌리기 센티널
     for why, conf in pipeline.BACKFILL_CONFS.items():
         assert conf not in others, f"{why}({conf}) 가 다른 경로와 값이 겹친다"
     assert len(set(pipeline.BACKFILL_CONFS.values())) == len(pipeline.BACKFILL_CONFS), \
@@ -59,7 +83,7 @@ def test_market_fill_writes_the_confidence_column():
 
 def test_market_change_always_re_renders_evidence_tokens_and_embedding():
     """마켓이 바뀌는 경로는 셋을 **함께** 다시 만든다 — 하나만 고치면 인용과 검색이 갈린다."""
-    for fn in (pipeline.backfill_review_markets, pipeline.repair_evidence_headers):
+    for fn in RE_RENDER_FNS:
         src = inspect.getsource(fn)
         for col in ("evidence=%s", "tokens=%s", "embedding=%s"):
             assert col in src, f"{fn.__name__} 가 {col} 를 다시 안 만든다"
@@ -86,8 +110,7 @@ def test_confidence_only_backfill_does_not_touch_the_market():
 
 def test_every_repair_defaults_to_dry_run():
     """유료도 아니고 되돌리기도 어려운 쓰기는 **기본이 계획 출력**이어야 한다."""
-    for fn in (pipeline.backfill_review_markets, pipeline.backfill_market_confidence,
-               pipeline.repair_evidence_headers):
+    for fn in DRY_RUN_FNS:
         sig = inspect.signature(fn)
         assert sig.parameters["dry_run"].default is True, f"{fn.__name__} 의 dry_run 기본값이 True 가 아니다"
         assert sig.parameters["dry_run"].kind is inspect.Parameter.KEYWORD_ONLY, \
@@ -97,8 +120,7 @@ def test_every_repair_defaults_to_dry_run():
 
 def test_repairs_spend_no_llm_calls():
     """이 경로는 전부 무과금이어야 한다 — 재임베딩은 로컬 BGE-M3 다."""
-    for fn in (pipeline.backfill_review_markets, pipeline.backfill_market_confidence,
-               pipeline.repair_evidence_headers):
+    for fn in DRY_RUN_FNS:
         src = inspect.getsource(fn)
         for paid in ("LLM(", "llm.complete", "extract_review", "extract_spec"):
             assert paid not in src, f"{fn.__name__} 가 유료 호출을 한다: {paid}"
@@ -106,18 +128,99 @@ def test_repairs_spend_no_llm_calls():
 
 
 def test_the_body_scan_conflict_guard_stays_out():
-    """⛔ **되돌린 자리 — 다시 넣지 말 것.** '본문이 다른 마켓을 말했으면 채우지 마라' 가드.
+    """⛔ **되돌린 자리 — 옛 소비처에서의 부활은 계속 금지.**
 
-    개발 중 넣었다가 되돌렸다(2026-08-10). 비교글은 마켓이 여럿 등장하는 게 정상이고,
-    그중 하나를 제품명으로만 가리키는 것도 정상이다 — 표기 부재는 모순이 아니다.
-    실측 3건이 그 가드에 걸렸는데 셋 다 채운 값이 맞았다(`빠코볼, ㅂㅇㅍ 빨대 이런거였음` ·
-    `ㅅㅈㄴ` = 별칭 `슬지나` 의 초성이라 그 글이 곧 지나 글). 막는 쪽 손실은 화면에 안 보인다.
+    되돌린 것은 `backfill_review_markets` 안의 ***행 스코프 부정 가드***다: '본문이 다른
+    마켓을 말했으면 이미 정해진 채움을 거부하라'. 실패 모드는 "비교글에 마켓이 여럿 나오는
+    건 정상인데 그중 하나를 제품명으로만 가리킨 것을 모순으로 읽었다"이고, 실측 3건 전부
+    채운 값이 **맞았다**(`빠코볼, ㅂㅇㅍ 빨대 이런거였음` · `ㅅㅈㄴ` = 별칭 `슬지나` 의
+    초성이라 그 글이 곧 지나 글). 막는 쪽 손실은 화면에 안 보인다.
+
+    2026-08-11 에 **조각 스코프 긍정 스캐너**(`linking.markets_in_text`)가 생겼다. 스코프도
+    방향도 다르고, 무엇보다 **기수성**이 그 구분을 기계적으로 보장한다 — 그 결과는 `unique`
+    가 정확히 하나일 때만 근거가 되므로, 옛 가드를 깨뜨린 바로 그 입력(마켓을 여럿 나열하는
+    비교글)에서 **아무것도 만들지 않고 그냥 통과한다**(게이트:
+    `eval/test_market_scan.py::test_a_comparison_post_yields_no_single_market`).
+
+    그래서 이 게이트는 셋을 지킨다:
+      ① 옛 소비처에서의 부활 금지 — 되돌린 판정은 여전히 유효하다.
+      ② `hasattr` 금지는 해제하되 **죽은 코드 금지의 의도는 소비처 강제로 대체**한다.
+      ③ 되돌림의 진짜 교훈 — "**막는 판단을 조용히 하지 마라**" — 을 집행한다.
     """
-    src = inspect.getsource(pipeline.backfill_review_markets)
-    assert "markets_in_text" not in src, "되돌린 본문 스캔 가드가 되살아났다"
-    assert not hasattr(linking, "markets_in_text"), \
-        "가드용 헬퍼가 소비처 없이 남아 있다(죽은 코드)"
-    print("✓ 본문 스캔 충돌 가드 미부활 OK")
+    for fn in (pipeline.backfill_review_markets, pipeline.backfill_market_from_product):
+        assert "markets_in_text" not in inspect.getsource(fn), \
+            f"{fn.__name__} 에 되돌린 본문 스캔 가드가 되살아났다"
+    assert hasattr(linking, "markets_in_text"), "조각 스코프 스캐너가 없다"
+    for fn in (linking.link_post, pipeline.dc_market_target):
+        assert "markets_in_text" in inspect.getsource(fn), \
+            f"{fn.__name__} 가 스캐너를 안 쓴다 — 스캐너가 소비처 없이 남았다(죽은 코드)"
+    # ③ 조용한 차단 금지 — 충돌은 목록으로도 나가고 로그로도 남는다.
+    src = inspect.getsource(pipeline.backfill_dc_market_priority)
+    assert "conflict_list" in src and "log." in src, \
+        "충돌 판정이 사람 목록으로 안 나온다 — 막는 쪽 손실은 화면에 안 보인다"
+    print("✓ 본문 스캔: 옛 소비처 미부활 · 새 스캐너 소비처 강제 · 조용한 차단 금지 OK")
+
+
+def test_no_revert_path_writes_a_confidence_any_backfill_selector_matches():
+    """⛔ **되돌리기가 되돌려지지 않는 선재 결함** — 되돌린 행이 다음 백필에 재무장된다.
+
+    `revert_market_inversion` 은 `market_confidence=0` 으로 되돌렸는데
+    `backfill_market_from_product` 의 선택자가 `coalesce(market_confidence,0)=0::real` 이다.
+    실측(2026-08-11): amos 에서 그 선택자에 걸리는 행이 171개다. 되돌리기가 셋으로 늘어나면
+    표면적도 3배가 된다 — 그래서 **센티널**을 쓴다.
+    """
+    revert_fns = (pipeline.revert_market_inversion, pipeline.revert_overlay_blocked_fills,
+                  pipeline.revert_dc_market_priority)
+    for fn in revert_fns:
+        src = inspect.getsource(fn)
+        assert "market_confidence=0," not in src and "market_confidence = 0" not in src, \
+            f"{fn.__name__} 가 0 으로 되돌려 백필 선택자를 재무장한다"
+        assert "REVERT_SENTINEL_CONF" in src, f"{fn.__name__} 가 센티널을 안 쓴다"
+    from slime_rag.config import settings
+    assert pipeline.REVERT_SENTINEL_CONF != 0
+    assert pipeline.REVERT_SENTINEL_CONF < settings.link_abstain_threshold, \
+        "센티널이 보류선 위면 '마켓을 못 정했다'는 뜻이 사라진다"
+    # 선택자와의 비교차 — 센티널이 어떤 백필의 기본 WHERE 에도 안 걸린다.
+    sel = inspect.getsource(pipeline.backfill_market_from_product)
+    assert "include_reverted" in sel, "되돌린 행 재백필이 명시 인자로 안 막혀 있다"
+    assert inspect.signature(pipeline.backfill_market_from_product) \
+        .parameters["include_reverted"].default is False, "기본이 재무장이다"
+    print("✓ 되돌리기 센티널(재무장 금지) OK")
+
+
+def test_rollback_predicate_casts_to_real_including_the_sentinel():
+    """⚠️ `0.01` 은 REAL 로 **정확히 표현되지 않는다** — `::real` 캐스트가 빠지면 0행이다.
+
+    `INVERSION_ROLLBACK_WHERE` 가 겪은 함정과 같은 자리이고, 조용히 빈 결과라
+    '되돌릴 게 없다'와 구분되지 않는다.
+    """
+    import struct
+    assert struct.unpack("f", struct.pack("f", pipeline.REVERT_SENTINEL_CONF))[0] \
+        != pipeline.REVERT_SENTINEL_CONF, \
+        "센티널이 REAL 로 정확히 표현된다 — 이 케이스의 전제가 바뀌었으니 다시 볼 것"
+    assert "::real" in pipeline.INVERSION_ROLLBACK_WHERE
+    sel = inspect.getsource(pipeline.backfill_market_from_product)
+    assert "%s::real" in sel, "센티널 비교에 캐스트가 없다 — 조용히 0행"
+    print("✓ 센티널 ::real 캐스트 OK")
+
+
+def test_repair_ledgers_live_outside_dot_omc():
+    """⛔ **원장이 `.omc/` 아래면 세션 수명이다** — `.gitignore` 가 통째로 무시한다.
+
+    그러면 '되돌릴 수 있다'는 주장이 실제로는 거짓이다(기실행된
+    `backfill_non_product_labels` 의 롤백 주장도 이미 그 상태였다). 원장은 커밋되는
+    `data/repair_ledgers/` 에만 산다. 담는 건 id·이전값·이름·시각뿐이라 ADR-0013 안전이다.
+    """
+    from slime_rag import repair_ledger
+    p = str(repair_ledger.LEDGER_DIR)
+    assert "/.omc/" not in p and not p.endswith("/.omc"), f"원장이 .omc 아래다: {p}"
+    assert p.endswith("data/repair_ledgers"), p
+    assert repair_ledger.FORBIDDEN_FIELDS & {"body", "evidence", "attributes"}, \
+        "원장이 원문 칸을 막지 않는다"
+    for fn in (pipeline.backfill_dc_market_priority, pipeline.revert_overlay_blocked_fills,
+               pipeline.revert_market_inversion, pipeline.repair_dc_attribution):
+        assert "repair_ledger" in inspect.getsource(fn), f"{fn.__name__} 가 원장을 안 남긴다"
+    print("✓ 원장 위치·내용 계약 OK")
 
 
 # ------------------------------------------------------------------ 디시 귀속 제자리 복구

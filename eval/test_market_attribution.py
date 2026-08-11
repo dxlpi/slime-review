@@ -344,7 +344,10 @@ def test_inherited_market_carries_its_own_confidence():
     kb = _kb()
     own = linking.link_post({"market": "ㅂㅉ", "reviews": [
         {"mentioned_product": "한줌", "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
-    inh = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True, "reviews": [
+    # 제목이 그 마켓을 선언한 스레드여야 상속이 걸린다(§6.3 · AC12) — 아래 AC12 케이스가
+    # 제목 없는 쪽을 따로 고정한다.
+    inh = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True,
+                             "_thread_title": "ㅂㅉ 후기 몰아쓰기", "reviews": [
         {"mentioned_product": "한줌", "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
 
     assert own.market == inh.market == "빈짱", (own.market, inh.market)
@@ -355,7 +358,8 @@ def test_inherited_market_carries_its_own_confidence():
     assert linking.REASON_INHERIT in inh.reason, inh.reason
 
     # 항목이 자기 마켓을 말했으면 상속 표식이 있어도 그건 상속이 아니다.
-    said = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True, "reviews": [
+    said = linking.link_post({"market": "ㅂㅉ", "_market_inherited": True,
+                              "_thread_title": "ㅂㅉ 후기 몰아쓰기", "reviews": [
         {"mentioned_market": "ㅇㅉ", "mentioned_product": "한줌",
          "firsthand_evidence": "한줌 조음"}]}, kb=kb)[0]
     assert said.market == "연찌" and said.market_confidence != linking.INHERIT_CONF, \
@@ -372,12 +376,105 @@ def test_fill_path_confidences_never_collide():
             "inversion_spec": linking.INVERSION_CONF_SPEC,
             "inversion_registry": linking.INVERSION_CONF_REGISTRY,
             "inherit": linking.INHERIT_CONF,
+            "piece_surface": linking.REPAIR_CONF_PIECE_SURFACE,
+            "piece_choseong": linking.REPAIR_CONF_PIECE_CHOSEONG,
+            "revert_sentinel": pipeline.REVERT_SENTINEL_CONF,
             **{f"backfill_{k}": v for k, v in pipeline.BACKFILL_CONFS.items()}}
     # 직접 매칭 두 값(표면형 0.95 · 초성 0.85)과도 겹치면 안 된다.
     vals["direct_surface"], vals["direct_choseong"] = 0.95, 0.85
     assert len(set(vals.values())) == len(vals), f"확신도 충돌: {vals}"
+    assert len(vals) == 12, f"확신도 눈금 개수가 바뀌었다({len(vals)}) — 의도인지 확인할 것"
     assert linking.INHERIT_CONF > 0.6, "보류 임계 아래면 '채웠는데 보류'인 모순 행이 남는다"
     print(f"✓ 채움 경로 확신도 {len(vals)}개 전부 고유 OK")
+
+
+# ------------------------------------------------------- AC10~AC13 귀속 우선순위(계획 Phase 3)
+def _inv(pairs):
+    return linking.build_market_inversion(pairs, {}, excludes=[])
+
+
+def test_ac10_layer1_ownership_beats_thread_inheritance():
+    """**AC10** — 항목이 마켓을 말하지 않고 상속만 있을 때, 1층 유일소유가 상속을 **이긴다**.
+
+    감사 D2 18행이 정확히 이 순서 때문에 생겼다: `요구르팅` 의 1층 소유는 지나인데
+    늪지 스레드 상속이 덮었다. 예전 코드는 `surface` 에 `fallback_market` 이 섞여 있어서
+    상속이 있으면 역인덱스가 **아예 안 돌았다**.
+    """
+    kb = _kb()
+    doc = {"market": "늪지", "_market_inherited": True, "_thread_title": "ㄴㅈ 후기",
+           "reviews": [{"mentioned_product": "요구르팅"}]}
+    r = linking.link_post(doc, kb=kb, inversion=_inv([("지나", "요구르팅")]))[0]
+    assert r.market == "지나", f"상속이 1층 유일소유를 이겼다: {r.market} ({r.reason})"
+    assert r.market_confidence == linking.INVERSION_CONF_SPEC
+    # 1층이 그 이름을 모르면 상속이 그대로 산다(과잉수정 가드).
+    r2 = linking.link_post(doc, kb=kb, inversion=_inv([("지나", "다른것")]))[0]
+    assert (r2.market, r2.market_confidence) == ("늪지", linking.INHERIT_CONF), r2
+    print("✓ AC10 1층 유일소유 > 스레드 상속 OK")
+
+
+def test_ac11_an_abstained_mention_still_blocks_the_inversion():
+    """**AC11** — `mentioned_market` 충돌로 보류된 행은 역인덱스가 **안 돈다**(불변).
+
+    갈린 증거를 제품명 소유관계로 덮으면 개체연결의 보류 판정을 조용히 뒤집는 것이 된다.
+    """
+    kb = _conflict_kb()
+    r = linking.link("ㅁㅁ", "요구르팅", kb=kb, inversion=_inv([("머머", "요구르팅")]))
+    assert r.market is None, f"보류가 역인덱스로 뒤집혔다: {r.market}"
+    print("✓ AC11 보류 행은 역인덱스 미발동 OK")
+
+
+def test_ac12_inheritance_needs_the_title_to_declare_the_market():
+    """**AC12** — 제목에 마켓이 없는 스레드에서는 본문 마켓이 **상속되지 않는다**.
+
+    실측(스레드 200743 `인생슬 적구 가`): 한 댓글의 `ㅂㅉ 달토끼` 하나가 그 글 20행 전부를
+    빈짱으로 만들었다. 실제로는 `ㅂㅇㅍ`·`ㅍㅅㅌㄹ`·`ㅅㄹㄹ`·`ㅇㅉ`·`ㅇㅇㅈ`·`ㅇㅊ` 가 섞인
+    '내 인생슬 나열' 글이고 1층 소유는 베이퍼·웨이즈·봄·연찌로 갈린다.
+    ⚠️ 조용히 버리지 않는다 — `_inherit_blocked_by_title` 표식이 남는다(무음 금지).
+    """
+    kb = _kb()
+    doc = {"market": "빈짱", "_market_inherited": True, "_thread_title": "인생슬 적구 가",
+           "reviews": [{"mentioned_product": "달토끼"}]}
+    r = linking.link_post(doc, kb=kb)[0]
+    assert r.market is None, f"제목이 선언 안 한 마켓이 상속됐다: {r.market}"
+    assert doc.get("_inherit_blocked_by_title") == "빈짱", doc
+    print("✓ AC12 제목 미선언 → 상속 차단 OK")
+
+
+def test_ac13_a_declaring_title_still_lets_inheritance_through():
+    """**AC13** — 제목이 마켓을 선언한 스레드에서는 상속이 **여전히** 걸린다.
+
+    AC12 를 만족시키는 가장 쉬운 방법이 '상속 통째 제거'인데, 그러면 마켓을 안 밝힌 댓글의
+    귀속을 통째로 잃는다(`test_post_market_still_fills_empty_pieces` 와 같은 방향의 가드).
+    제목 표기는 초성(`ㅂㅉ`)이어도 되고 표면형(`빈짱`)이어도 된다 — 갤 관행이 초성이다.
+    """
+    kb = _kb()
+    for title in ("ㅂㅉ 후기 몰아쓰기", "빈짱 후기 몰아쓰기"):
+        doc = {"market": "빈짱", "_market_inherited": True, "_thread_title": title,
+               "reviews": [{"mentioned_product": "달토끼"}]}
+        r = linking.link_post(doc, kb=kb)[0]
+        assert r.market == "빈짱", f"제목이 선언했는데 상속이 끊겼다({title}): {r.reason}"
+        assert r.market_confidence == linking.INHERIT_CONF
+        assert "_inherit_blocked_by_title" not in doc
+    print("✓ AC13 제목 선언 스레드는 상속 유지 OK")
+
+
+def test_piece_body_scan_fills_only_on_a_single_market():
+    """조각 본문이 **정확히 하나**의 마켓을 지목할 때만 채운다 — 비교글에선 아무것도 안 한다.
+
+    이게 되돌린 행 스코프 가드와 다른 점의 기계적 근거다(ADR-0018 대안 (d) 기각 사유):
+    옛 가드를 깨뜨린 입력에서 이 경로는 **막지 않고 그냥 아무것도 만들지 않는다**.
+    """
+    kb = _kb()
+    doc = {"market": None, "reviews": [{"mentioned_product": "달토끼"}]}
+    one = linking.markets_in_text("ㅂㅉ 에서 산 거임", kb)
+    r = linking.link_post(doc, kb=kb, text_markets=one)[0]
+    assert r.market == "빈짱" and r.market_confidence == linking.REPAIR_CONF_PIECE_CHOSEONG, r
+    many = linking.markets_in_text("빠코볼, ㅂㅇㅍ 빨대 이런거였음. ㅁㅁㄴ 도 좋았고", kb)
+    assert len(many.unique) > 1, many.unique
+    r2 = linking.link_post({"market": None, "reviews": [{"mentioned_product": "달토끼"}]},
+                           kb=kb, text_markets=many)[0]
+    assert r2.market is None, f"비교글에서 마켓을 만들어 냈다: {r2.market}"
+    print("✓ 조각 본문 스캔: 단일일 때만 채움 OK")
 
 
 # ---------------------------------------------------------------- ③ 포함관계 후보(대역 conn)
@@ -464,6 +561,11 @@ if __name__ == "__main__":
     test_existing_three_layers_still_hold()
     test_inherited_market_carries_its_own_confidence()
     test_fill_path_confidences_never_collide()
+    test_ac10_layer1_ownership_beats_thread_inheritance()
+    test_ac11_an_abstained_mention_still_blocks_the_inversion()
+    test_ac12_inheritance_needs_the_title_to_declare_the_market()
+    test_ac13_a_declaring_title_still_lets_inheritance_through()
+    test_piece_body_scan_fills_only_on_a_single_market()
     test_containment_candidates_are_reported_not_merged()
     test_containment_output_carries_no_source_text()
     print("\n모든 마켓 귀속 테스트 통과 (LLM·DB·네트워크 미접촉)")

@@ -129,16 +129,28 @@ def test_curated_hashtags_cover_every_kb_market():
     회귀 근거(2026-08-07): `모모찌` 키가 빠져 있어 검색어 없는 광역 수집이 그 마켓 태그를
     **한 번도 요청하지 않았다**. 개수를 상수로 박아 두면(예전엔 13) 마켓이 늘 때 같은 구멍이
     다시 생기고, 요청을 안 했다는 사실은 0건과 구분되지 않아 조용하다.
+
+    ⚠️ 대상은 **`handle` 이 있는 마켓**뿐이다(2026-08-11). KB 가 14→38마켓이 되면서
+      **이름만 등록되고 `handle` 이 빈** 항목이 24개 생겼다 — 감사가 아모스갤에서 마켓 자리로
+      쓰인다고 지목한 초성들이고, 실명은 알아냈지만 IG 계정은 아직 모른다.
+      그 마켓들은 `pipeline._seller_targets` 가 경고와 함께 건너뛰므로 **수집 대상이 아니고**,
+      해시태그를 지어내면 실재하지 않는 태그를 요청하게 된다(1급 규칙: 모르는 건 안 만든다).
+      ⛔ 이 필터를 '전 마켓'으로 되돌리지 말 것 — 되돌리려면 핸들을 먼저 채워야 한다.
+        핸들이 채워지는 순간 `want` 가 자동으로 늘어 이 게이트가 다시 구멍을 잡는다.
     """
     import json
     from slime_rag import linking
 
     doc = json.loads(settings.ig_hashtags_path.read_text(encoding="utf-8"))
     have = set(doc["by_market"])
-    want = {m["market_word"] for m in linking.load_kb().markets if m.get("market_word")}
+    markets = linking.load_kb().markets
+    want = {m["market_word"] for m in markets if m.get("market_word") and m.get("handle")}
+    no_handle = {m["market_word"] for m in markets if not m.get("handle")}
     assert not (want - have), f"by_market 에 빠진 마켓: {sorted(want - have)}"
-    assert not (have - want), f"KB 에 없는 by_market 키(오타 의심): {sorted(have - want)}"
-    print(f"✓ 큐레이션 해시태그가 KB 마켓 {len(want)}개 전부 덮음 OK")
+    assert not (have - want - no_handle), \
+        f"KB 에 없는 by_market 키(오타 의심): {sorted(have - want - no_handle)}"
+    print(f"✓ 큐레이션 해시태그가 수집 가능한 KB 마켓 {len(want)}개 전부 덮음 OK "
+          f"(핸들 미상 {len(no_handle)}개는 수집 대상 밖)")
 
 
 def test_fetch_profiles_mapping():

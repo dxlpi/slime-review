@@ -1,0 +1,5307 @@
+{
+  "_note": "아모스갤 추출 전수 검수(사람) 오라클. 키는 (post_id, mentioned_product) — reviews.id 는 접기가 지우고 evidence 는 마켓 변경이 재렌더한다. 원문 바이트 없음(ADR-0013).",
+  "_key_fields": [
+    "post_id",
+    "mentioned_product"
+  ],
+  "_counts": {
+    "D1": 27,
+    "D2": 18,
+    "D2c": 1,
+    "D3": 3,
+    "D4": 3,
+    "D5a": 22,
+    "D5b": 25,
+    "D6": 54,
+    "D7": 4,
+    "D8": 7,
+    "D10": 8,
+    "F1": 115
+  },
+  "entries": [
+    {
+      "key": "amos-hanjul-compare-001␟한글과자한줌",
+      "post_id": "amos-hanjul-compare-001",
+      "mentioned_product": "한글과자한줌",
+      "thread_no": null,
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "한글과자한줌",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "빈짱",
+        "product": "한글과자한줌"
+      }
+    },
+    {
+      "key": "amos-hanjul-compare-001␟과일사탕한줌",
+      "post_id": "amos-hanjul-compare-001",
+      "mentioned_product": "과일사탕한줌",
+      "thread_no": null,
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "과일사탕한줌",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "빈짱",
+        "product": "과일사탕한줌"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767␟진저브레드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767",
+      "mentioned_product": "진저브레드",
+      "thread_no": "59767",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "진저브레드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "진저브레드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767␟바나나쉬폰케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767",
+      "mentioned_product": "바나나쉬폰케이크",
+      "thread_no": "59767",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "바나나쉬폰케이크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "바나나쉬폰케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767␟키위크림머랭",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=59767",
+      "mentioned_product": "키위크림머랭",
+      "thread_no": "59767",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "키위크림머랭",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "키위크림머랭"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597␟진저브레드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597",
+      "mentioned_product": "진저브레드",
+      "thread_no": "72597",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D3",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "진저브레드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "진저브레드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597␟애망요",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597",
+      "mentioned_product": "애망요",
+      "thread_no": "72597",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "애망요",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "애망요"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597␟말차와플",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=72597",
+      "mentioned_product": "말차와플",
+      "thread_no": "72597",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "말차와플",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "말차와플"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟윈터스노우볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "윈터스노우볼",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "윈터스노우볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "윈터스노우볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟바쉬케",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "바쉬케",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "바쉬케",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "바쉬케"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟애망요",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "애망요",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "애망요",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "애망요"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟사우어필드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "사우어필드",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "사우어필드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "사우어필드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟진저크런키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "진저크런키",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D2c",
+        "D1"
+      ],
+      "current": {
+        "market": "지나",
+        "product": "진저크런키",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": null,
+        "product": "진저크런키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟벨벳크림볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "벨벳크림볼",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "벨벳크림볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "벨벳크림볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟빅생볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "빅생볼",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "빅생볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "빅생볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟엑스트라띡밀크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "엑스트라띡밀크",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "엑스트라띡밀크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "엑스트라띡밀크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟진저브레드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "진저브레드",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "진저브레드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "진저브레드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟리아트리스디폼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "리아트리스디폼",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "리아트리스디폼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "리아트리스디폼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316␟레쿠칩",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316",
+      "mentioned_product": "레쿠칩",
+      "thread_no": "126316",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "레쿠칩",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "레쿠칩"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732320␟맥플",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732320",
+      "mentioned_product": "맥플",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "맥플",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "맥플"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732323␟진저브래드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732323",
+      "mentioned_product": "진저브래드",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "진저브래드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "진저브레드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732352␟플레이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732352",
+      "mentioned_product": "플레이크",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "플레이크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "플레이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732362␟맥플",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732362",
+      "mentioned_product": "맥플",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "맥플",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "맥플"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732471␟진저",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732471",
+      "mentioned_product": "진저",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "진저",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "진저"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732472␟물젤리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=126316#cmt:732472",
+      "mentioned_product": "물젤리",
+      "thread_no": "126316",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "물젤리",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "물젤리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟리치휩",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "리치휩",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "리치휩",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "리치휩"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟절미스프레드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "절미스프레드",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "절미스프레드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "절미스프레드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟베리베리타르트",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "베리베리타르트",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "베리베리타르트",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "베리베리타르트"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟베리시리얼요거트",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "베리시리얼요거트",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "베리시리얼요거트",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "베리시리얼요거트"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟해바라기볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "해바라기볼",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "해바라기볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "해바라기볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟체리아이스와플",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "체리아이스와플",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "체리아이스와플",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "체리아이스와플"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟은초코",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "은초코",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "은초코",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "은초코"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟딸기크림브라우니",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "딸기크림브라우니",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "딸기크림브라우니",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "딸기크림브라우니"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟감크숲",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "감크숲",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "감크숲",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "감크숲"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟만두밥",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "만두밥",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "만두밥",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "만두밥"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟하트잼쿠키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "하트잼쿠키",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "하트잼쿠키",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "하트잼쿠키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟댕댕이크림쿠키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "댕댕이크림쿠키",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "댕댕이크림쿠키",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "댕댕이크림쿠키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟더블비얀코",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "더블비얀코",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "더블비얀코",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "더블비얀코"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟콘햄치볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "콘햄치볼",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "콘햄치볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "콘햄치볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566␟밀크꼬끄카롱",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=128566",
+      "mentioned_product": "밀크꼬끄카롱",
+      "thread_no": "128566",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "밀크꼬끄카롱",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "플로라",
+        "product": "밀크꼬끄카롱"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟허밍",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "허밍",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "허밍",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "허밍"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟핑키별",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "핑키별",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "핑키별",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "핑키별"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟미봉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "미봉",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "미봉",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "미봉"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟버건디",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "버건디",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "버건디",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "버건디"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟네온라켓",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "네온라켓",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "네온라켓",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "네온라켓"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟빅코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "빅코볼",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "빅코볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빅코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟황치즈콘",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "황치즈콘",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "황치즈콘",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "황치즈콘"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟트로키카나",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "트로키카나",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "트로키카나",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "트로키카나"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟레트로하이볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "레트로하이볼",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "레트로하이볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "레트로하이볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟베스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "베스",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "베스",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "베스"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟칩스타치오",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "칩스타치오",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "칩스타치오",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "칩스타치오"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟팝시코크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "팝시코크",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "팝시코크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "팝시코크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟체리블러쉬",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "체리블러쉬",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "체리블러쉬",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "체리블러쉬"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟그릭포도",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "그릭포도",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "그릭포도",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "그릭포도"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟물먹치",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "물먹치",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "물먹치",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "물먹치"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟초베파",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "초베파",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "초베파",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "초베파"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟그리너리볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": "그리너리볼",
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "그리너리볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "그리너리볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738",
+      "mentioned_product": null,
+      "thread_no": "142738",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813313␟자몽",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813313",
+      "mentioned_product": "자몽",
+      "thread_no": "142738",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "자몽",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "자몽"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813318␟자몽",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813318",
+      "mentioned_product": "자몽",
+      "thread_no": "142738",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "자몽",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "자몽"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813318␟썸파",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813318",
+      "mentioned_product": "썸파",
+      "thread_no": "142738",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "썸파",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "썸파"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813322␟자몽",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=142738#cmt:813322",
+      "mentioned_product": "자몽",
+      "thread_no": "142738",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "자몽",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "자몽"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟빙하쇄빙선",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "빙하쇄빙선",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "빙하쇄빙선",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빙하쇄빙선"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟후르츠펑키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "후르츠펑키",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "후르츠펑키",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "후르츠펑키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟불량자몽",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "불량자몽",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "불량자몽",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "불량자몽"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟네온라켓",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "네온라켓",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "네온라켓",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "네온라켓"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟칩스타치오",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "칩스타치오",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "칩스타치오",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "칩스타치오"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟먹구름큐브",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "먹구름큐브",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "먹구름큐브",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "먹구름큐브"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟버건드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "버건드",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "버건드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "버건드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟프레즐리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "프레즐리",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "프레즐리",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "프레즐리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟민트볼초코",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "민트볼초코",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "민트볼초코",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "민트볼초코"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟디팡",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "디팡",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "디팡",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "디팡"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟빅코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "빅코볼",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "빅코볼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빅코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟미블",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "미블",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "미블",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "미블"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟데잇지",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "데잇지",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "데잇지",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "데잇지"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟체리블러쉬",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "체리블러쉬",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "체리블러쉬",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "체리블러쉬"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟애라즈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "애라즈",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "애라즈",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "애라즈"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟홀리스톤",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "홀리스톤",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "홀리스톤",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "홀리스톤"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟레몬스쿱",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "레몬스쿱",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "레몬스쿱",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "레몬스쿱"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟아씨밥",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "아씨밥",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "아씨밥",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "아씨밥"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610␟헤이븐빌리지",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610",
+      "mentioned_product": "헤이븐빌리지",
+      "thread_no": "143610",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "헤이븐빌리지",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "헤이븐빌리지"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816856␟믹스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816856",
+      "mentioned_product": "믹스",
+      "thread_no": "143610",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "믹스",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "믹스"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816859␟빙하",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816859",
+      "mentioned_product": "빙하",
+      "thread_no": "143610",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "빙하",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "빙하"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816878␟믹스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816878",
+      "mentioned_product": "믹스",
+      "thread_no": "143610",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "믹스",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "믹스"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816891␟불량",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=143610#cmt:816891",
+      "mentioned_product": "불량",
+      "thread_no": "143610",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "불량",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "불량"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟미쯔머핀",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "미쯔머핀",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "미쯔머핀",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "미쯔머핀"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟얼음와작",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "얼음와작",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "얼음와작",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "얼음와작"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟해피밀런치박스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "해피밀런치박스",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "해피밀런치박스",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "해피밀런치박스"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟블루베리곰카롱",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "블루베리곰카롱",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "블루베리곰카롱",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "블루베리곰카롱"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟애니멀치즈쿠키슈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "애니멀치즈쿠키슈",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "애니멀치즈쿠키슈",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "애니멀치즈쿠키슈"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟베리치즈글레이즈드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "베리치즈글레이즈드",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "베리치즈글레이즈드",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "베리치즈글레이즈드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟애플생크림카스테라",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "애플생크림카스테라",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "애플생크림카스테라",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "애플생크림카스테라"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟초코벌룬컵케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "초코벌룬컵케이크",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "초코벌룬컵케이크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "초코벌룬컵케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474␟꼬끄래빗",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=181474",
+      "mentioned_product": "꼬끄래빗",
+      "thread_no": "181474",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "꼬끄래빗",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "코코모",
+        "product": "꼬끄래빗"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=184299#cmt:1008992␟뚝딱보리굴비",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=184299#cmt:1008992",
+      "mentioned_product": "뚝딱보리굴비",
+      "thread_no": "184299",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "뚝딱보리굴비",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "진통제",
+        "product": "뚝딱보리굴비"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184␟로투스버터쿠크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184",
+      "mentioned_product": "로투스버터쿠크",
+      "thread_no": "189184",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D3"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "로투스버터쿠크",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "로투스버터쿠크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184␟토마토라구파스타",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184",
+      "mentioned_product": "토마토라구파스타",
+      "thread_no": "189184",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "토마토라구파스타",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "토마토라구파스타"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184␟모닝빠앙",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184",
+      "mentioned_product": "모닝빠앙",
+      "thread_no": "189184",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "모닝빠앙",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "모닝빠앙"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184␟허니넛츠시리얼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189184",
+      "mentioned_product": "허니넛츠시리얼",
+      "thread_no": "189184",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "허니넛츠시리얼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "허니넛츠시리얼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511",
+      "mentioned_product": "빠코볼",
+      "thread_no": "189511",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "빠코볼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032182␟우드폼볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032182",
+      "mentioned_product": "우드폼볼",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "D1"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "우드폼볼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "페페롱",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032184␟ㄴㅈ 풀 조합 비슷한 생베",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032184",
+      "mentioned_product": "ㄴㅈ 풀 조합 비슷한 생베",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "풀 조합 비슷한 생베",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032185␟요구르팅",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032185",
+      "mentioned_product": "요구르팅",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "요구르팅",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "요구르팅"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032190␟헝잭버거",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032190",
+      "mentioned_product": "헝잭버거",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "헝잭버거",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "헝잭버거"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032197␟쿠리티",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032197",
+      "mentioned_product": "쿠리티",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D3"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "쿠리티",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "쿠리티"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032227␟헝잭버거",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032227",
+      "mentioned_product": "헝잭버거",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "헝잭버거",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "헝잭버거"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032227␟건체리크럼블",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032227",
+      "mentioned_product": "건체리크럼블",
+      "thread_no": "189511",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "건체리크럼블",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "건체리크럼블"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189588#cmt:1032525␟퐁말",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189588#cmt:1032525",
+      "mentioned_product": "퐁말",
+      "thread_no": "189588",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": null,
+        "product": "퐁말",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=190545␟마롱크림",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=190545",
+      "mentioned_product": "마롱크림",
+      "thread_no": "190545",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "마롱크림",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "마롱크림식빵"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=191005␟바나나 피넛 버터컵",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=191005",
+      "mentioned_product": "바나나 피넛 버터컵",
+      "thread_no": "191005",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "바나나 피넛 버터컵",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "바나나피넛버터컵"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=191970␟지글리 구아검 들어간 것",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=191970",
+      "mentioned_product": "지글리 구아검 들어간 것",
+      "thread_no": "191970",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "지글리 구아검 들어간 것",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=194006#cmt:1055454␟할로윈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=194006#cmt:1055454",
+      "mentioned_product": "할로윈",
+      "thread_no": "194006",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "할로윈",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609␟로지가든",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609",
+      "mentioned_product": "로지가든",
+      "thread_no": "195609",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "로지가든",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "로지가든"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609␟쿠앤크초코퍼지",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609",
+      "mentioned_product": "쿠앤크초코퍼지",
+      "thread_no": "195609",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "쿠앤크초코퍼지",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "쿠앤크초코퍼지"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609␟블루베리요거보울",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609",
+      "mentioned_product": "블루베리요거보울",
+      "thread_no": "195609",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1",
+        "D2"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "블루베리요거보울",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "블루베리요거보울"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609#cmt:1062957␟바토디",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609#cmt:1062957",
+      "mentioned_product": "바토디",
+      "thread_no": "195609",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "바토디",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "바토디"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609#cmt:1062958␟바나나피넛버터",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195609#cmt:1062958",
+      "mentioned_product": "바나나피넛버터",
+      "thread_no": "195609",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "바나나피넛버터",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "바나나피넛버터컵"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195979␟랍스터 빠다구이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=195979",
+      "mentioned_product": "랍스터 빠다구이",
+      "thread_no": "195979",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "랍스터 빠다구이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "랍스터빠다구이"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199071␟허니",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199071",
+      "mentioned_product": "허니",
+      "thread_no": "199071",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "허니",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "허니"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199460␟화초생케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199460",
+      "mentioned_product": "화초생케이크",
+      "thread_no": "199460",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "화초생케이크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "화초생케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199680#cmt:1080852␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199680#cmt:1080852",
+      "mentioned_product": "빠코볼",
+      "thread_no": "199680",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "빠코볼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199836␟존나좋다",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199836",
+      "mentioned_product": "존나좋다",
+      "thread_no": "199836",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b",
+        "D10"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "존나좋다",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887␟초코비크런키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887",
+      "mentioned_product": "초코비크런키",
+      "thread_no": "199887",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "초코비크런키",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "초코비크런키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887␟베리팝스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887",
+      "mentioned_product": "베리팝스",
+      "thread_no": "199887",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "베리팝스",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "베리팝스"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887␟갈릭쉬림프마요",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887",
+      "mentioned_product": "갈릭쉬림프마요",
+      "thread_no": "199887",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "갈릭쉬림프마요",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "갈릭쉬림프마요"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887␟허니푸냥이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887",
+      "mentioned_product": "허니푸냥이",
+      "thread_no": "199887",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "허니푸냥이",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "허니푸냥이"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887␟비매품 1번",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199887",
+      "mentioned_product": "비매품 1번",
+      "thread_no": "199887",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D10"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200606#cmt:1084866␟아생케",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200606#cmt:1084866",
+      "mentioned_product": "아생케",
+      "thread_no": "200606",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "아생케",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "아생케"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200606#cmt:1084875␟첫굼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200606#cmt:1084875",
+      "mentioned_product": "첫굼",
+      "thread_no": "200606",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "첫굼",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200699␟ㅅㄱㄷ UFO머핀",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200699",
+      "mentioned_product": "ㅅㄱㄷ UFO머핀",
+      "thread_no": "200699",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D7"
+      ],
+      "current": {
+        "market": null,
+        "product": "ㅅㄱㄷ UFO머핀",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "UFO머핀"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200738#cmt:1085529␟아생케",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200738#cmt:1085529",
+      "mentioned_product": "아생케",
+      "thread_no": "200738",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "아생케",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "아생케"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743␟적구 가",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743",
+      "mentioned_product": "적구 가",
+      "thread_no": "200743",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "적구 가",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085505␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085505",
+      "mentioned_product": "빠코볼",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "빠코볼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506␟파이토",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506",
+      "mentioned_product": "파이토",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "파이토",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "파이토"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506␟오레오",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506",
+      "mentioned_product": "오레오",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "오레오",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "오레오"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506␟빨대슬",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506",
+      "mentioned_product": "빨대슬",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "빨대슬",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085509␟초코칩쿠키도우",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085509",
+      "mentioned_product": "초코칩쿠키도우",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "초코칩쿠키도우",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "뭉슬라임",
+        "product": "초코칩쿠키도우"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085510␟아작이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085510",
+      "mentioned_product": "아작이",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "아작이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "파스텔로",
+        "product": "아작이"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085512␟약과별",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085512",
+      "mentioned_product": "약과별",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "약과별",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "스르륵",
+        "product": "약과별"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514␟마롱크림식빵",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514",
+      "mentioned_product": "마롱크림식빵",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "마롱크림식빵",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "마롱크림식빵"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514␟파치크림",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514",
+      "mentioned_product": "파치크림",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "파치크림",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": "파치크림"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514␟그래놀라딸기토스트",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514",
+      "mentioned_product": "그래놀라딸기토스트",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "그래놀라딸기토스트",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "그래놀라딸기토스트"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514␟빈티지크림케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514",
+      "mentioned_product": "빈티지크림케이크",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "빈티지크림케이크",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "빈티지크림케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514␟멜로플레이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085514",
+      "mentioned_product": "멜로플레이크",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "멜로플레이크",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "멜로플레이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085539␟블치크림",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085539",
+      "mentioned_product": "블치크림",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "블치크림",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": "블치크림"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085539␟치케버터맛쿠키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085539",
+      "mentioned_product": "치케버터맛쿠키",
+      "thread_no": "200743",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "치케버터맛쿠키",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "연찌",
+        "product": "치케버터맛쿠키"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200853#cmt:1085974␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200853#cmt:1085974",
+      "mentioned_product": null,
+      "thread_no": "200853",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200953␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200953",
+      "mentioned_product": "빠코볼",
+      "thread_no": "200953",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "지나",
+        "product": "빠코볼",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "스르륵",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200965#cmt:1086438␟슬랑이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200965#cmt:1086438",
+      "mentioned_product": "슬랑이",
+      "thread_no": "200965",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "지나",
+        "product": "슬랑이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201080#cmt:1086936␟ㅃㅇ",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201080#cmt:1086936",
+      "mentioned_product": "ㅃㅇ",
+      "thread_no": "201080",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "삐야",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123␟미감",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123",
+      "mentioned_product": "미감",
+      "thread_no": "201123",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "미감",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087073␟첫굼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087073",
+      "mentioned_product": "첫굼",
+      "thread_no": "201123",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "첫굼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087075␟디폼류",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087075",
+      "mentioned_product": "디폼류",
+      "thread_no": "201123",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "디폼류",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201142␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201142",
+      "mentioned_product": "빠코볼",
+      "thread_no": "201142",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "지나",
+        "product": "빠코볼",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201142#cmt:1087164␟빠코볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201142#cmt:1087164",
+      "mentioned_product": "빠코볼",
+      "thread_no": "201142",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "지나",
+        "product": "빠코볼",
+        "market_confidence": 0.9
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": "빠코볼"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201175#cmt:1087304␟디폼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201175#cmt:1087304",
+      "mentioned_product": "디폼",
+      "thread_no": "201175",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201175#cmt:1087318␟육쩐 젤쿠칩",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201175#cmt:1087318",
+      "mentioned_product": "육쩐 젤쿠칩",
+      "thread_no": "201175",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "육쩐 젤쿠칩",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "육쩐 젤쿠칩"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201302␟초코디폼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201302",
+      "mentioned_product": "초코디폼",
+      "thread_no": "201302",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "초코디폼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201437#cmt:1088421␟바나나 빨대",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201437#cmt:1088421",
+      "mentioned_product": "바나나 빨대",
+      "thread_no": "201437",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "바나나 빨대",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088523␟플레잉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088523",
+      "mentioned_product": "플레잉",
+      "thread_no": "201464",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "플레잉",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088525␟플레잉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088525",
+      "mentioned_product": "플레잉",
+      "thread_no": "201464",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "플레잉",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088527␟플레잉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088527",
+      "mentioned_product": "플레잉",
+      "thread_no": "201464",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "플레잉",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088547␟플레잉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088547",
+      "mentioned_product": "플레잉",
+      "thread_no": "201464",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "플레잉",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "베이퍼",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495␟레몬커드쉘",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "mentioned_product": "레몬커드쉘",
+      "thread_no": "201495",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "레몬커드쉘",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": "레몬커드쉘도넛"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495␟피쵸필드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "mentioned_product": "피쵸필드",
+      "thread_no": "201495",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D8"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "피쵸필드",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": "피쵸필드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495␟냥티시에",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "mentioned_product": "냥티시에",
+      "thread_no": "201495",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D8"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "냥티시에",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": "냥티시에"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495␟미도리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "mentioned_product": "미도리",
+      "thread_no": "201495",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "미도리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": "미도리푸딩소다"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201524#cmt:1088780␟유슬이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201524#cmt:1088780",
+      "mentioned_product": "유슬이",
+      "thread_no": "201524",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "웨이즈",
+        "product": "유슬이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201550#cmt:1088836␟초코별",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201550#cmt:1088836",
+      "mentioned_product": "초코별",
+      "thread_no": "201550",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "웨이즈",
+        "product": "초코별",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": "초코별파일럿"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201551#cmt:1088846␟할로윈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201551#cmt:1088846",
+      "mentioned_product": "할로윈",
+      "thread_no": "201551",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "웨이즈",
+        "product": "할로윈",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679␟갈릭스콘",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679",
+      "mentioned_product": "갈릭스콘",
+      "thread_no": "201679",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "연찌",
+        "product": "갈릭스콘",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "연찌",
+        "product": "디저트갈릭스콘"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679␟딸기요거트",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679",
+      "mentioned_product": "딸기요거트",
+      "thread_no": "201679",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "연찌",
+        "product": "딸기요거트",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "연찌",
+        "product": "떠먹는딸기요거트"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679␟펄러비즈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679",
+      "mentioned_product": "펄러비즈",
+      "thread_no": "201679",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "연찌",
+        "product": "펄러비즈",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "연찌",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679#cmt:1089299␟펄러비즈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679#cmt:1089299",
+      "mentioned_product": "펄러비즈",
+      "thread_no": "201679",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "연찌",
+        "product": "펄러비즈",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "연찌",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201978#cmt:1090453␟유자",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201978#cmt:1090453",
+      "mentioned_product": "유자",
+      "thread_no": "201978",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D8",
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "유자",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "유자"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201978#cmt:1090453␟빠코",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201978#cmt:1090453",
+      "mentioned_product": "빠코",
+      "thread_no": "201978",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D8",
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "빠코",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987␟글루올",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987",
+      "mentioned_product": "글루올",
+      "thread_no": "201987",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987␟빨대",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987",
+      "mentioned_product": "빨대",
+      "thread_no": "201987",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987#cmt:1090534␟갈배괴물",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201987#cmt:1090534",
+      "mentioned_product": "갈배괴물",
+      "thread_no": "201987",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "갈배괴물",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "간배괴물"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202004#cmt:1090600␟크런키",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202004#cmt:1090600",
+      "mentioned_product": "크런키",
+      "thread_no": "202004",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": null,
+        "product": "크런키",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202004#cmt:1090605␟유폭찜",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202004#cmt:1090605",
+      "mentioned_product": "유폭찜",
+      "thread_no": "202004",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "유폭찜",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "유폭찜"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202007#cmt:1090617␟디폼클리어",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202007#cmt:1090617",
+      "mentioned_product": "디폼클리어",
+      "thread_no": "202007",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "디폼클리어",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202008#cmt:1090623␟레몬커드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202008#cmt:1090623",
+      "mentioned_product": "레몬커드",
+      "thread_no": "202008",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "레몬커드",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": "레몬커드쉘도넛"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090764␟와이풀 그린티",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090764",
+      "mentioned_product": "와이풀 그린티",
+      "thread_no": "202036",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "와이풀 그린티",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "와이풀그린티"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090765␟막걸리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090765",
+      "mentioned_product": "막걸리",
+      "thread_no": "202036",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "막걸리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "막걸리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090776␟막걸리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090776",
+      "mentioned_product": "막걸리",
+      "thread_no": "202036",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "막걸리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "막걸리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202038␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202038",
+      "mentioned_product": null,
+      "thread_no": "202038",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202122␟츄빵",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202122",
+      "mentioned_product": "츄빵",
+      "thread_no": "202122",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "츄빵",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124␟썬더락",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124",
+      "mentioned_product": "썬더락",
+      "thread_no": "202124",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "썬더락",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "에스지",
+        "product": "썬더락"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124␟씨브리즈",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124",
+      "mentioned_product": "씨브리즈",
+      "thread_no": "202124",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "씨브리즈",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "에스지",
+        "product": "씨브리즈"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124␟교동 지글리 비매",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124",
+      "mentioned_product": "교동 지글리 비매",
+      "thread_no": "202124",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "에스지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124#cmt:1091110␟모노리본",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124#cmt:1091110",
+      "mentioned_product": "모노리본",
+      "thread_no": "202124",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "모노리본",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "에스지",
+        "product": "모노리본"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124#cmt:1091112␟돌슬라임",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124#cmt:1091112",
+      "mentioned_product": "돌슬라임",
+      "thread_no": "202124",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": null,
+        "product": "돌슬라임",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202131␟이번차수",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202131",
+      "mentioned_product": "이번차수",
+      "thread_no": "202131",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "지나",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091191␟뀰샐러드",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091191",
+      "mentioned_product": "뀰샐러드",
+      "thread_no": "202139",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "뀰샐러드",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "지나",
+        "product": "뀰샐러드"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091387␟아이스체리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091387",
+      "mentioned_product": "아이스체리",
+      "thread_no": "202139",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "아이스체리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "아이스체리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091394␟아이스체리콕",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202139#cmt:1091394",
+      "mentioned_product": "아이스체리콕",
+      "thread_no": "202139",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "베이퍼",
+        "product": "아이스체리콕",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "아이스체리콕"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159␟슬랑이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159",
+      "mentioned_product": "슬랑이",
+      "thread_no": "202159",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "슬랑이",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159",
+      "mentioned_product": null,
+      "thread_no": "202159",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091271␟슬랑이갤로",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091271",
+      "mentioned_product": "슬랑이갤로",
+      "thread_no": "202159",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "슬랑이갤로",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091287␟슬랑이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091287",
+      "mentioned_product": "슬랑이",
+      "thread_no": "202159",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "슬랑이",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165␟오마카슬3",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165",
+      "mentioned_product": "오마카슬3",
+      "thread_no": "202165",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D4",
+        "D1"
+      ],
+      "current": {
+        "market": "푸딩",
+        "product": "오마카슬3",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": null,
+        "product": "오마카슬3"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165#cmt:1091297␟펌킨치즈케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165#cmt:1091297",
+      "mentioned_product": "펌킨치즈케이크",
+      "thread_no": "202165",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D4"
+      ],
+      "current": {
+        "market": "푸딩",
+        "product": "펌킨치즈케이크",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": null,
+        "product": "펌킨치즈케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165#cmt:1091311␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202165#cmt:1091311",
+      "mentioned_product": null,
+      "thread_no": "202165",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D4"
+      ],
+      "current": {
+        "market": "푸딩",
+        "product": null,
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202173␟ㄴㅈ 서비스 폼볼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202173",
+      "mentioned_product": "ㄴㅈ 서비스 폼볼",
+      "thread_no": "202173",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "서비스 폼볼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202173␟갈배",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202173",
+      "mentioned_product": "갈배",
+      "thread_no": "202173",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "갈배",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "갈배"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182␟디자인",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182",
+      "mentioned_product": "디자인",
+      "thread_no": "202182",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "디자인",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182#cmt:1091401␟고양이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182#cmt:1091401",
+      "mentioned_product": "고양이",
+      "thread_no": "202182",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "고양이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189␟밀키크림파르페",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189",
+      "mentioned_product": "밀키크림파르페",
+      "thread_no": "202189",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D2"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "밀키크림파르페",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "모모네",
+        "product": "밀키크림파르페"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189#cmt:1091409␟말차뭉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189#cmt:1091409",
+      "mentioned_product": "말차뭉",
+      "thread_no": "202189",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": null,
+        "product": "말차뭉",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": "말차뭉"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189#cmt:1091430␟디폼생베",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189#cmt:1091430",
+      "mentioned_product": "디폼생베",
+      "thread_no": "202189",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "디폼생베",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202191#cmt:1091431␟구ㅍㄷ",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202191#cmt:1091431",
+      "mentioned_product": "구ㅍㄷ",
+      "thread_no": "202191",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D7",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "구ㅍㄷ",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "푸딩",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091512␟프링글스",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091512",
+      "mentioned_product": "프링글스",
+      "thread_no": "202205",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "프링글스",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091527␟마카롱",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091527",
+      "mentioned_product": "마카롱",
+      "thread_no": "202205",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "마카롱",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202208␟크런치 슬라임",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202208",
+      "mentioned_product": "크런치 슬라임",
+      "thread_no": "202208",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "크런치 슬라임",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "띵이",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202210␟인수메뉴들",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202210",
+      "mentioned_product": "인수메뉴들",
+      "thread_no": "202210",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "인수메뉴들",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202224#cmt:1091579␟크런치",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202224#cmt:1091579",
+      "mentioned_product": "크런치",
+      "thread_no": "202224",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226␟슬켓",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226",
+      "mentioned_product": "슬켓",
+      "thread_no": "202226",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "슬켓",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "빈짱",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226#cmt:1091609␟빠삭이",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226#cmt:1091609",
+      "mentioned_product": "빠삭이",
+      "thread_no": "202226",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "빈짱",
+        "product": "빠삭이",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "빈짱",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233␟배",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233",
+      "mentioned_product": "배",
+      "thread_no": "202233",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "배",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "갈배"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233␟막걸리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233",
+      "mentioned_product": "막걸리",
+      "thread_no": "202233",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "막걸리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "막걸리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233#cmt:1091618␟막걸리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233#cmt:1091618",
+      "mentioned_product": "막걸리",
+      "thread_no": "202233",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "막걸리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "막걸리"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234␟뼈갈우나",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234",
+      "mentioned_product": "뼈갈우나",
+      "thread_no": "202234",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "뼈갈우나",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "뼈갈우"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234␟갈배",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234",
+      "mentioned_product": "갈배",
+      "thread_no": "202234",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "갈배",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "갈배"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234#cmt:1091628␟참새눈까리",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234#cmt:1091628",
+      "mentioned_product": "참새눈까리",
+      "thread_no": "202234",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "참새눈까리",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "참새눈까리죽"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244␟뭉치",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244",
+      "mentioned_product": "뭉치",
+      "thread_no": "202244",
+      "kind": "post",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "뭉치",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "뭉치"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091670␟케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091670",
+      "mentioned_product": "케이크",
+      "thread_no": "202244",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "케이크",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091676␟비뭉",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091676",
+      "mentioned_product": "비뭉",
+      "thread_no": "202244",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "비뭉",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "비뭉"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091684␟뭉치",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091684",
+      "mentioned_product": "뭉치",
+      "thread_no": "202244",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "뭉치",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "뭉치"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091684␟케이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202244#cmt:1091684",
+      "mentioned_product": "케이크",
+      "thread_no": "202244",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "케이크",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246␟파츠",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246",
+      "mentioned_product": "파츠",
+      "thread_no": "202246",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "파츠",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246␟지비프",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246",
+      "mentioned_product": "지비프",
+      "thread_no": "202246",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "지비프",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246#cmt:1091673␟석기시대",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246#cmt:1091673",
+      "mentioned_product": "석기시대",
+      "thread_no": "202246",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": "머머",
+        "product": "석기시대",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "머머",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249␟ㅋㅈ(ㅁㅁ)",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249",
+      "mentioned_product": "ㅋㅈ(ㅁㅁ)",
+      "thread_no": "202249",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "D7"
+      ],
+      "current": {
+        "market": null,
+        "product": "ㅋㅈ(ㅁㅁ)",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249#cmt:1091683␟ㅂ",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249#cmt:1091683",
+      "mentioned_product": "ㅂ",
+      "thread_no": "202249",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "봄",
+        "product": null,
+        "market_confidence": 0.82
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249#cmt:1091694␟생베",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249#cmt:1091694",
+      "mentioned_product": "생베",
+      "thread_no": "202249",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "웨이즈",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202264#cmt:1091785␟바나나",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202264#cmt:1091785",
+      "mentioned_product": "바나나",
+      "thread_no": "202264",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "바나나",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "바나나피칸케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202264#cmt:1091794␟바나나",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202264#cmt:1091794",
+      "mentioned_product": "바나나",
+      "thread_no": "202264",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "바나나",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "바나나피칸케이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟블베청",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "블베청",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "블베청",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "블베청"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟궁둥이의 은신술",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "궁둥이의 은신술",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "궁둥이의 은신술",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "궁둥이의 은신술"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟벌집 카이막",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "벌집 카이막",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "벌집 카이막",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "벌집 카이막"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟쿠키 바닐라 어쩌구",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "쿠키 바닐라 어쩌구",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟버블버블 어쩌구",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "버블버블 어쩌구",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟알리고 치즈사과",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "알리고 치즈사과",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "알리고 치즈사과",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "알리고 치즈사과"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟생크림 뼈 어쩌구",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "생크림 뼈 어쩌구",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266␟두유쉐이크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266",
+      "mentioned_product": "두유쉐이크",
+      "thread_no": "202266",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "두유쉐이크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "두유쉐이크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266#cmt:1091795␟봄 누텔라 바이트",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266#cmt:1091795",
+      "mentioned_product": "봄 누텔라 바이트",
+      "thread_no": "202266",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "누텔라 바이트",
+        "market_confidence": 0.92
+      },
+      "proposed": {
+        "market": "봄",
+        "product": "누텔라바이트"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266#cmt:1091826␟콰작컵케2크",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202266#cmt:1091826",
+      "mentioned_product": "콰작컵케2크",
+      "thread_no": "202266",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": "콰작컵케2크",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "호씨",
+        "product": "콰작컵케2크"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270",
+      "mentioned_product": null,
+      "thread_no": "202270",
+      "kind": "post",
+      "status": "🔧 수정",
+      "codes": [
+        "F1",
+        "D8"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "진라임",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091799␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091799",
+      "mentioned_product": null,
+      "thread_no": "202270",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D8"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091801␟",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091801",
+      "mentioned_product": null,
+      "thread_no": "202270",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D8"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091848␟ㅍㅍㄹ 애플크림머핀",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091848",
+      "mentioned_product": "ㅍㅍㄹ 애플크림머핀",
+      "thread_no": "202281",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D7"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "ㅍㅍㄹ 애플크림머핀",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": null,
+        "product": "애플크림머핀"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091849␟숭덩자바",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091849",
+      "mentioned_product": "숭덩자바",
+      "thread_no": "202281",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "숭덩자바",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "숭덩자바"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091849␟잘자바",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091849",
+      "mentioned_product": "잘자바",
+      "thread_no": "202281",
+      "kind": "comment",
+      "status": "⚠️ 지적",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "예찬",
+        "product": "잘자바",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "예찬",
+        "product": "잘자바"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202288#cmt:1091868␟멜로디",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202288#cmt:1091868",
+      "mentioned_product": "멜로디",
+      "thread_no": "202288",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "멜로디",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "멜로디크림"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202295#cmt:1091887␟별디폼",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202295#cmt:1091887",
+      "mentioned_product": "별디폼",
+      "thread_no": "202295",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a"
+      ],
+      "current": {
+        "market": "봄",
+        "product": "별디폼",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "봄",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202300#cmt:1091900␟사해구",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202300#cmt:1091900",
+      "mentioned_product": "사해구",
+      "thread_no": "202300",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5b"
+      ],
+      "current": {
+        "market": null,
+        "product": "사해구",
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": null,
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202300#cmt:1091902␟ㅇㄹ",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202300#cmt:1091902",
+      "mentioned_product": "ㅇㄹ",
+      "thread_no": "202300",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "F1"
+      ],
+      "current": {
+        "market": null,
+        "product": null,
+        "market_confidence": 0.0
+      },
+      "proposed": {
+        "market": "에러",
+        "product": null
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091978␟엉겁처지",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091978",
+      "mentioned_product": "엉겁처지",
+      "thread_no": "202309",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D6"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "엉겁처지",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "늪지",
+        "product": "엉겁처치"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981␟찹두카",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981",
+      "mentioned_product": "찹두카",
+      "thread_no": "202309",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "찹두카",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "알파카",
+        "product": "찹두카"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981␟꼼꼼크림",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981",
+      "mentioned_product": "꼼꼼크림",
+      "thread_no": "202309",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "꼼꼼크림",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "알파카",
+        "product": "꼼꼼크림"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981␟팝업이데아",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091981",
+      "mentioned_product": "팝업이데아",
+      "thread_no": "202309",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D1"
+      ],
+      "current": {
+        "market": "늪지",
+        "product": "팝업이데아",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "알파카",
+        "product": "팝업이데아"
+      }
+    },
+    {
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202317#cmt:1091987␟점섞슬",
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202317#cmt:1091987",
+      "mentioned_product": "점섞슬",
+      "thread_no": "202317",
+      "kind": "comment",
+      "status": "🔧 수정",
+      "codes": [
+        "D5a",
+        "D1"
+      ],
+      "current": {
+        "market": "모모네",
+        "product": "점섞슬",
+        "market_confidence": 0.85
+      },
+      "proposed": {
+        "market": "코멜리",
+        "product": null
+      }
+    }
+  ]
+}

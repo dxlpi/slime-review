@@ -27,3 +27,9 @@ data/apify_profile_*_raw.json
 # 수집 원문 저장소(slime_rag/rawstore.py) — 같은 규칙. 파생물인 product_registry.json 은
 # 이름·건수·날짜·URL 만이라 커밋 대상이다(캡션 본문 없음).
 data/raw/
+
+# 디시 추출 검수 문서 **원본** — 조각 본문을 1,500자까지 그대로 싣는다(약 600KB).
+# 같은 규칙이다: 수집한 바이트는 git 밖. 잃는 게 없는 이유는 스크립트 + data/raw/dc_thread 로
+# $0 재생성되기 때문이고, 커밋되는 건 --redacted 로 뽑은 편집본
+# (docs/dcinside-extraction-review.redacted.md — 식별자·판정·D코드·≤15자 스니펫만)이다.
+docs/dcinside-extraction-review.md

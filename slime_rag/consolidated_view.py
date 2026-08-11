@@ -489,6 +489,13 @@ _SALIENT = {
 }
 
 
+# 감정 축 **수리 사이드카**가 레코드에 실리는 키(ADR-0018). DB 컬럼은 `reviews.attribute_repairs`
+# 이고 `pipeline._records_for` 가 이 이름으로 얹는다. `attributes` 안에 예약 네임스페이스를
+# 파지 않은 이유: 감사 골드의 안정 키가 `attributes->>'mentioned_product'` 이고 그 계약의 전제가
+# "이 JSONB 는 불변"이라, 같은 칸을 건드리기 시작하면 그 전제가 약해진다.
+ATTR_REPAIRS_KEY = "_attribute_repairs"
+
+
 def _source_material(reviews: list[dict], *, tag_products: bool = False,
                      fields: Optional[list[str]] = None) -> dict:
     """한 소스 후기 → 속성별 evidence 재료(LLM 섹션 요약 입력). 근거 없는 속성은 키 자체를 뺀다.
@@ -498,6 +505,12 @@ def _source_material(reviews: list[dict], *, tag_products: bool = False,
 
     `fields` 는 축이 정한다(ADR-0015). 주문 축 재료는 호출부가 `_fold_orders` 로 접어서 넘기므로
     여기서 다시 접지 않는다 — 접는 규칙이 두 곳에 있으면 조용히 갈라진다.
+
+    **수리 사이드카**(`ATTR_REPAIRS_KEY`)가 있으면 그 축을 건너뛴다 — 잘못 배치된 판정
+    (실측: `소리` 축에 들어간 `비즈 탈출`)이 **유료 요약을 재생성할 때마다 다시 오염**시키기
+    때문이다. 7행이 작아 보여도 비용은 반복적이다.
+    ⚠️ **다른 축으로 옮겨 담지 않는다** — 옮기면 없던 판단을 만든다(1급 규칙 위반).
+      원본 `attributes` 도 한 바이트도 안 바뀐다(provenance 스냅샷).
     """
     by_attr: dict[str, list] = {}
     for f in (fields if fields is not None else ATTR_FIELDS):
@@ -505,6 +518,8 @@ def _source_material(reviews: list[dict], *, tag_products: bool = False,
         for r in reviews:
             blk = r.get(f)
             if not isinstance(blk, dict):
+                continue
+            if ((r.get(ATTR_REPAIRS_KEY) or {}).get(f) or {}).get("action") == "drop":
                 continue
             item = {"sentiment": blk.get("sentiment"), "evidence": blk.get("evidence")}
             if tag_products:

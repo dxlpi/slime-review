@@ -448,11 +448,34 @@ def test_composites_containing_a_type_or_glue_word_survive():
     0개인데, 그 단어를 **품은** 제품명은 16개다. 부분일치로 넓히면 그 16개가 통째로
     사라지고, 그 손실은 화면에 안 보인다(후기가 그냥 제품 없이 사라진다).
     """
-    for real in ("내리꽃디폼", "디폼생베", "디폼클리어", "베이직우드폼", "베이직우드버터",
-                 "말차초코크런치바", "허밍크런치", "오레오흑임자크런치", "크런치팝팝",
-                 "몽글클라우드", "우드득건반", "믹스폼듀", "물젤리수수깡"):
+    real_names = ("내리꽃디폼", "베이직우드폼", "베이직우드버터", "말차초코크런치바",
+                  "허밍크런치", "오레오흑임자크런치", "크런치팝팝", "몽글클라우드",
+                  "우드득건반", "믹스폼듀", "물젤리수수깡")
+    for real in real_names:
         assert not extract.is_non_product_word(real), f"합성 제품명을 지웠다: {real}"
+    # 증거를 **주입해도** 살아남아야 한다 — 이 이름들은 1층 `specs` 에 실재한다(실측
+    # 2026-08-11: 위 11개 중 `물젤리수수깡` 만 1층 밖이고 나머지 10개는 `specs` 안).
+    # 수식 갈래(`modified_suffixes`)가 증거를 묻는 자리라, 증거가 있는데도 지우면 그게 회귀다.
+    for real in real_names:
+        assert not extract.is_non_product_word(real, real_names), f"증거 있는 이름을 지웠다: {real}"
     print("✓ 종류어·재료어를 품은 합성 제품명 생존 OK")
+
+
+def test_two_names_moved_out_of_the_survivor_list_by_human_review():
+    """⚠️ **`디폼생베`·`디폼클리어` 는 2026-08-11 에 생존 목록에서 나갔다** — 조용히 빼지 않는다.
+
+    둘 다 사람 검수가 **종류어**로 판정한 이름이고, 실측으로 1층 `specs` 에 **없다**
+    (레지스트리 전용 — 해시태그 빈도로 유도된 후보라 잡음이 섞이는 층이다):
+      · `디폼클리어` — `data/market_inversion_excludes.json` 의 `_rulings` 가 근거를 남겼다.
+        늪지 게시물의 꼬리 분류 태그 무더기(`#클리어디폼 #디폼크런치 #디폼클리어 #클리어슬라임`)
+        에 섞여 있었고 그 글의 실제 제품은 `#꼬도독닭발` 이며, 후기 쪽은 `ㅁㅁ`(머머)라고 썼다.
+      · `디폼생베` — 446조각 전수 검수의 `TYPE_PARTS_WORDS`(디폼 + 생베, 둘 다 종류/재료어).
+    이 케이스가 있는 이유: 생존 목록에서 이름을 지우기만 하면 다음 사람이 '왜 빠졌지' 를 모른 채
+    되돌린다. 판정이 바뀌었다는 사실 자체를 게이트로 남긴다.
+    """
+    for word in ("디폼생베", "디폼클리어"):
+        assert extract.is_non_product_word(word), f"사람 판정이 되돌려졌다: {word}"
+    print("✓ 사람 검수로 이동한 두 이름 OK")
 
 
 def test_forgotten_name_fragments_are_never_products():
@@ -500,6 +523,104 @@ def test_word_gate_reaches_dcinside_through_the_thread_path():
     print("✓ 해시태그 없는 소스에도 단어 게이트 적용 OK")
 
 
+# ------------------------------------------------------ 디시 어휘 게이트 확장(계획 Phase 4)
+def test_bare_vocabulary_asks_no_evidence():
+    """**맨몸** 종류어·부속어·메타어는 증거를 묻지 않는다 — 물으면 되살아난다.
+
+    실측(2026-08-11): `펄러비즈`·`점섞슬`·`액괴`·`슬랑이`·`할로윈` 5개가
+    `known_product_names()` 에 들어 있는데 **전부 레지스트리(해시태그 유도 후보)뿐이고
+    1층 `specs` 엔 0개**다. 레지스트리는 사람이 승격한 목록이 아니다.
+    `is_non_product_label` ①이 판매자가 실제로 단 `#비매품` 태그 때문에 증거를 안 묻는 것과
+    정확히 같은 자리다.
+    """
+    noisy_evidence = {"펄러비즈", "점섞슬", "액괴", "슬랑이", "할로윈"}
+    for word in ("퐁말", "파츠", "플레잉", "첫굼", "미감", "슬켓", "유슬이",
+                 "프링글스", "돌슬라임", *noisy_evidence):
+        assert extract.is_non_product_word(word), f"맨몸 어휘를 놓쳤다: {word}"
+        assert extract.is_non_product_word(word, noisy_evidence), \
+            f"증거를 물어서 맨몸 어휘가 되살아났다: {word}"
+    print("✓ 맨몸 어휘: 증거 무관 OK")
+
+
+def test_modified_names_need_evidence_and_fail_safe_without_it():
+    """**수식된** 이름은 1층/레지스트리가 모를 때만 비제품 — 증거 미주입이면 무변경.
+
+    `enforce_product_vocab` ③·`is_non_product_label` ③과 같은 규칙이다: 증거 없이 지우는
+    쪽이 화면에 안 보이는 손실이라 더 나쁘다.
+    """
+    assert not extract.is_non_product_word("초코디폼"), "증거 없이 수식형을 지웠다"
+    assert not extract.is_non_product_word("별디폼"), "증거 없이 수식형을 지웠다"
+    assert extract.is_non_product_word("초코디폼", {"빠코볼"}), "증거가 있는데 수식형을 못 지웠다"
+    assert not extract.is_non_product_word("초코디폼", {"초코디폼"}), \
+        "1층/레지스트리가 아는 이름을 지웠다"
+    print("✓ 수식형: 증거 요구 + 페일세이프 OK")
+
+
+def test_punctuation_wrapped_jamo_is_not_a_product():
+    """`ㅋㅈ(ㅁㅁ)` — 마켓 표기를 괄호로 병기한 형태(실측 ROW#1324). 알맹이가 자모뿐이다.
+
+    ⚠️ 이건 ④(자모뿐인 이름)의 좁은 확장이지 **구조 규칙의 일반화가 아니다**. 제목 감탄사
+      (`존나좋다`)나 어절(`적구 가`)은 어휘로만 잡는다 — `와이풀 그린티` 같은 진짜
+      띄어쓰기 제품명이 반례라서다.
+    """
+    for name in ("ㅋㅈ(ㅁㅁ)", "ㅅㄱㄷ", "ㅇㅍㅋ / ㅃㅇ"):
+        assert extract.is_non_product_word(name), f"자모뿐인 이름을 놓쳤다: {name}"
+    for name in ("와이풀 그린티", "4pm스낵", "UFO머핀"):
+        assert not extract.is_non_product_word(name), f"진짜 제품명을 지웠다: {name}"
+    print("✓ 구두점 감싼 자모 → 비제품 OK")
+
+
+def test_word_gate_evidence_is_never_narrowed():
+    """⛔ **재료를 마켓/스레드 스코프로 좁히지 말 것** — 같은 이름에 경로마다 다른 판정이 붙는다.
+
+    `MarketInversion` 은 **마켓 스코프로 접혀 있고**(`_own_index` 가 유일소유 판정까지 끝낸
+    dict) 정규화도 다르다(`_strip().lower()` vs `_norm_tag()`). 재사용하면
+    `is_non_product_label` 독스트링이 못박은 금지를 정확히 위반한다 — 마켓을 아직 모르는
+    조각(=디시의 절반)에서 수식 갈래가 전부 지워진다.
+    재료는 `pipeline.known_product_names()` **한 벌**이다.
+    """
+    import inspect
+    from slime_rag import linking, pipeline
+    for fn in (linking.link, pipeline.dc_attribution_target, extract.extract_thread):
+        for line in inspect.getsource(fn).splitlines():
+            if "is_non_product_word" not in line or line.lstrip().startswith("#"):
+                continue
+            for narrowed in ("inversion", "MarketInversion", "market]", "by_market",
+                             "thread", "spec["):
+                assert narrowed not in line, \
+                    f"{fn.__name__} 가 좁혀진 재료를 어휘 게이트에 넘긴다: {line.strip()}"
+    # 수집 경로가 실제로 재료를 흘리는가 — 안 흘리면 게이트가 백필에서만 돈다.
+    ing = inspect.getsource(pipeline.ingest_dcinside)
+    assert "known_product_names" in ing, "디시 수집이 재료를 안 만든다"
+    assert "known_products=label_known" in ing, \
+        "`label_known` 이 `extract_collected` 까지만 간다 — 색인 경로에 안 닿는다"
+    idx = inspect.getsource(pipeline.index.index_post)
+    assert "known_products=known_products" in idx, "`index_post` 가 재료를 `link_post` 로 안 넘긴다"
+    print("✓ 어휘 게이트 증거 비축소 + 배관 관통 OK")
+
+
+def test_the_vocabulary_file_never_holds_line_words():
+    """⛔ `LINE_WORDS`(뭉치·갈배·유자·진저…)는 **제품 라인/축약 지칭**이라 여기 넣으면 안 된다.
+
+    그건 실재 제품의 약칭이라 별칭 사전(`data/product_aliases.json`) 소관이고, 여기 섞으면
+    진짜 후기의 제품명이 지워진다 — 유령 제품과 반대 방향의, 더 알아채기 어려운 실패다.
+    """
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "data" / "non_product_words.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    words = {w for k in ("type_parts", "meta", "market_notation") for w in data[k]}
+    line_words = {"뭉치", "케이크", "허니", "빙하", "믹스", "불량", "유자", "크머", "레몬커드",
+                  "말차뭉", "비뭉", "숭덩자바", "잘자바", "막걸리", "갈배", "아생케", "유폭찜",
+                  "바토디", "마크시", "배", "자몽", "썸파", "물젤리", "진저", "맥플", "베플",
+                  "플레이크"}
+    assert not (words & line_words), f"제품 축약 지칭이 비제품 어휘에 들어갔다: {words & line_words}"
+    # 수식 판정 꼬리는 2음절 이상 — `폼`·`슬` 을 넣으면 `베이직우드폼` 이 증거 대기로 넘어간다.
+    assert all(len(s.replace(" ", "")) >= 2 for s in data["modified_suffixes"]), \
+        "한 음절 꼬리가 들어갔다 — 레지스트리에 없는 진짜 제품이 지워진다"
+    print("✓ 어휘 파일: 라인어 미포함 · 꼬리 2음절 이상 OK")
+
+
 if __name__ == "__main__":
     test_glue_and_scent_lines_become_the_hashtagged_product()
     test_market_tag_never_becomes_a_product()
@@ -536,4 +657,10 @@ if __name__ == "__main__":
     test_jamo_only_names_are_never_products()
     test_word_gate_nulls_the_name_but_keeps_the_review()
     test_word_gate_reaches_dcinside_through_the_thread_path()
+    test_two_names_moved_out_of_the_survivor_list_by_human_review()
+    test_bare_vocabulary_asks_no_evidence()
+    test_modified_names_need_evidence_and_fail_safe_without_it()
+    test_punctuation_wrapped_jamo_is_not_a_product()
+    test_word_gate_evidence_is_never_narrowed()
+    test_the_vocabulary_file_never_holds_line_words()
     print("\n제품명 귀속 복구 오프라인 테스트 통과 ✅")

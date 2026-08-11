@@ -1,0 +1,753 @@
+{
+  "_note": "계측기 A(계획 §3.4) — 제품 축 리플레이. LLM 0회·읽기전용. 마켓 축은 attributes 에 mentioned_market 이 없어 리플레이 불가.",
+  "source": "amos",
+  "scanned_rows": 801,
+  "by_reason": {
+    "market_token_split": 2,
+    "market_token_split+non_product_word": 1,
+    "non_product_word": 49,
+    "unchanged": 749
+  },
+  "name_defect_rows": 51,
+  "already_handled_rows": 51,
+  "needs_new_vocab_rows": 0,
+  "already_handled_names": [
+    {
+      "name": "플레잉",
+      "rows": 4
+    },
+    {
+      "name": "슬랑이",
+      "rows": 3
+    },
+    {
+      "name": "첫굼",
+      "rows": 2
+    },
+    {
+      "name": "펄러비즈",
+      "rows": 2
+    },
+    {
+      "name": "할로윈",
+      "rows": 2
+    },
+    {
+      "name": "존나좋다",
+      "rows": 1
+    },
+    {
+      "name": "적구 가",
+      "rows": 1
+    },
+    {
+      "name": "크런키",
+      "rows": 1
+    },
+    {
+      "name": "빠코",
+      "rows": 1
+    },
+    {
+      "name": "마카롱",
+      "rows": 1
+    },
+    {
+      "name": "프링글스",
+      "rows": 1
+    },
+    {
+      "name": "지글리 구아검 들어간 것",
+      "rows": 1
+    },
+    {
+      "name": "디폼클리어",
+      "rows": 1
+    },
+    {
+      "name": "풀 조합 비슷한 생베",
+      "rows": 1
+    },
+    {
+      "name": "우드폼볼",
+      "rows": 1
+    },
+    {
+      "name": "퐁말",
+      "rows": 1
+    },
+    {
+      "name": "ㅅㄱㄷ UFO머핀",
+      "rows": 1
+    },
+    {
+      "name": "빨대슬",
+      "rows": 1
+    },
+    {
+      "name": "미감",
+      "rows": 1
+    },
+    {
+      "name": "디폼류",
+      "rows": 1
+    },
+    {
+      "name": "초코디폼",
+      "rows": 1
+    },
+    {
+      "name": "바나나 빨대",
+      "rows": 1
+    },
+    {
+      "name": "유슬이",
+      "rows": 1
+    },
+    {
+      "name": "디폼생베",
+      "rows": 1
+    },
+    {
+      "name": "ㅍㅍㄹ 애플크림머핀",
+      "rows": 1
+    },
+    {
+      "name": "서비스 폼볼",
+      "rows": 1
+    },
+    {
+      "name": "돌슬라임",
+      "rows": 1
+    },
+    {
+      "name": "츄빵",
+      "rows": 1
+    },
+    {
+      "name": "크런치 슬라임",
+      "rows": 1
+    },
+    {
+      "name": "파츠",
+      "rows": 1
+    },
+    {
+      "name": "지비프",
+      "rows": 1
+    },
+    {
+      "name": "석기시대",
+      "rows": 1
+    },
+    {
+      "name": "슬랑이갤로",
+      "rows": 1
+    },
+    {
+      "name": "디자인",
+      "rows": 1
+    },
+    {
+      "name": "인수메뉴들",
+      "rows": 1
+    },
+    {
+      "name": "점섞슬",
+      "rows": 1
+    },
+    {
+      "name": "슬켓",
+      "rows": 1
+    },
+    {
+      "name": "빠삭이",
+      "rows": 1
+    },
+    {
+      "name": "별디폼",
+      "rows": 1
+    },
+    {
+      "name": "사해구",
+      "rows": 1
+    },
+    {
+      "name": "ㅋㅈ(ㅁㅁ)",
+      "rows": 1
+    },
+    {
+      "name": "구ㅍㄷ",
+      "rows": 1
+    },
+    {
+      "name": "고양이",
+      "rows": 1
+    }
+  ],
+  "needs_new_vocab_names": [],
+  "already_handled": [
+    {
+      "id": 54,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=199836␟존나좋다",
+      "product": "존나좋다",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 133,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743␟적구 가",
+      "product": "적구 가",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 162,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202004#cmt:1090600␟크런키",
+      "product": "크런키",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 165,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201978#cmt:1090453␟빠코",
+      "product": "빠코",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 166,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200606#cmt:1084875␟첫굼",
+      "product": "첫굼",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 377,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091527␟마카롱",
+      "product": "마카롱",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 378,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202205#cmt:1091512␟프링글스",
+      "product": "프링글스",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 405,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=191970␟지글리 구아검 들어간 것",
+      "product": "지글리 구아검 들어간 것",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 445,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679␟펄러비즈",
+      "product": "펄러비즈",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 806,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202007#cmt:1090617␟디폼클리어",
+      "product": "디폼클리어",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 850,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032184␟ㄴㅈ 풀 조합 비슷한 생베",
+      "product": "풀 조합 비슷한 생베",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 856,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189511#cmt:1032182␟우드폼볼",
+      "product": "우드폼볼",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 860,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=189588#cmt:1032525␟퐁말",
+      "product": "퐁말",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 954,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200699␟ㅅㄱㄷ UFO머핀",
+      "product": "ㅅㄱㄷ UFO머핀",
+      "codes": [
+        "D7"
+      ],
+      "target": "UFO머핀",
+      "why": "market_token_split",
+      "new_market": "신기동"
+    },
+    {
+      "id": 1002,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200743#cmt:1085506␟빨대슬",
+      "product": "빨대슬",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1030,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123␟미감",
+      "product": "미감",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1033,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087075␟디폼류",
+      "product": "디폼류",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1034,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201123#cmt:1087073␟첫굼",
+      "product": "첫굼",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1041,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201302␟초코디폼",
+      "product": "초코디폼",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1045,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201437#cmt:1088421␟바나나 빨대",
+      "product": "바나나 빨대",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1046,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088523␟플레잉",
+      "product": "플레잉",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1047,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088527␟플레잉",
+      "product": "플레잉",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1048,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088525␟플레잉",
+      "product": "플레잉",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1049,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201464#cmt:1088547␟플레잉",
+      "product": "플레잉",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1058,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201524#cmt:1088780␟유슬이",
+      "product": "유슬이",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1064,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201551#cmt:1088846␟할로윈",
+      "product": "할로윈",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1075,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201679#cmt:1089299␟펄러비즈",
+      "product": "펄러비즈",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1105,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202189#cmt:1091430␟디폼생베",
+      "product": "디폼생베",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1111,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202281#cmt:1091848␟ㅍㅍㄹ 애플크림머핀",
+      "product": "ㅍㅍㄹ 애플크림머핀",
+      "codes": [
+        "D7"
+      ],
+      "target": "애플크림머핀",
+      "why": "market_token_split",
+      "new_market": "페페롱"
+    },
+    {
+      "id": 1129,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202173␟ㄴㅈ 서비스 폼볼",
+      "product": "서비스 폼볼",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1141,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202124#cmt:1091112␟돌슬라임",
+      "product": "돌슬라임",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1145,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202122␟츄빵",
+      "product": "츄빵",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1152,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202208␟크런치 슬라임",
+      "product": "크런치 슬라임",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1153,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246␟파츠",
+      "product": "파츠",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1154,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246␟지비프",
+      "product": "지비프",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1155,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202246#cmt:1091673␟석기시대",
+      "product": "석기시대",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1161,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159␟슬랑이",
+      "product": "슬랑이",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1164,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091271␟슬랑이갤로",
+      "product": "슬랑이갤로",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1165,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202159#cmt:1091287␟슬랑이",
+      "product": "슬랑이",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1166,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182␟디자인",
+      "product": "디자인",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1169,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202210␟인수메뉴들",
+      "product": "인수메뉴들",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1173,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202317#cmt:1091987␟점섞슬",
+      "product": "점섞슬",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1175,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226␟슬켓",
+      "product": "슬켓",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1176,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202226#cmt:1091609␟빠삭이",
+      "product": "빠삭이",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1178,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202295#cmt:1091887␟별디폼",
+      "product": "별디폼",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1181,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202300#cmt:1091900␟사해구",
+      "product": "사해구",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1324,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202249␟ㅋㅈ(ㅁㅁ)",
+      "product": "ㅋㅈ(ㅁㅁ)",
+      "codes": [
+        "D7"
+      ],
+      "target": null,
+      "why": "market_token_split+non_product_word",
+      "new_market": "코지"
+    },
+    {
+      "id": 1336,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202191#cmt:1091431␟구ㅍㄷ",
+      "product": "구ㅍㄷ",
+      "codes": [
+        "D7"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1337,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202182#cmt:1091401␟고양이",
+      "product": "고양이",
+      "codes": [
+        "D5a"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1368,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=194006#cmt:1055454␟할로윈",
+      "product": "할로윈",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    },
+    {
+      "id": 1388,
+      "key": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=200965#cmt:1086438␟슬랑이",
+      "product": "슬랑이",
+      "codes": [
+        "D5b"
+      ],
+      "target": null,
+      "why": "non_product_word",
+      "new_market": null
+    }
+  ],
+  "needs_new_vocab": []
+}

@@ -21,7 +21,7 @@ import json
 import logging
 import re
 
-from .config import settings
+from .config import settings, ROOT
 from .llm_ops import LLM
 
 log = logging.getLogger("extract")
@@ -181,6 +181,8 @@ LAYER2_SYSTEM = f"""\
 [필드 구분 — 자주 헷갈림]
 - sound(소리): 비즈/재료가 서로 부딪혀 나는 소리도 여기. 예) '걀걀거림'은 비즈 부딪는 청각 신호 → sound.
   (소리 관련 의성어를 texture.feel/feel_other 로 보내지 마라.)
+  ⚠️ **탈출은 소리가 아니다.** '비즈 탈출 / 폼이 후두둑 날라감' 은 구성물이 빠져나가는
+  현상이라 지속력·질감 사안이다 → sound 에 넣지 마라. 소리 얘기가 없으면 sound 는 null.
 - longevity(지속력): '슬라임이 빨리 죽었다 / 오래 살아있다' 등 시간 경과 후 제품 수명만.
   배송이 빠르다/늦다/아직 배송중은 지속력과 무관 → longevity 아님.
 - shipping_cs(최상위): 배송/문자/도착/교환·CS 관련은 전부 여기(후기 단위).
@@ -505,27 +507,131 @@ FRAGMENT_MARKERS = ("어쩌구", "어쩌고", "어쩍고")
 #   그 순서를 지키는 곳은 둘뿐이다: `linking.link`(수집 경로) · `pipeline.dc_attribution_target`
 #   (적재분 복구). 그래서 `extract_thread` 는 이 게이트를 **부르지 않는다**.
 _ALL_JAMO_RE = re.compile(r"^[ㄱ-ㅎ\s]+$")
+# 구두점을 뺀 알맹이가 자모뿐인 이름도 제품이 아니다 — `ㅋㅈ(ㅁㅁ)` 처럼 마켓 표기를
+# 괄호로 병기한 형태가 실재한다(실측 ROW#1324). 진짜 제품명은 음절이나 숫자를 갖는다.
+_PUNCT_RE = re.compile(r"[\s()（）\[\]{}<>/·,.\-_~!?'\"“”‘’]+")
+
+# 감사가 새로 발견한 비제품 어휘. 파일에 사는 이유는 `data/promo_gate_terms.json` 과 같다 —
+# 어휘는 코퍼스가 자라면 같이 자라고, 코드에 박으면 배포가 필요한 데다 **사람이 검수한
+# 판단**이라는 성격이 소스코드에 섞여 안 보이게 된다.
+NON_PRODUCT_WORDS_PATH = ROOT / "data" / "non_product_words.json"
+_WORD_CACHE: dict | None = None
 
 
-def is_non_product_word(name: str | None) -> bool:
-    """이 이름이 제품이 아니라 **종류어·재료어·조각난 이름**인가. 순수 함수(무LLM·무DB·무KB).
+def load_non_product_words() -> tuple[frozenset, tuple]:
+    """`(맨몸 어휘, 수식 판정 꼬리)`. 파일이 없거나 깨지면 빈 값(안전 degrade).
 
-    `is_non_product_label` 의 형제다. 넷 중 하나면 True:
-      ① 종류 통제어휘와 **완전일치**(`디폼`·`클리어`·`수수깡`·`빨대`·`빈백`·`크런치`…).
+    ⚠️ 깨졌을 때 '어휘 없음'으로 떨어지는 게 안전한 쪽이다 — 이 게이트는 **지우는** 규칙이라
+      비면 아무것도 안 지운다. `load_market_inversion_excludes`(제외 목록이 비면 **채워진다**)
+      와 방향이 반대라 실패 정책의 안전성 논증도 반대다. 그래도 조용히 넘기지 않는다.
+    """
+    global _WORD_CACHE
+    if _WORD_CACHE is None:
+        try:
+            data = json.loads(NON_PRODUCT_WORDS_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            log.warning("비제품 어휘 읽기 실패 — 어휘 없이 진행: %s", e)
+            data = {}
+        bare = {_norm(w) for k in ("type_parts", "meta", "market_notation")
+                for w in (data.get(k) or []) if w}
+        # 한 음절 꼬리는 받지 않는다 — `폼`·`슬` 을 허용하면 `베이직우드폼` 이 증거 대기로
+        # 넘어가고, 레지스트리에 없는 진짜 제품이 지워진다(화면에 안 보이는 손실).
+        suffixes = tuple(sorted({_norm(s) for s in (data.get("modified_suffixes") or [])
+                                 if len(_norm(s)) >= 2}, key=len, reverse=True))
+        _WORD_CACHE = {"bare": frozenset(bare), "suffixes": suffixes}
+    return _WORD_CACHE["bare"], _WORD_CACHE["suffixes"]
+
+
+def is_non_product_word(name: str | None, known_products=None) -> bool:
+    """이 이름이 제품이 아니라 **종류어·재료어·조각난 이름**인가. 순수 함수(무LLM·무DB·**무KB**).
+
+    `is_non_product_label` 의 형제다. `is_non_product_label` 이 **판매 형식**(`비매품`·`차수`)을
+    보는 데 비해 이쪽은 **종류·재료·부속·메타어**를 본다. 둘 다 제품이 아니지만 막는 실패가
+    달라서 게이트도 카운터도 가른다.
+
+    **맨몸(bare) — 증거를 묻지 않는다.** 하나라도 맞으면 True:
+      ① 종류 통제어휘(`TYPE_ENUM`)와 **완전일치**(`디폼`·`클리어`·`수수깡`·`빨대`·`빈백`…).
          사용자 규칙: 종류어는 제품명이 아니다(→ [MEMORY.md] 슬라임 속성 어휘 분류 규칙).
       ② 풀·베이스 재료어와 **완전일치**(`글루올`·`아마존`·`점토`…).
+      ②' `data/non_product_words.json` 의 어휘와 **완전일치**(`퐁말`·`파츠`·`플레잉`·`첫굼`…).
       ③ 이름에 '기억 안 남' 표지가 붙어 있다(`버블버블 어쩌구`).
-      ④ 이름이 자모뿐이다(`ㅅㄱㄷ`).
-    ①②는 **완전일치 전용**이다 — 위 상수 주석의 실측 근거 참조. 합성어는 건드리지 않는다.
+      ④ 구두점을 뺀 알맹이가 **자모뿐**이다(`ㅅㄱㄷ`·`ㅋㅈ(ㅁㅁ)`).
+    ⚠️ ①②②'가 증거를 안 묻는 건 의도다. 물으면 되살아난다 — 실측(2026-08-11):
+      `펄러비즈`·`점섞슬`·`액괴`·`슬랑이`·`할로윈` 5개가 `known_product_names()` 에 있는데
+      **전부 레지스트리(해시태그 유도 후보)뿐이고 1층 `specs` 엔 0개**다. 레지스트리는 사람이
+      승격한 목록이 아니라 유도된 후보라 잡음이 섞인다. `is_non_product_label` ①이 판매자가
+      실제로 단 `#비매품` 태그 때문에 증거를 안 묻는 것과 정확히 같은 자리다.
+
+    **수식된(modified) — 증거를 묻는다.** `modified_suffixes` 로 끝나되 앞에 낱말이 붙은 이름
+      (`초코디폼`·`별디폼`)은 **1층/레지스트리가 모를 때만** 비제품이다.
+      ⚠️ `known_products` 미주입이면 **아무것도 안 지운다**(페일세이프) — 증거 없이 지우는
+        쪽이 화면에 안 보이는 손실이라 더 나쁘다(`enforce_product_vocab` ③과 같은 규칙).
+
+    ⛔ **부분일치로 넓히지 말 것.** 실측(2026-08-10, `specs` 제품명 1,981개): 위 어휘와
+      **완전히 같은** 이름은 0개인데 **품은** 이름은 16개다(`내리꽃디폼`·`베이직우드폼`·
+      `말차초코크런치바`·`허밍크런치`). 넓히면 그 16개가 화면에 안 보이게 사라진다.
+
+    `known_products`: 1층 `specs` + 제품 후보 레지스트리의 이름들(**마켓 무관 전량**).
+      ⚠️ 마켓별로도, 스레드별로도 좁히지 말 것 — 여기서 묻는 건 '이 마켓의 제품인가'가 아니라
+        '이 표기가 누군가의 제품명으로 실재하는가'다. 좁히면 마켓을 아직 모르는 조각
+        (=디시의 절반)에서 수식 갈래가 전부 지워지고, **같은 이름에 경로마다 다른 판정이
+        붙는다.** 재료는 `pipeline.known_product_names()` 한 벌이다.
+      ⚠️ 인자가 늘어도 이 함수는 **순수하다** — 주입받을 뿐 읽지 않는다(무KB 유지).
     """
     core = _norm(name or "")
     if not core:
         return False
-    if core in {_norm(t) for t in TYPE_ENUM} or core in GLUE_WORDS:
+    bare, suffixes = load_non_product_words()
+    if core in {_norm(t) for t in TYPE_ENUM} or core in GLUE_WORDS or core in bare:
         return True
     if any(m in core for m in FRAGMENT_MARKERS):
         return True
-    return bool(_ALL_JAMO_RE.match(name or ""))
+    stripped = _PUNCT_RE.sub("", name or "")
+    if stripped and _ALL_JAMO_RE.match(stripped):
+        return True
+    if not known_products:
+        return False                      # 증거 없음 → 수식 갈래는 건드리지 않는다
+    hit = next((s for s in suffixes if core.endswith(s) and len(core) > len(s)), None)
+    if not hit:
+        return False
+    return _norm_tag(core) not in {_norm_tag(p) for p in known_products}
+
+
+# ---------------------------------------------------------------- 감정 축 오배치(D8)
+# `소리` 축에 들어간 **탈출**(비즈·폼이 빠져나감) 표지. 실측 5행.
+# ⚠️ 어휘를 넓히지 말 것 — `걀걀거림` 은 사용자가 직접 못박은 정상 sound 근거다
+#   (→ [MEMORY.md] 슬라임 속성 어휘 분류 규칙). 여기 있는 건 '구성물이 빠져나간다'를
+#   가리키는 말뿐이고, 소리 의성어는 하나도 없다.
+_ESCAPE_MARKERS = ("탈출", "날라감", "날아감", "후두둑")
+
+
+def flag_escape_in_sound(doc: dict) -> int:
+    """`sound` 축 근거가 **탈출**이면 그 축 판정을 제거한다. 반환: 제거한 항목 수. 순수 함수.
+
+    탈출은 지속력/질감 사안이지 소리가 아니다. 규칙은 프롬프트에도 적혀 있지만
+    (`LAYER2_SYSTEM` 의 [필드 구분]) **강제는 코드가** 한다 — 전언 차단과 같은 자리다.
+
+    ⛔ **다른 축으로 옮겨 담지 않는다.** 옮기면 없던 판단을 만든다(1급 규칙: 미언급 → null,
+      지어내기 금지). 작성자가 지속력 얘기를 했는지는 이 함수가 알 수 없다.
+    ⚠️ 적재분에는 이 함수를 **제자리에 쓰지 않는다** — `attributes` 는 추출기가 실제로 뭐라고
+      했는지의 provenance 스냅샷이다. `pipeline.backfill_sentiment_axis` 가 같은 판정을 쓰되
+      **사이드카 컬럼**(`reviews.attribute_repairs`)에만 기록한다.
+    """
+    dropped = 0
+    for rv in (doc.get("reviews") or []):
+        if escape_in_sound(rv):
+            rv["sound"] = None
+            dropped += 1
+    return dropped
+
+
+def escape_in_sound(review: dict) -> bool:
+    """이 후기 항목의 `sound` 근거가 탈출 서술인가. 순수 함수(적재분 판정도 이걸 쓴다)."""
+    blk = review.get("sound")
+    if not isinstance(blk, dict):
+        return False
+    ev = " ".join(str(blk.get(k) or "") for k in ("evidence", "onomatopoeia", "notes"))
+    return any(m in ev for m in _ESCAPE_MARKERS)
 
 
 def drop_non_product_words(doc: dict) -> int:
@@ -1272,6 +1378,16 @@ def extract_collected(raws: list, llm: LLM, model: str | None = None,
         #   항목별 마켓이 필요하면 폴백이 아니라 `reviews[].mentioned_market` 이 자리다.
         market = docs[0].get("market") if post and docs else None
         for raw, doc in zip(members, docs):
+            # 비공개 표식 — 상속의 **권위 판정 재료**다. 디시 관행상 스레드가 '무슨 마켓
+            # 글인가'는 제목이 정하고(`ㅋㅋㅁ 첫굼 후기`), 본문에 스쳐 지나간 마켓까지 스레드
+            # 마켓으로 세면 한 번 언급된 초성이 그 글 댓글 전부를 물들인다. 그래서
+            # `linking.link_post` 가 **제목이 그 마켓을 지목하는지** 확인한 뒤에만 상속을 넘긴다.
+            # ⛔ 판정을 여기서 하지 말 것 — KB 를 봐야 하고, 추출층이 KB 를 알면 계층이
+            #   뒤집힌다(이 파일 머리말의 "정규화는 linking 단계" 규칙 · `is_non_product_word`
+            #   가 `ㅇㅊ` 를 마켓으로 못 알아보는 것과 같은 자리).
+            # ⛔ `doc["market"]` 을 옮기지 말 것 — 그 칸은 이미 여러 곳이 읽는 계약이다.
+            if title:
+                doc["_thread_title"] = title
             # **채우기만 한다 — 덮어쓰지 않는다.** 조각이 자기 마켓을 뽑았으면 그게 그 조각의
             # 사실이고, 스레드 값은 마켓을 말하지 않은 형제를 위한 폴백일 뿐이다.
             # 실측(2026-08-10, 아모스갤 813행): 덮어쓰기 때문에 **36행이 자기 본문과 모순**됐다.

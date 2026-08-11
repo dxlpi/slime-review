@@ -169,7 +169,8 @@ def _sent(review: dict, block: str) -> str | None:
 def index_post(doc: dict, *, source: str, post_id: str | None = None,
                aliases: dict[str, str] | None = None, review_class: str = "genuine",
                relevance_meta: dict | None = None, source_ref: dict | None = None,
-               raw=None, conn=None, inversion=None) -> int:
+               raw=None, conn=None, inversion=None,
+               known_products=None, unregistered=None) -> int:
     """
     추출 후기 1건(doc) → 제품별로 연결·렌더·임베딩 후 reviews 테이블에 적재.
     review_class='genuine'|'promo' — 홍보성 후기는 종합뷰에서 실사용과 분리 집계된다.
@@ -199,7 +200,17 @@ def index_post(doc: dict, *, source: str, post_id: str | None = None,
       호출부가 조각 식별자를 항상 넘기는 게 전제다.
     """
     kb = linking.load_kb()
-    links = linking.link_post(doc, kb=kb, aliases=aliases, inversion=inversion)
+    # 조각 본문 스캔은 **여기서 한 번** 만든다 — `link_post` 는 doc 만 받는데 doc 엔 본문이
+    # 없고(추출 결과다), 항목마다 다시 스캔하면 같은 조각의 항목들이 서로 다른 순간의
+    # 스캔 결과를 보게 된다. `market_inversion_index` 를 런당 한 번만 만드는 것과 같은 성질:
+    # 귀속이 처리 순서에 의존하면 안 된다.
+    text_markets = (linking.markets_in_text(raw.text or "", kb,
+                                            unregistered=unregistered or frozenset(),
+                                            known_products=known_products)
+                    if raw is not None and getattr(raw, "text", None) else None)
+    links = linking.link_post(doc, kb=kb, aliases=aliases, inversion=inversion,
+                              unregistered=unregistered, known_products=known_products,
+                              text_markets=text_markets)
     reviews = doc.get("reviews", [])
     # shipping_cs 는 후기(주문) 단위 사실이라 doc 최상위에 산다(ADR-0005) — 제품 항목엔 없다.
     # 그런데 attributes 에 들어가는 건 제품 항목뿐이라, 복제하지 않으면 종합뷰의

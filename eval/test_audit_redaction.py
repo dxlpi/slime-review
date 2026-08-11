@@ -40,11 +40,23 @@ _BACKTICK_RE = re.compile(r"`([^`]*)`")
 
 
 def test_the_raw_audit_document_is_gitignored():
-    """원본은 **추적 대상이 아니다.** 잃는 게 없다 — 스크립트 + `data/raw/dc_thread` 로 $0 재생성."""
-    r = subprocess.run(["git", "check-ignore", "-q", "docs/dcinside-extraction-review.md"],
-                       cwd=ROOT)
+    """원본은 **추적 대상이 아니다.** 잃는 게 없다 — 스크립트 + `data/raw/dc_thread` 로 $0 재생성.
+
+    ⚠️ 계약은 **`.gitignore` 의 그 줄**이다(추적 파일이라 어디서든 읽힌다). `git check-ignore`
+      는 실제 해석까지 보는 더 강한 검사지만 **git 저장소 안에서만** 돈다 — CI 재현은
+      `git ls-files` 로 뽑은 트리에서 돌리므로 거기엔 `.git` 이 없다. 그래서 강한 검사는
+      가능할 때만 얹고, 없으면 **눈에 보이게** 넘어간다(조용한 스킵 금지).
+      이 저장소가 `test_apify_source` 에서 정확히 같은 방식으로 한 번 깨졌다.
+    """
+    rule = "docs/dcinside-extraction-review.md"
+    lines = {ln.strip() for ln in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    assert rule in lines, f".gitignore 에 규칙이 없다: {rule}"
+    if not (ROOT / ".git").exists():
+        print("✓ 감사 원본 gitignore 규칙 OK (git 저장소 밖 — check-ignore skip)")
+        return
+    r = subprocess.run(["git", "check-ignore", "-q", rule], cwd=ROOT)
     assert r.returncode == 0, "원문 본문 600KB 짜리 검수 문서가 gitignore 되지 않았다"
-    print("✓ 감사 원본 gitignore OK")
+    print("✓ 감사 원본 gitignore OK (규칙 + 실제 해석)")
 
 
 def test_redacted_carries_no_source_text_block():

@@ -2455,7 +2455,26 @@ def dc_market_target(product, stored_market, *, kb, inversion=None,
         title_markets = linking.markets_in_text(title or "", kb, unregistered=unregistered)
 
     uniq = text_markets.unique
-    if len(uniq) > 1:                              # ④ 비교글 — 만들지 않고 내보낸다
+    spec_mk = None                                 # 1층 유일소유(레지스트리 미참조)
+    if product and inversion is not None:
+        key = linking._strip(product).lower()
+        if key not in inversion.excludes:
+            spec_mk = inversion.spec.get(key)
+
+    if len(uniq) > 1:
+        # ④ 조각이 마켓을 여럿 지목했다. 보통은 비교글이라 **만들지 않고 내보낸다.**
+        #   ⚠️ 예외 하나: 1층 유일소유가 **그 후보들 중 하나**를 지목하면 증거가 갈린 게
+        #     아니라 **좁혀진** 것이다. 실측(2026-08-11) — `ㅅㅈㄴ 헝잭버거 , ㅂㅇㅍ
+        #     건체리크럼블` 한 댓글이 두 행 모두 `늪지` 로 찍혀 있었다(감사 D1 ROW#421·422).
+        #     조각은 두 마켓을 말하지만 **제품명이 어느 쪽인지 말해 준다**: `헝잭버거` 는
+        #     지나, `건체리크럼블` 은 베이퍼다. 그걸 충돌로 흘려보내면 감사가 지목한 바로
+        #     그 오귀속이 남는다.
+        #   ⛔ 1층이 **후보 밖** 마켓을 지목하면 그건 진짜 충돌이다 — 두 증거가 어긋난다.
+        #     조용히 1층을 이기게 하지 말 것.
+        if spec_mk and spec_mk in uniq:
+            if spec_mk == stored_market:
+                return None, "unchanged", None
+            return spec_mk, "spec_narrows_multi", BACKFILL_CONF_SPEC
         return None, "conflict_multi_market", None
     if len(uniq) == 1:                             # ①
         mw = next(iter(uniq))
@@ -2466,12 +2485,7 @@ def dc_market_target(product, stored_market, *, kb, inversion=None,
                 else linking.REPAIR_CONF_PIECE_CHOSEONG)
         return mw, "piece_scan", conf
 
-    spec_mk = None                                 # ② 1층 유일소유(레지스트리 미참조)
-    if product and inversion is not None:
-        key = linking._strip(product).lower()
-        if key not in inversion.excludes:
-            spec_mk = inversion.spec.get(key)
-    if spec_mk:
+    if spec_mk:                                    # ②
         if spec_mk == stored_market:
             return None, "unchanged", None
         return spec_mk, "spec_unique", BACKFILL_CONF_SPEC

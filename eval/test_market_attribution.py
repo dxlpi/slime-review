@@ -458,6 +458,33 @@ def test_ac13_a_declaring_title_still_lets_inheritance_through():
     print("✓ AC13 제목 선언 스레드는 상속 유지 OK")
 
 
+def test_layer1_narrows_a_multi_market_piece_but_never_overrides_it():
+    """조각이 마켓을 **여럿** 지목해도 1층 소유가 그중 하나면 갈린 게 아니라 **좁혀진** 것이다.
+
+    실측(감사 D1 ROW#421·422): `ㅅㅈㄴ 헝잭버거 , ㅂㅇㅍ 건체리크럼블` 한 댓글이 두 행 모두
+    `늪지` 로 찍혀 있었다. 조각은 두 마켓을 말하지만 **제품명이 어느 쪽인지 말해 준다** —
+    `헝잭버거` 는 지나, `건체리크럼블` 은 베이퍼다. 이걸 충돌로 흘려보내면 감사가 지목한
+    바로 그 오귀속이 그대로 남는다.
+
+    ⛔ 1층이 **후보 밖** 마켓을 지목하면 그건 진짜 충돌이다 — 두 증거가 어긋나므로
+      조용히 1층을 이기게 하지 않는다.
+    """
+    from slime_rag import pipeline
+    kb = _kb()
+    inv = _inv([("지나", "헝잭버거"), ("베이퍼", "건체리크럼블"), ("모모네", "로지가든")])
+    text = "나도 맨날 찾아다니는데 ㅅㅈㄴ 헝잭버거 , ㅂㅇㅍ 건체리크럼블 좋았음"
+    for product, want in (("헝잭버거", "지나"), ("건체리크럼블", "베이퍼")):
+        mk, why, conf = pipeline.dc_market_target(product, "늪지", kb=kb, inversion=inv,
+                                                  text=text, title="")
+        assert (mk, why) == (want, "spec_narrows_multi"), (product, mk, why)
+        assert conf == pipeline.BACKFILL_CONF_SPEC
+    # 1층이 후보 밖을 지목하면 충돌로 남는다(조용한 승격 금지).
+    mk, why, _c = pipeline.dc_market_target("로지가든", "늪지", kb=kb, inversion=inv,
+                                            text=text, title="")
+    assert (mk, why) == (None, "conflict_multi_market"), (mk, why)
+    print("✓ 1층이 다중 후보를 좁힘 · 후보 밖은 충돌 유지 OK")
+
+
 def test_piece_body_scan_fills_only_on_a_single_market():
     """조각 본문이 **정확히 하나**의 마켓을 지목할 때만 채운다 — 비교글에선 아무것도 안 한다.
 
@@ -565,6 +592,7 @@ if __name__ == "__main__":
     test_ac11_an_abstained_mention_still_blocks_the_inversion()
     test_ac12_inheritance_needs_the_title_to_declare_the_market()
     test_ac13_a_declaring_title_still_lets_inheritance_through()
+    test_layer1_narrows_a_multi_market_piece_but_never_overrides_it()
     test_piece_body_scan_fills_only_on_a_single_market()
     test_containment_candidates_are_reported_not_merged()
     test_containment_output_carries_no_source_text()

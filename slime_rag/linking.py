@@ -337,6 +337,18 @@ def build_market_inversion(spec_pairs=(), registry=None, *, excludes=None) -> Ma
 AMBIGUOUS_SURFACES = frozenset({"푸딩", "봄", "지나", "캐치", "머머", "스르륵"})
 AMBIGUOUS_CHOSEONG = frozenset({"ㅈㄴ"})
 
+# 한 글자 초성은 **버리지 않는다.** 한동안 `len >= 2` 로 걸렀는데, 현 KB 에서 한 글자 초성은
+# `ㅂ`(봄) 하나이고 실측(2026-08-11, amos 801행)에서 제목 19회 · 본문 56회 등장하는데
+# **전부 마켓 표기였다**(`ㅂ 산사람중에서…` · `ㅂ슬라임 간단후기` · `ㅂ은 수분감있음`).
+# 버리는 쪽 대가가 컸다: 제목이 `ㅂ …` 인 스레드가 '제목이 마켓을 선언 안 함'으로 읽혀
+# 상속 권위를 잃고, 그 결과 멀쩡한 행이 NULL 되돌림 후보로 올라왔다(실측 8행).
+# ⚠️ 자모 런은 **최장 일치**라 `ㅂㅇㅍ`·`ㅋㅋㅋ` 에서 한 글자가 따로 떨어져 나오지 않는다 —
+#   그래서 한 글자 매칭은 정말로 홀로 선 자모에만 걸린다.
+# 다만 감탄·웃음으로 홀로 서는 자모는 다르다. KB 가 그런 글자를 초성으로 갖는 마켓을 언젠가
+# 담으면 웃음 런 하나가 마켓 근거가 되므로, 그 글자들은 **모호 토큰으로 강등**한다
+# (= 바로 뒤에 아는 제품명이 붙을 때만 승격). 현 KB 의 `ㅂ` 은 여기 없다.
+_SOLO_JAMO_NOISE = frozenset("ㅋㅎㅠㅜㅡㅇㅏㅗㅐㅔㅗㅓ")
+
 # 표면형 매칭의 **경계 규칙**. 부분문자열 매칭만으로는 마켓명이 다른 낱말 속에 묻혀도 잡힌다 —
 # 실측(2026-08-11, 아모스갤 801행): `토끼나마나` 안의 `마나`(마나슬라임) · `포이즈닝` 안의
 # `포이`(포이슬라임). 둘 다 **진짜 제품명**이라, 그대로 두면 제품명이 마켓 근거로 둔갑한다.
@@ -390,7 +402,7 @@ def _scan_tables(kb: KB) -> tuple[dict, dict]:
     for m in kb.markets:
         mw = m["market_word"]
         for c in [m.get("choseong") or "", *(m.get("choseong_aliases") or [])]:
-            if len(c) >= 2 and mw not in cho.setdefault(c, []):
+            if c and mw not in cho.setdefault(c, []):
                 cho[c].append(mw)
         for f in [mw, *(m.get("aliases") or [])]:
             f = _strip(f or "")
@@ -472,7 +484,7 @@ def markets_in_text(text: str, kb: KB, *, unregistered=frozenset(),
 
     for run in set(_JAMO_RUN_ANY_RE.findall(text)):
         hits = cho_tbl.get(run)
-        if run in AMBIGUOUS_CHOSEONG:
+        if run in AMBIGUOUS_CHOSEONG or (len(run) == 1 and run in _SOLO_JAMO_NOISE):
             noisy.add(run)
             if hits and len(hits) == 1 and _promoted(text, run, known_norm):
                 _hit(hits[0], "초성")

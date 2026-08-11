@@ -112,6 +112,40 @@ def test_a_comparison_post_yields_no_single_market():
     print("✓ 비교글 → unique 다중(근거 미생성) OK")
 
 
+def test_a_single_jamo_choseong_still_counts():
+    """⛔ **한 글자 초성을 버리지 말 것.** `len >= 2` 필터가 있었고, 대가가 실측으로 컸다.
+
+    현 KB 의 한 글자 초성은 `ㅂ`(봄) 하나이고, amos 801행에서 제목 19회·본문 56회 등장하는데
+    **전부 마켓 표기**였다(`ㅂ 산사람중에서…` · `ㅂ슬라임 간단후기` · `ㅂ은 수분감있음`).
+    버렸을 때 벌어진 일: 제목이 `ㅂ …` 인 스레드가 '제목이 마켓을 선언 안 함'으로 읽혀 상속
+    권위를 잃고, 멀쩡한 행 **8개**가 NULL 되돌림 후보로 올라왔다.
+    ⚠️ 자모 런은 최장 일치라 `ㅂㅇㅍ`·`ㅋㅋㅋ` 에서 한 글자가 떨어져 나오지 않는다.
+    """
+    kb = _kb()
+    for text in ("ㅂ 산사람중에서 비매 선택한사람", "ㅂ슬라임 간단후기", "근데 ㅂ은 수분감있음"):
+        assert linking.markets_in_text(text, kb).unique == frozenset({"봄"}), text
+    # 더 긴 런 안에서는 한 글자가 따로 잡히지 않는다.
+    assert linking.markets_in_text("슬린이 ㅂㅇㅍ 첫구매", kb).unique == frozenset({"베이퍼"})
+    print("✓ 한 글자 초성(`ㅂ`=봄) 인식 OK")
+
+
+def test_solo_interjection_jamo_are_demoted_to_ambiguous():
+    """감탄·웃음으로 홀로 서는 자모가 마켓 초성이면 **모호 토큰으로 강등**한다.
+
+    현 KB 엔 그런 마켓이 없지만, 하나라도 생기면 웃음 런 하나가 마켓 근거가 된다.
+    강등되면 바로 뒤에 아는 제품명이 붙을 때만 승격하므로 그 경로가 막힌다.
+    """
+    def m(word, cho):
+        return {"market": word, "market_word": word, "handle": word, "handles_alt": [],
+                "aliases": [], "choseong": cho, "choseong_aliases": [], "products": []}
+    fake = linking.KB({"markets": [m("크림", "ㅋ")]})
+    assert linking.markets_in_text("ㅋ 아 웃겨", fake).unique == frozenset()
+    assert "ㅋ" in linking.markets_in_text("ㅋ 아 웃겨", fake).noisy
+    assert linking.markets_in_text("ㅋ 빠코볼 좋더라", fake,
+                                   known_products={"빠코볼"}).unique == frozenset({"크림"})
+    print("✓ 홀로 선 감탄 자모 강등 OK")
+
+
 def test_choseong_collision_goes_to_ambiguous_not_unique():
     """초성 충돌은 갈린 증거다 — `unique` 가 아니라 `ambiguous`."""
     def m(word, cho):

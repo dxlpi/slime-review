@@ -93,6 +93,27 @@
   `[제품 후보]` 로 넣는다 — 단 **그 스레드 본문에 등장한 표면형만**(`vocab_candidates`),
   그리고 사후에 `enforce_product_vocab` 이 코드로 재검사한다(규칙은 프롬프트, 강제는 코드).
   실측 커버리지: 신규 조각을 가진 171스레드 중 **129개(75%)** 에 정규 제품명이 그대로 등장한다.
+- **Important: amos `attributes` 에 `mentioned_market` 이 없다 → 마켓 축은 리플레이 불가.**
+  실측 키(2026-08-11): `firsthand_evidence · longevity · overall · sound · texture · scent ·
+  mentioned_product · shipping_cs · value`. `link()` 의 첫 입력이 저장돼 있지 않으므로
+  **마켓 귀속을 재추출 없이 재계산할 방법이 없다.** 제품 축은 반대다 —
+  `pipeline.dc_attribution_target` 이 순수 함수라 `evals/replay_dc_attribution_target.py` 가
+  $0 로 리플레이한다.
+  **Why it matters:** 그래서 마켓 축의 유일한 측정치는 **사람이 만든 전수 감사 문서**이고,
+  그게 [ADR-0018](docs/adr/0018-attribution-priority-and-unregistered-markets.md) 이
+  '측정 없이 건드리지 말 것'으로 봉인돼 있던 귀속 순서를 바꾼 근거다.
+  **Don't:** '리플레이해서 확인하자'는 계획을 마켓 축에 세우지 말 것 — 재발견 방지용 기록이다.
+- **Important: 마켓 표면형 스캔은 부분문자열이면 안 된다.** 실측(2026-08-11, amos 801행):
+  `토끼나마나` 안의 `마나`(마나슬라임) · `포이즈닝` 안의 `포이`(포이슬라임)가 잡혔다 —
+  둘 다 **진짜 제품명**이라 제품명이 마켓 근거로 둔갑한다. 그렇다고 양쪽 경계를 다 막으면
+  `늪지에서 샀는데` 가 죽는다(조사는 이름에 붙어서 온다). 규칙: 왼쪽이 음절이면 거부,
+  오른쪽은 **조사일 때만** 허용(`linking._surface_occurs`).
+  그리고 `스르륵` 은 마켓명이자 의태어라 `AMBIGUOUS_SURFACES` 다(`손사이로 스르륵 나가는`).
+- **Important: KB 명부가 커지면 감사 숫자가 움직인다.** 같은 검수 스크립트가 KB 14마켓에선
+  D3 105 · F1 78 · 🔧 179 를, 38마켓에선 **D3 3 · F1 115 · 🔧 220** 을 낸다(판정 규칙은 불변 —
+  D2·D5a·D5b·D6·D7·D8·D10 은 한 건도 안 움직였다). 미등재로 못 채우던 행이 채울 수 있는 행으로
+  옮겨 갈 뿐이다.
+  **Don't:** 감사 기준선을 '고정된 진실'로 인용하지 말 것 — **KB 스냅샷과 함께** 읽어야 한다.
 
 ## 수집 (합법성)
 - 디시는 익명 UGC·robots 준수·발췌 표시(전문 미공개)라 가장 방어 가능한 스크랩(면접 포인트).
@@ -104,3 +125,5 @@
 - 임베딩 BGE-M3 / 벡터스토어 pgvector → [ADR-0001](docs/adr/0001-embedding-and-vectorstore.md)
 - 소스 편향은 1급 기능(평균 금지) → [ADR-0002](docs/adr/0002-source-bias-first-class.md)
 - 후기(주문) 단위 vs 제품 단위 분리 → [ADR-0005](docs/adr/0005-review-vs-product-unit.md)
+- 디시 마켓 귀속 우선순위 · 미등재 마켓 오버레이 · 되돌리기 센티널 · 복구 원장 →
+  [ADR-0018](docs/adr/0018-attribution-priority-and-unregistered-markets.md)

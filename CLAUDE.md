@@ -11,7 +11,7 @@ something to correct for** — never average it; show it per source, plus the ga
 ## Where to look (map)
 - **Overall flow & dependencies**: [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + mermaid + ripple table)
 - **Domain rules & tribal knowledge**: [MEMORY.md](MEMORY.md) (vocabulary, promo detection, Layer 1 rules, entity linking, KB structure)
-- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria, human-in-the-loop spec review, meta-only drop authority)
+- **Structural decisions**: [docs/adr/](docs/adr/) (embeddings, source bias, IG fixture, promo cascade, review unit, M/Q/E axes, collected_for target policy, value→shipping section, source links & owner media, market logos, six-criteria summary & search page, frontend removal, processing vs publication, verdict/minority & badge meta, market-scope order criteria, human-in-the-loop spec review, meta-only drop authority, attribution priority & unregistered markets)
 - **Per-module detail**: [slime_rag](slime_rag/CLAUDE.md) · [sql](sql/CLAUDE.md) ·
   [eval](eval/CLAUDE.md) (unit tests) · [evals](evals/CLAUDE.md) (pass-rate)
 - **Build record & productivity evidence**: [BUILD_LOG.md](BUILD_LOG.md) · **stack rationale**: [README.md](README.md)
@@ -334,6 +334,44 @@ something to correct for** — never average it; show it per source, plus the ga
     ⚠️ 접기(fold)는 하지 않는다 — 같은 조각의 두 행이 나란히 `product=NULL` 이 되어도
     `UNIQUE(source, post_id, product)` 는 NULL 을 서로 다른 값으로 보므로 제약에 안 걸리고,
     내용이 다른 두 후기를 이름이 비었다는 이유로 합치면 진짜 후기가 사라진다.
+- **디시 마켓 귀속의 우선순위가 뒤집혔고, 그 근거는 사람이 만든 전수 감사다**(2026-08-11,
+  [ADR-0018](docs/adr/0018-attribution-priority-and-unregistered-markets.md)).
+  CLAUDE.md 가 "재검토 여지가 있으나 **측정 없이 건드리지 말 것**"으로 봉인해 둔 순서
+  (상속 > 1층 소유)를 바꿨다. **그 측정이 도착했기 때문**이다 — 아모스갤 801행 / 조각 446개를
+  원문과 1:1로 대조한 검수 문서이고, 그 순서 때문에 생긴 오귀속을 **D2 18행** 짚었다.
+  · **왜 다른 측정으로는 못 했나**: 마켓 축은 리플레이가 **원리적으로 불가능**하다. 실측한
+    amos `attributes` 에 **`mentioned_market` 이 없다** — `link()` 의 첫 입력이 저장돼 있지
+    않으니 재추출 없이는 재계산이 안 된다. 제품 축은 반대라
+    `evals/replay_dc_attribution_target.py` 가 $0 로 리플레이한다(실측: Phase 4 **전** 51행 중
+    현행 코드가 잡는 것 **0행**, **후** 51행 전부 — 이 분할이 없었으면 어휘를 필요 이상으로 넓혔다).
+  · **새 사다리**(좁은 것부터): 항목 명시 0.95/0.85 → 제품명 접두 0.92/0.82 →
+    **조각 본문 스캔** 0.88/0.83 → **1층 유일소유** 0.80 → **스레드 상속(제목이 그 마켓을
+    선언한 글에서만)** 0.75. ⛔ 항목이 마켓을 **말했는데 보류된** 행엔 아래 셋을 안 태운다.
+  · **KB 미등재 마켓은 채우지 않고 막는다** — `data/unregistered_market_tokens.json`(커밋되는
+    사람 판단 오버레이). 접두를 떼고, 상속·역인덱스를 끄고, **스레드 스코프 차단**으로 D2c
+    (`ㅋㅋㅁ` 스레드의 `진저크런키` 가 지나 1층과 이름이 겹쳐 그 행만 채워지던 사고)를 없앤다.
+  · **되돌리기는 0 이 아니라 센티널 0.01** — 0 으로 되돌리면 다음 백필 선택자
+    (`coalesce(market_confidence,0)=0::real`)에 다시 걸려 **재무장된다**(실측 171행). 선재
+    결함을 같이 고쳤다. provenance 상수 9 → **12값 고유**.
+  · **확신도가 담지 못하는 열쇠는 원장이 갖는다** — `slime_rag/repair_ledger.py` →
+    **`data/repair_ledgers/`**. ⛔ `.omc/` 는 gitignore 라 거기 적은 원장은 **세션 수명**이고,
+    그러면 '되돌릴 수 있다'가 거짓이 된다(기실행된 `backfill_non_product_labels` 의 롤백
+    주장이 이미 그 상태였다).
+  · **감정 축 오배치는 사이드카**(`reviews.attribute_repairs`) — `attributes` 는 provenance
+    스냅샷이라 못 고치고, 방치하면 **유료 요약을 재생성할 때마다 다시 오염**시킨다.
+  · **재감사 기준은 행 수가 아니라 안정 키 위의 집합 차이**(`evals/diff_audit.py`,
+    키 = `(post_id, attributes->>'mentioned_product')`). 접기가 분모를 줄이므로 행 수 비교는
+    고쳐서인지 사라져서인지 구분하지 못한다. `regressed ≠ ∅` 면 하드 실패.
+  ⚠️ **감사 숫자는 KB 에 의존한다.** 계획서가 인용한 D3 105 · F1 78 · 🔧 179 는 KB 가
+    14마켓이던 시점의 값이고, 지금 KB 는 **38마켓**이라(감사가 미등재로 지목한 초성 24개가
+    이름만 등록됨 — `handle`·`logo` 는 비어 있다) 같은 스크립트가 **D3 3 · F1 115 · 🔧 220**
+    을 낸다. 판정 규칙은 불변이고 D2·D5a·D5b·D6·D7·D8·D10 은 한 건도 안 움직였다.
+    커밋된 기준선·골드는 **현재 KB 기준**이다.
+  ⚠️ **아직 DB 에 쓰지 않았다** — 전 백필이 `dry_run` 리포트까지다(계획 §12: AUTO dry_run →
+    HUMAN 승인 → 실행). dry 실측: `backfill_dc_market_priority` filled 75 · corrected 25 ·
+    **cleared 26**(감사 D4 는 3행) · **conflicts 120**(자동 미기록, 사람 목록) ·
+    `repair_dc_attribution` writes 52 · `backfill_product_aliases` renames 4 ·
+    `backfill_sentiment_axis` 5 · `backfill_review_bodies` 6(복구불가 2).
 - Still to do: **deployment** (hard gate #1 — `web/` as a static site + `api/` as a service; nothing
   else blocks it) · turn on the post-meta sort axes now that the columns exist — `e930471` added
   `body`/`title`/`author`/`posted_at`/`likes`/`views`/`comment_count`/`votes_up`, and `list_reviews`
@@ -361,6 +399,20 @@ python -m eval.test_index_meta && python -m eval.test_layer1_collection # 색인
 python -m eval.test_incremental_collection # 증분 수집(안정 키 · 추출 전 컷 · 워터마크 · 변경분 요약)
 python -m eval.test_product_repair                             # 제품명 귀속 복구 + 비제품 라벨·단어 게이트
 python -m eval.test_market_prefix && python -m eval.test_market_backfill  # 마켓 접두 분리 · 백필/복구 위생
+python -m eval.test_market_scan && python -m eval.test_unregistered_markets  # 조각 스코프 스캐너 · 미등재 마켓 오버레이
+python -m eval.test_sentiment_axis_sidecar && python -m eval.test_dc_canonical_candidates  # 감정 축 사이드카 · D6 정본 후보
+python -m eval.test_audit_redaction                            # 감사 편집본/골드 경계(ADR-0013)
+python evals/dump_dcinside_pieces.py /tmp/dc_pieces.jsonl      # 디시 검수 덤프(무과금·읽기전용)
+python evals/review_dcinside_extraction.py /tmp/dc_pieces.jsonl /tmp/dc-review.md \
+  --redacted docs/dcinside-extraction-review.redacted.md \
+  --json evals/results/dc_attribution_baseline.json \
+  --gold evals/gold/dc_attribution_gold.json                   # 원본은 gitignore · 편집본만 커밋
+python evals/replay_dc_attribution_target.py                   # 계측기 A(제품 축 리플레이 · $0)
+# 재감사 diff — 두 번째 인자는 백필 실행 뒤 같은 방식으로 다시 뜬 리포트다
+python evals/diff_audit.py evals/results/dc_attribution_baseline.json /tmp/dc_after.json \
+  --folds 'data/repair_ledgers/*fold*.json'
+python -c "from slime_rag import pipeline as p; print({k:v for k,v in p.backfill_dc_market_priority().items() if not k.endswith('_list')})"  # 마켓 축 재도출 규모(무과금)
+python -c "from slime_rag import repair_ledger; print(repair_ledger.manifest())"     # 복구 원장 현황(무과금)
 python -m eval.test_alias_candidates                           # 약칭 후보 유도(자동 병합 금지)
 OPENAI_API_KEY="" python evals/audit_attribution.py            # 마켓/제품 귀속 감사(무과금·읽기전용)
 python -m eval.test_market_inversion                           # 제품→마켓 역인덱스(1층 우선·보류 불가침·롤백)

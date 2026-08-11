@@ -12,7 +12,8 @@
 | `relevance.py` | 관련성 필터 — topic(코사인)·domain(centroid)·**M/Q/E 3축**. 합집합 후보 + E 신뢰도 순위 + 예산 |
 | `relevance_rules.py` | M/Q/E 표면 규칙 캐스케이드 — 한국어 증거성 표지 기반. 어휘는 `LEXICON` 상수 데이터 |
 | `extract.py` | 추출 러너 — 2층 후기(`LAYER2_SCHEMA`) + 1층 판매자 스펙(`extract_spec`) |
-| `linking.py` | 개체연결 — KB 표면형/초성 역인덱스, 충돌 시 abstain + **제품→마켓 역인덱스**(`MarketInversion` 2층 · 전용 confidence · 제외 오버레이) |
+| `linking.py` | 개체연결 — KB 표면형/초성 역인덱스, 충돌 시 abstain + **제품→마켓 역인덱스**(`MarketInversion` 2층 · 전용 confidence · 제외 오버레이) + **조각 스코프 텍스트 스캐너**(`markets_in_text` → `ScanResult` unique/ambiguous/unknown/noisy · 모호 토큰 · 경계 규칙 · 미등재 오버레이, [ADR-0018](../docs/adr/0018-attribution-priority-and-unregistered-markets.md)) |
+| `repair_ledger.py` | **복구 원장**(ADR-0018) — 확신도 칸이 담지 못하는 되돌리기 열쇠(NULL 되돌림·개명·같은 확신도 재사용)를 `data/repair_ledgers/<fn>.json` 에 원자적으로. 화이트리스트 칸만 · 원문 바이트 금지 · `.omc/` 금지(gitignore = 세션 수명). DB·네트워크·LLM 무의존 |
 | `bias.py` | 편향 태깅(IG) — 홍보성 게이트→LLM 캐스케이드, 판매자 라우팅 `partition` |
 | `layer1.py` | 1층 fixture 로더 + `seed_kb_products` + `iter_specs` |
 | `index.py` / `search.py` | BGE-M3 임베딩 적재 / 하이브리드(dense+BM25 RRF)+메타필터+근거답변 |
@@ -407,13 +408,66 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
   `linking.link_post` → `link(inherited=True)` 다.
   **Don't:** 그 표식을 없애고 `doc["market"]` 을 다른 키로 **옮기지 말 것** — 그 칸은 이미
   여러 곳이 읽는 계약이라 옮기면 상속분이 조용히 사라진다.
-  **Don't:** 확신도 값을 다른 다섯 상수와 겹치게 두지 말 것(게이트:
-  `test_fill_path_confidences_never_collide` — 9개 값이 전부 고유여야 한다).
+  **Don't:** 확신도 값을 다른 상수와 겹치게 두지 말 것(게이트:
+  `test_fill_path_confidences_never_collide` — 이제 **12개 값**이 전부 고유해야 한다:
+  직접 2 · 접두 2 · 역인덱스 2 · 상속 1 · 백필 2 · **조각 스캔 2** · **되돌리기 센티널 1**).
   **Note:** 이 숫자들은 provenance 표식이지 **티어 정렬 키가 아니다.** 어느 근거가 이기는지는
-  `link()` 의 분기 순서가 정한다 — 현재 역인덱스는 `surface` 가 비어 있을 때만 돌아서
-  상속으로 채워진 행에는 닿지 않는다(상속이 역인덱스보다 앞선다). 비교 스레드에선 제품명
-  소유관계가 더 맞을 수 있어 **재검토 여지가 있는 순서**이나, 바꾸면 많은 행의 마켓이 움직이므로
-  측정 없이 건드리지 말 것.
+  `link()` 의 분기 순서가 정한다.
+- **Important:** **그 순서가 2026-08-11 에 바뀌었다**([ADR-0018](../docs/adr/0018-attribution-priority-and-unregistered-markets.md)).
+  예전 서술("역인덱스는 `surface` 가 비어 있을 때만 돌아서 상속분에 안 닿는다 — 재검토 여지가
+  있으나 **측정 없이 건드리지 말 것**")이 요구한 **그 측정이 도착했다**: 아모스갤 801행 /
+  조각 446개를 사람이 원문과 1:1 대조한 전수 검수다. 그 문서가 이 순서 때문에 생긴 오귀속을
+  **D2 18행** 짚었다(`요구르팅` 의 1층 소유는 지나인데 늪지 스레드 상속이 덮는 식).
+  **Note:** 왜 다른 측정으로는 못 했나 — **마켓 축은 리플레이가 원리적으로 불가능하다.**
+  실측한 amos `attributes` 에 **`mentioned_market` 이 없다**(키는 firsthand_evidence ·
+  longevity · overall · sound · texture · scent · mentioned_product · shipping_cs · value).
+  `link()` 의 첫 입력이 저장돼 있지 않으니 재추출 없이는 재계산할 수 없고, 그래서 사람이 만든
+  감사 문서가 **유일한 측정치**다. 제품 축은 반대다 — `dc_attribution_target` 이 순수 함수라
+  `evals/replay_dc_attribution_target.py` 가 $0 로 리플레이한다.
+  **현재 사다리**(좁은 것부터): ①항목 명시 0.95/0.85 → ②제품명 접두 0.92/0.82 →
+  ③**조각 본문 스캔** 0.88/0.83 → ④**1층 유일소유** 0.80 → ⑤**스레드 상속(제목이 그 마켓을
+  선언한 글에서만)** 0.75.
+  **Don't:** ①② 가 **있었는데 보류된** 행에 ③④⑤ 를 태우지 말 것 — 갈린 증거를 덮는 것이 된다.
+  **Don't:** 상속을 통째로 없애지 말 것(AC13) — 제목이 선언한 글에선 여전히 걸려야 한다.
+- **Important:** KB **미등재** 마켓 초성은 **추론 차단 전용 오버레이**로 관리한다
+  (`data/unregistered_market_tokens.json` · `linking.load_unregistered_market_tokens`, ADR-0018).
+  하는 일은 셋이고 전부 막는 쪽이다: ①`_market_token` 이 접두로 인정해 떼어 내고
+  ②`resolve_market` 미발견이라 마켓은 NULL 인데 `surface` 가 **비지 않아** 상속·역인덱스가 꺼지고
+  ③**스레드 스코프 차단** — 조각/제목이 가리키는 마켓이 미등재뿐이면 역인덱스를 끈다.
+  ③이 D2c 자리다: 스레드는 `ㅋㅋㅁ` 후기인데 `진저크런키` 가 지나 1층과 겹쳐 **그 행만** 채워지고
+  같은 글의 다른 제품은 NULL 이라 한 글 안에서 마켓이 갈렸다. 접두 분리로는 못 막는다(그 이름엔
+  접두가 없었다).
+  **Don't:** 오버레이로 마켓을 **채우지 말 것** — 채우려면 KB 등록(실명·핸들, 사람 입력)이 필요하다.
+  **Don't:** 완성형을 넣지 말 것 — 로더가 거부하고 경고한다. 통과하면 `_market_token` 이 그것을
+  접두로 인정해 **진짜 제품명을 자른다**(`포도`→푸딩 금지를 우회하는 구멍).
+  **Note:** 실측(2026-08-11) — 씨앗 23토큰 중 **22개가 이미 KB 마켓**이었다(KB 가 14→38마켓이
+  된 뒤). 파일엔 여전히 미등재인 것만 남기고 확인분은 `now_registered` 로 기록한다.
+- **Important:** 표면형 스캔에는 **경계 규칙**이 있다(`linking._surface_occurs`). 단순 부분문자열
+  이면 마켓명이 다른 낱말 속에 묻혀도 잡힌다 — 실측: `토끼나마나` 안의 `마나`, `포이즈닝` 안의
+  `포이`. 둘 다 **진짜 제품명**이라 제품명이 마켓 근거로 둔갑한다. 그렇다고 양쪽을 다 막으면
+  `늪지에서 샀는데` 가 죽는다(조사는 이름에 붙어서 온다) → 왼쪽은 음절이면 거부, 오른쪽은
+  **조사일 때만** 허용.
+  **Don't:** `kb.resolve_market` 을 모호 토큰 규칙으로 좁히지 말 것 — 저건 추출기가 이미
+  마켓 칸에 넣은 값을 푸는 함수라, 거기서 `푸딩` 을 막으면 정상 행이 죽는다.
+- **Important:** 감정 축 오배치는 **사이드카**(`reviews.attribute_repairs`)로 기록한다(ADR-0018).
+  `attributes` 인플레이스 수정은 금지(provenance 스냅샷 + 감사 골드 키가 그 불변성에 얹혀 있다)
+  이고, 방치도 금지(잘못 배치된 판정이 **유료 요약을 재생성할 때마다 다시 오염**시킨다).
+  배관은 4곳 — 스키마 · `_records_for` 의 SELECT · 레코드 병합 · 백필 쓰기.
+  **Don't:** '컬럼이 써졌다'로 게이트하지 말 것 — 배관 한 곳이 빠져도 통과하는 무언 실패다.
+  게이트는 **써진 사이드카가 `_source_material` 출력을 바꾸는지**를 끝까지 본다.
+  **Don't:** 값을 다른 축으로 옮기지 말 것(없던 판단을 만든다). `걀걀거림` 은 정상 sound 근거다.
+- **Important:** 되돌리기는 확신도 **0 이 아니라 센티널**(`REVERT_SENTINEL_CONF` 0.01)을 쓴다.
+  0 으로 되돌리면 `backfill_market_from_product` 의 선택자(`coalesce(market_confidence,0)=0::real`)
+  에 **다시 걸려 재무장된다** — 되돌리기가 되돌려지지 않는다(실측 171행이 그 선택자에 걸린다).
+  정당한 재백필은 `include_reverted=True` **명시 인자로만**.
+  **Note:** 0.01 은 REAL 로 정확히 표현되지 않는다 → SQL 비교에 `::real` 필수.
+- **Important:** 확신도가 담지 못하는 되돌리기 열쇠(NULL 되돌림·개명·같은 확신도 재사용)는
+  **원장**이 갖는다 — `slime_rag/repair_ledger.py` → `data/repair_ledgers/<fn>.json`.
+  **Don't:** `.omc/` 아래에 두지 말 것 — gitignore 라 원장이 **세션 수명**이 되고, 그러면
+  '되돌릴 수 있다'가 거짓이 된다(기실행된 `backfill_non_product_labels` 의 롤백 주장이 이미
+  그 상태였다). 담는 건 id·이전값·이름·시각뿐이라 ADR-0013 안전이다.
+  **Don't:** 함수별 파일을 합치지 말 것 — fold 집합은 `resolved = baseline − after − folded`
+  의 하드 입력이라, 합치면 어느 함수가 지웠는지 못 가르고 **성공 지표가 조용히 부풀려진다**.
 - **Important:** 같은 조각의 제품명 **포함관계는 자동으로 접지 않는다** —
   `pipeline.product_containment_candidates`(LLM 0회·DB 읽기 전용, 2026-08-10)가 후보만 뽑는다.
   `derive_alias_candidates` 와 **신호가 다르다**: 저건 코퍼스 전체의 엄격 **접두** 규칙이라
@@ -428,6 +482,21 @@ python -m slime_rag.spec_overrides   # 사람 검수 오버레이 현황(무과�
 - **Important:** 종류어·재료어·조각난 이름도 제품이 아니다 — `extract.is_non_product_word`
   (2026-08-10). 실측: `디폼`·`클리어`·`수수깡` 등 12행 · `글루올`·`아마존` 등 8행 ·
   `캔디어쩌구` 류 5행 · 자모뿐인 이름(`ㅅㄱㄷ`) 6행.
+  **Important:** 2026-08-11 에 **맨몸/수식 2분법**으로 확장됐다(ADR-0018, 시그니처가
+  `is_non_product_word(name, known_products=None)` 로 늘었다 — 순수 함수·무KB 는 유지).
+  맨몸(어휘 완전일치)은 **증거를 묻지 않고**, 수식된 것(`초코디폼`)은 1층/레지스트리가 모를
+  때만 비제품이며, 증거 미주입이면 **아무것도 안 지운다**(페일세이프).
+  어휘는 `data/non_product_words.json` — `promo_gate_terms.json` 선례.
+  **Don't:** 맨몸에 증거를 묻지 말 것 — 실측(2026-08-11) `펄러비즈`·`점섞슬`·`액괴`·`슬랑이`·
+  `할로윈` 5개가 `known_product_names()` 에 있는데 **전부 레지스트리(유도 후보)뿐이고 1층
+  `specs` 엔 0개**다. `is_non_product_label` ①이 `#비매품` 태그 때문에 증거를 안 묻는 것과 같다.
+  **Don't:** `TYPE_ENUM` 을 파일로 옮기지 말 것 — 1층 스키마 enum 이라 갈리면 조용히 어긋난다.
+  **Don't:** `LINE_WORDS`(뭉치·갈배·유자·진저…)를 그 파일에 넣지 말 것 — 실재 제품의 축약
+  지칭이라 별칭 사전 소관이고, 섞으면 진짜 후기의 제품명이 지워진다.
+  **Note:** 증거는 이제 `index_post → link_post → link` 로 **관통한다**. 그전엔 `label_known`
+  이 `extract_collected` 까지만 가서 수식 갈래가 **백필 경로에서만** 증거를 받았다 — 같은
+  이름에 경로마다 다른 판정이 붙는 그 실패다(게이트:
+  `test_word_gate_evidence_is_never_narrowed`).
   **Don't:** 부분일치로 넓히지 말 것 — `specs` 제품명 1,980개 중 그 단어와 **완전히 같은** 이름은
   0개인데 **품은** 이름은 16개다(`내리꽃디폼`·`베이직우드폼`·`말차초코크런치바`…).
   `is_non_product_label` 이 `나비매듭` 때문에 부분일치를 금지한 것과 같은 자리다.

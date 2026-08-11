@@ -485,6 +485,39 @@ def test_layer1_narrows_a_multi_market_piece_but_never_overrides_it():
     print("✓ 1층이 다중 후보를 좁힘 · 후보 밖은 충돌 유지 OK")
 
 
+def test_a_single_market_piece_never_silently_overrides_layer1_ownership():
+    """조각이 마켓을 **하나만** 말해도 1층 소유가 다르면 충돌이다 — 위 ⛔의 **대칭**.
+
+    위 케이스(다중 후보)엔 ⛔ 가 있는데 **단일 후보 분기엔 없었다**. 그래서 조각 스캔이
+    1층을 조용히 이겼다 — 재감사 실측(2026-08-11) 새 결함 4행이 전부 이 구멍이다:
+    `나 ㅂㅇㅍ 빨대는 잘 모르겠더라 … 빠코볼은 재미없었으면` 한 댓글이 `빠코볼`(1층 지나)
+    행을 **베이퍼**로 찍었다. 조각이 마켓을 하나만 말한다는 건 그 조각의 **화제**가 하나란
+    뜻이지, 거기 언급된 **제품이 그 마켓 것**이라는 뜻이 아니다 — 이 갤의 지배적 형태가
+    한 글에서 여러 마켓을 비교하는 글이라(상속 폴백 제거와 같은 실측) 정상 형태다.
+
+    ⚠️ 확신도로는 사후에 못 고른다: 되돌림이 0.90/0.85 → 0.83 이라 값만 보면 정상 채움과
+      구별되지 않는다. 그래서 **쓰기 전에** 막고 사람 목록으로 내보낸다.
+    ⚠️ 1층이 **모르는** 이름이면 막지 않는다 — 그러면 조각 스캔이 통째로 죽는다
+      (실측: 같은 런의 올바른 채움 4행이 1층 미등재 제품이었다).
+    """
+    from slime_rag import pipeline
+    kb = _kb()
+    inv = _inv([("지나", "빠코볼")])
+    text = "나 ㅂㅇㅍ 빨대는 잘 모르겠더라 농도 잡아도 ㅜ 빠코볼은 재미없었으면"
+    mk, why, conf = pipeline.dc_market_target("빠코볼", "지나", kb=kb, inversion=inv,
+                                              text=text, title="")
+    assert (mk, why, conf) == (None, "conflict_spec_vs_piece", None), (mk, why, conf)
+    # 1층이 모르는 이름이면 조각 스캔이 그대로 산다(과잉 차단 회귀).
+    mk2, why2, _c = pipeline.dc_market_target("빨대슬", None, kb=kb, inversion=inv,
+                                              text=text, title="")
+    assert (mk2, why2) == ("베이퍼", "piece_scan"), (mk2, why2)
+    # 1층과 조각이 **같은** 마켓을 말하면 충돌이 아니다.
+    mk3, why3, _c3 = pipeline.dc_market_target(
+        "빠코볼", None, kb=kb, inversion=_inv([("베이퍼", "빠코볼")]), text=text, title="")
+    assert (mk3, why3) == ("베이퍼", "piece_scan"), (mk3, why3)
+    print("✓ 단일 조각 스캔이 1층 소유를 조용히 못 이김 · 과잉 차단 없음 OK")
+
+
 def test_piece_body_scan_fills_only_on_a_single_market():
     """조각 본문이 **정확히 하나**의 마켓을 지목할 때만 채운다 — 비교글에선 아무것도 안 한다.
 
@@ -593,6 +626,7 @@ if __name__ == "__main__":
     test_ac12_inheritance_needs_the_title_to_declare_the_market()
     test_ac13_a_declaring_title_still_lets_inheritance_through()
     test_layer1_narrows_a_multi_market_piece_but_never_overrides_it()
+    test_a_single_market_piece_never_silently_overrides_layer1_ownership()
     test_piece_body_scan_fills_only_on_a_single_market()
     test_containment_candidates_are_reported_not_merged()
     test_containment_output_carries_no_source_text()

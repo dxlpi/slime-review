@@ -2429,6 +2429,9 @@ def dc_market_target(product, stored_market, *, kb, inversion=None,
     사다리 — 순서가 곧 근거의 세기다:
       ① `text_markets.unique` 가 **정확히 하나** → 그 마켓
          (`REPAIR_CONF_PIECE_SURFACE` 0.88 / `..._CHOSEONG` 0.83).
+         ⛔ 단, **1층이 다른 마켓을 지목하면 쓰지 않고 내보낸다**(`conflict_spec_vs_piece`).
+           ④의 ⛔와 대칭이다 — 조각이 마켓을 하나만 말한다는 건 그 조각의 **화제**가 하나란
+           뜻이지, 거기 언급된 **제품이 그 마켓 것**이라는 뜻이 아니다.
       ② ①이 비고 **1층 유일소유** → 그 마켓(`BACKFILL_CONF_SPEC` 0.90 재사용).
       ③ ①②가 비고 저장값이 있다 → **건드리지 않는다**(근거를 못 재도출하면 보존).
       ④ `text_markets.unique` 가 **여럿**(비교글) → **쓰지 않고 목록으로 내보낸다.**
@@ -2478,6 +2481,18 @@ def dc_market_target(product, stored_market, *, kb, inversion=None,
         return None, "conflict_multi_market", None
     if len(uniq) == 1:                             # ①
         mw = next(iter(uniq))
+        # ⛔ ④의 ⛔와 **대칭인 자리**다. 조각이 마켓을 하나만 말해도, 1층이 그 행 제품의
+        #   소유자로 **다른** 마켓을 지목하면 두 증거가 어긋난 것이지 좁혀진 게 아니다.
+        #   이 분기에만 그 검사가 없어서 조각 스캔이 1층을 **조용히** 이겼다 — 재감사
+        #   실측(2026-08-11) D2 4행: `ㅂㅇㅍ 빨대는 잘 모르겠더라 … 빠코볼은` 한 댓글이
+        #   `빠코볼`(1층 지나) 행을 베이퍼로 찍었다. 이 갤의 지배적 형태가 **한 글에서 여러
+        #   마켓을 비교하는 글**이라(상속 폴백을 없앤 것과 같은 실측), "A 마켓 얘기 중에 B
+        #   마켓 제품을 언급"은 예외가 아니라 정상이다.
+        #   ⚠️ 되돌림(0.85·0.90 → 0.83)이라 **확신도로는 사후에 못 고른다** — 조각 스캔이
+        #     직접 매칭·1층 백필보다 낮은 값을 쓰는데 값만 보면 정상 채움과 구별되지 않는다.
+        #   ⚠️ 조용히 1층을 이기게 하지도, 조용히 막지도 않는다 — `conflict` 로 **내보낸다**.
+        if spec_mk and spec_mk != mw:
+            return None, "conflict_spec_vs_piece", None
         if mw == stored_market:
             return None, "unchanged", None
         conf = (linking.REPAIR_CONF_PIECE_SURFACE
@@ -2525,8 +2540,13 @@ def _dc_plan(source: str) -> tuple[list[dict], dict]:
         rec = {"id": rid, "post_id": post_id, "product": product, "was_market": market,
                "was_conf": float(conf) if conf is not None else None,
                "to_market": mk, "to_conf": new_conf, "why": why, "attributes": attrs}
-        if why == "conflict_multi_market":
+        if why.startswith("conflict"):
+            # 접두로 받는다 — 충돌 사유가 늘 때(`conflict_spec_vs_piece`) 여기 한 줄을
+            # 같이 안 고치면 **충돌이 조용히 fill 로 새어 나간다**(무음 실패).
+            # 사유별로도 센다: 두 충돌은 성격이 달라(비교글 vs 1층 불일치) 한 숫자로 합치면
+            # 어느 쪽이 늘었는지 사후에 못 가른다.
             counters["conflict"] += 1
+            counters[why] = counters.get(why, 0) + 1
             rec["kind"] = "conflict"
         elif why == "no_body":
             counters["skipped_no_body"] += 1

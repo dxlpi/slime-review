@@ -1,0 +1,48 @@
+{
+  "_note": "backfill_sentiment_axis 의 되돌리기 원장. 원문 바이트 없음(ADR-0013). 확신도 칸이 담지 못하는 값(옛 마켓·옛 이름·삭제)만 담는다.",
+  "source_fn": "backfill_sentiment_axis",
+  "written_at": "2026-08-11T03:40:49+00:00",
+  "count": 5,
+  "entries": [
+    {
+      "id": 340,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "product": "피쵸필드",
+      "axis": "sound",
+      "why": "탈출은 지속력/질감 사안이지 소리가 아니다",
+      "source_fn": "backfill_sentiment_axis"
+    },
+    {
+      "id": 341,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=201495",
+      "product": "냥티시에",
+      "axis": "sound",
+      "why": "탈출은 지속력/질감 사안이지 소리가 아니다",
+      "source_fn": "backfill_sentiment_axis"
+    },
+    {
+      "id": 1156,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270",
+      "product": null,
+      "axis": "sound",
+      "why": "탈출은 지속력/질감 사안이지 소리가 아니다",
+      "source_fn": "backfill_sentiment_axis"
+    },
+    {
+      "id": 1157,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091799",
+      "product": null,
+      "axis": "sound",
+      "why": "탈출은 지속력/질감 사안이지 소리가 아니다",
+      "source_fn": "backfill_sentiment_axis"
+    },
+    {
+      "id": 1158,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202270#cmt:1091801",
+      "product": null,
+      "axis": "sound",
+      "why": "탈출은 지속력/질감 사안이지 소리가 아니다",
+      "source_fn": "backfill_sentiment_axis"
+    }
+  ]
+}

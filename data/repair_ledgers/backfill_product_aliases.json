@@ -1,0 +1,44 @@
+{
+  "_note": "backfill_product_aliases 의 되돌리기 원장. 원문 바이트 없음(ADR-0013). 확신도 칸이 담지 못하는 값(옛 마켓·옛 이름·삭제)만 담는다.",
+  "source_fn": "backfill_product_aliases",
+  "written_at": "2026-08-11T03:40:00+00:00",
+  "count": 4,
+  "entries": [
+    {
+      "id": 412,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202234",
+      "market": "늪지",
+      "was": "뼈갈우나",
+      "to": "뼈갈우",
+      "why": "약칭 사전 승격분",
+      "source_fn": "backfill_product_aliases"
+    },
+    {
+      "id": 1125,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202036#cmt:1090764",
+      "market": "늪지",
+      "was": "와이풀 그린티",
+      "to": "와이풀그린티",
+      "why": "약칭 사전 승격분",
+      "source_fn": "backfill_product_aliases"
+    },
+    {
+      "id": 1139,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202309#cmt:1091978",
+      "market": "늪지",
+      "was": "엉겁처지",
+      "to": "엉겁처치",
+      "why": "약칭 사전 승격분",
+      "source_fn": "backfill_product_aliases"
+    },
+    {
+      "id": 1321,
+      "post_id": "https://gall.dcinside.com/mgallery/board/view/?id=amos&no=202233",
+      "market": "늪지",
+      "was": "배",
+      "to": "갈배",
+      "why": "약칭 사전 승격분",
+      "source_fn": "backfill_product_aliases"
+    }
+  ]
+}

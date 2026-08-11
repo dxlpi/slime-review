@@ -60,6 +60,22 @@ type RawPage = {
 /** 값이 없을 때 디자인의 자리표시자를 그대로 쓴다 — 레이아웃이 무너지지 않게. */
 const DASH = '—'
 
+/* 풀 조합 구분자. 판매자가 캡션에 쓰는 표기가 마켓마다 다르다 — 실측 1,803행에서
+ * 공백 1,395 · `+` 347 · `,` 123 이고, `+` 가 예찬·늪지의 기본 표기다.
+ * ⚠️ `>` 는 **구분자가 아니다**. `뉴클>>>>아모스`·`컬글>아올+스쿨` 처럼 배합 비율/순서를
+ * 나타내는 판매자 표기라(31행), 나누면 두 재료가 동등하게 보여 비율이 사라진다. 한 조각 안에
+ * 그대로 남긴다. */
+const GLUE_SEP = /\s*[+/,&·|]\s*|\s+/
+
+/** 풀 조합 한 줄. 구분자만 `+` 로 통일하고 재료어는 손대지 않는다 — 표기는 판매자 것이다.
+ *  `+` 인 이유(사용자 결정 2026-08-11): 판매자 다수가 이미 그렇게 쓰고(347행), 재료를 **섞는다**
+ *  는 뜻이 `·` 나열보다 분명하다. 처음 문제였던 건 `+` 라는 글자가 아니라 그걸 안 나눠서
+ *  생긴 조각(`+` 단독 칩 43행 · 통짜 한 덩어리 290행)이었다. */
+function joinGlues(raw: string | null | undefined): string {
+  const parts = (raw ?? '').split(GLUE_SEP).filter(Boolean)
+  return parts.length ? parts.join(' + ') : DASH
+}
+
 /** 아직 요약이 없는 기준의 빈 행. 매 렌더 새 객체를 만들면 표가 통째로 리렌더된다. */
 const EMPTY_CELL: Cell = { verdict: null, minority: null }
 /* 축마다 하나씩 미리 만들어 둔다 — `{...EMPTY_ROW, scope}` 로 즉석 생성하면 매 렌더 새 객체가
@@ -105,7 +121,7 @@ export type PageData = {
   marketMonogram: string | null
   product: string
   media: { caption: string; spec: string; embedUrl: string | null }
-  spec: { glues: string[]; scent: string; slimeType: string; texture: string }
+  spec: { glue: string; scent: string; slimeType: string; texture: string }
   summary: {
     all: SummaryRow[]; allBasis: string
     ig: SummaryRow[]; igBasis: string
@@ -146,8 +162,7 @@ function toPageData(d: RawPage): PageData {
     },
 
     spec: {
-      // 풀 조합은 디자인이 칩 여러 개로 그린다 — 공백/슬래시 어느 쪽으로 적혀도 나뉘게.
-      glues: (d.spec?.base_combo ?? '').split(/\s*[/,]\s*|\s+/).filter(Boolean),
+      glue: joinGlues(d.spec?.base_combo),
       scent: d.spec?.official_scent ?? DASH,
       // 카드는 '종류'를 보여주고 `beads` 는 안 보여준다(사용자 결정 2026-08-06). 내장 알갱이형
       // 제품에선 둘이 같은 단어로 겹치는데(빠코볼: 종류 '폼볼' / 토핑 '폼볼'), 구매자가 먼저

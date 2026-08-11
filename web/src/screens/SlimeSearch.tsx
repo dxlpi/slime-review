@@ -24,7 +24,6 @@ import { useEffect, useState } from 'react'
 
 import Badge from '../components/kds/Badge'
 import Button from '../components/kds/Button'
-import Chip from '../components/kds/Chip'
 import Icon from '../components/kds/Icon'
 import Input from '../components/kds/Input'
 import Tab from '../components/kds/Tab'
@@ -784,15 +783,12 @@ export default function SlimeSearch() {
               >
                 제품 정보
               </div>
+              {/* 칩이 아니라 평문이다(사용자 결정 2026-08-11) — 아래 향·종류·질감 세 줄과 같은
+                  모양. 디자인 원본은 칩이었지만 재료가 6~7개인 조합이 흔해(실측 최대 8개) 칩이
+                  줄바꿈하며 카드 높이를 밀었고, 판매자가 쓴 건 목록이 아니라 한 줄 표기다. */}
               <div style={specRow}>
                 <span style={specLabel}>풀 조합</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {page.spec.glues.map((g) => (
-                      <Chip key={g}>{g}</Chip>
-                    ))}
-                  </div>
-                </div>
+                <span style={specValue}>{page.spec.glue}</span>
               </div>
               <div style={specRow}>
                 <span style={specLabel}>향</span>

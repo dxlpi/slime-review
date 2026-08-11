@@ -96,7 +96,7 @@ export const page = {
   },
 
   spec: {
-    glues: ['풀 1 자리', '풀 2 자리'],
+    glue: '풀 1 자리 + 풀 2 자리',
     scent: '향 이름 · 계열 자리',
     slimeType: '종류 자리 (폼볼 · 디폼 · 클라우드)',
     texture: '질감 설명 자리 (버터 · 클리어 · 크런치)',

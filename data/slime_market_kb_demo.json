@@ -27,7 +27,9 @@
       "handles_alt": [],
       "market_word": "봄",
       "choseong": "ㅂ",
-      "choseong_aliases": [],
+      "choseong_aliases": [
+        "ㅂㅅㄹㅇ"
+      ],
       "aliases": [],
       "products": [],
       "logo": "data/market_logos/bom__slime.jpg"
@@ -161,8 +163,14 @@
       "handles_alt": [],
       "market_word": "지나",
       "choseong": "ㅈㄴ",
-      "choseong_aliases": [],
-      "aliases": ["슬지나", "쿨라임"],
+      "choseong_aliases": [
+        "ㅅㅈㄴ",
+        "ㅅㄹㅇㅈㄴ"
+      ],
+      "aliases": [
+        "슬지나",
+        "쿨라임"
+      ],
       "products": [],
       "logo": "data/market_logos/slime_gina_.jpg"
     },
@@ -176,6 +184,272 @@
       "aliases": [],
       "products": [],
       "logo": "data/market_logos/swampylandslime.jpg"
+    },
+    {
+      "market": "코코모",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "코코모",
+      "choseong": "ㅋㅋㅁ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "플로라",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "플로라",
+      "choseong": "ㅍㄹㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "호씨",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "호씨",
+      "choseong": "ㅎㅆ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "슬라임버니",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "슬라임버니",
+      "choseong": "ㅅㄹㅇㅂㄴ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "신기동",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "신기동",
+      "choseong": "ㅅㄱㄷ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "에러",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "에러",
+      "choseong": "ㅇㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "에스지",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "에스지",
+      "choseong": "ㅇㅅㅈ",
+      "choseong_aliases": [],
+      "aliases": [
+        "SG"
+      ],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "마나",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "마나",
+      "choseong": "ㅁㄴ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "진라임",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "진라임",
+      "choseong": "ㅈㄹㅇ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "페페롱",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "페페롱",
+      "choseong": "ㅍㅍㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "알파카",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "알파카",
+      "choseong": "ㅇㅍㅋ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "삐야",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "삐야",
+      "choseong": "ㅃㅇ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "코지",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "코지",
+      "choseong": "ㅋㅈ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "띵이",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "띵이",
+      "choseong": "ㄸㅇ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "파스텔로",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "파스텔로",
+      "choseong": "ㅍㅅㅌㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "코멜리",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "코멜리",
+      "choseong": "ㅋㅁㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "스르륵",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "스르륵",
+      "choseong": "ㅅㄹㄹ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "어바웃타임",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "어탐",
+      "choseong": "ㅇㅌ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "블루벨",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "블루벨",
+      "choseong": "ㅂㄹㅂ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "토피",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "토피",
+      "choseong": "ㅌㅍ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "포코",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "포코",
+      "choseong": "ㅍㅋ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "뭉슬라임",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "뭉슬라임",
+      "choseong": "ㅁㅅㄹㅇ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "포이",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "포이",
+      "choseong": "ㅍㅇ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
+    },
+    {
+      "market": "애플검",
+      "handle": "",
+      "handles_alt": [],
+      "market_word": "애플검",
+      "choseong": "ㅇㅍㄱ",
+      "choseong_aliases": [],
+      "aliases": [],
+      "products": [],
+      "logo": null
     }
   ]
 }
